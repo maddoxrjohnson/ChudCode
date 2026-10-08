@@ -1,0 +1,131 @@
+{
+  "$comment": "The canonical pattern taxonomy. Pattern ids are the only valid `pattern:<id>` review keys and the only values write_problem accepts in `patterns`. Keep ids stable: changing one orphans every review event recorded under it.",
+  "patterns": [
+    {
+      "id": "arrays-hashing",
+      "name": "Arrays & Hashing",
+      "blurb": "Frequency maps, set membership, prefix sums, and in-place index tricks.",
+      "typicalComplexity": "O(n) time, O(n) space"
+    },
+    {
+      "id": "two-pointers",
+      "name": "Two Pointers",
+      "blurb": "Converging or chasing indices over sorted or partitioned input.",
+      "typicalComplexity": "O(n) time, O(1) space"
+    },
+    {
+      "id": "sliding-window",
+      "name": "Sliding Window",
+      "blurb": "A contiguous range that grows and shrinks while maintaining an invariant.",
+      "typicalComplexity": "O(n) time, O(k) space"
+    },
+    {
+      "id": "stack",
+      "name": "Stack & Monotonic Stack",
+      "blurb": "Matching, nesting, and next-greater problems solved with LIFO order.",
+      "typicalComplexity": "O(n) time, O(n) space"
+    },
+    {
+      "id": "binary-search",
+      "name": "Binary Search",
+      "blurb": "Halving a sorted range or a monotonic answer space.",
+      "typicalComplexity": "O(log n) time, O(1) space"
+    },
+    {
+      "id": "linked-list",
+      "name": "Linked List",
+      "blurb": "Pointer surgery: reversal, cycle detection, merging, fast and slow runners.",
+      "typicalComplexity": "O(n) time, O(1) space"
+    },
+    {
+      "id": "trees",
+      "name": "Trees (DFS & BFS)",
+      "blurb": "Recursive and level-order traversal, subtree properties, and BST invariants.",
+      "typicalComplexity": "O(n) time, O(h) space"
+    },
+    {
+      "id": "tries",
+      "name": "Tries",
+      "blurb": "Prefix trees for word lookup, autocomplete, and wildcard matching.",
+      "typicalComplexity": "O(L) per operation"
+    },
+    {
+      "id": "heap",
+      "name": "Heap / Priority Queue",
+      "blurb": "Top-k selection, streaming medians, and scheduling by smallest or largest.",
+      "typicalComplexity": "O(n log k) time, O(k) space"
+    },
+    {
+      "id": "backtracking",
+      "name": "Backtracking",
+      "blurb": "Exhaustive search with pruning: subsets, permutations, and constraint placement.",
+      "typicalComplexity": "Exponential; pruning determines practicality"
+    },
+    {
+      "id": "graphs",
+      "name": "Graphs (DFS & BFS)",
+      "blurb": "Traversal, connected components, grids as graphs, and cycle detection.",
+      "typicalComplexity": "O(V + E) time, O(V) space"
+    },
+    {
+      "id": "union-find",
+      "name": "Union-Find",
+      "blurb": "Disjoint sets with path compression for connectivity and merging queries.",
+      "typicalComplexity": "Near O(1) amortized per operation"
+    },
+    {
+      "id": "topological-sort",
+      "name": "Topological Sort",
+      "blurb": "Ordering a DAG by dependencies with Kahn's algorithm or DFS finishing order.",
+      "typicalComplexity": "O(V + E) time, O(V) space"
+    },
+    {
+      "id": "shortest-path",
+      "name": "Shortest Paths",
+      "blurb": "Dijkstra, Bellman-Ford, and BFS on weighted or unweighted graphs.",
+      "typicalComplexity": "O((V + E) log V) time"
+    },
+    {
+      "id": "dp-1d",
+      "name": "1-D Dynamic Programming",
+      "blurb": "Linear state over a sequence: climbing stairs, house robber, coin change.",
+      "typicalComplexity": "O(n) or O(n·k) time"
+    },
+    {
+      "id": "dp-2d",
+      "name": "2-D Dynamic Programming",
+      "blurb": "Grid or two-sequence state: edit distance, LCS, unique paths.",
+      "typicalComplexity": "O(n·m) time, O(n·m) or O(min(n, m)) space"
+    },
+    {
+      "id": "greedy",
+      "name": "Greedy",
+      "blurb": "Locally optimal choices with an exchange argument that makes them globally optimal.",
+      "typicalComplexity": "O(n log n) time, usually from a sort"
+    },
+    {
+      "id": "intervals",
+      "name": "Intervals",
+      "blurb": "Sorting by start or end to merge, insert, or count overlaps.",
+      "typicalComplexity": "O(n log n) time, O(n) space"
+    },
+    {
+      "id": "math-geometry",
+      "name": "Math & Geometry",
+      "blurb": "Number theory, matrix rotation, spiral traversal, and arithmetic edge cases.",
+      "typicalComplexity": "Varies by problem"
+    },
+    {
+      "id": "bit-manipulation",
+      "name": "Bit Manipulation",
+      "blurb": "XOR tricks, bit counting, and masks as sets.",
+      "typicalComplexity": "O(1) or O(log n) per operation"
+    },
+    {
+      "id": "design",
+      "name": "Data Structure Design",
+      "blurb": "LRU cache, min stack, iterators: composing structures to hit per-operation targets.",
+      "typicalComplexity": "O(1) per operation is usually the target"
+    }
+  ]
+}

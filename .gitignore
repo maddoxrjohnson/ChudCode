@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+*.tgz
+.DS_Store
+
+# Local state created by dev scripts that point CHUDCODE_DIR at the repo
+.chudcode/

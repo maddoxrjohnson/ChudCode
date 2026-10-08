@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      # The runner integration tests execute real Python; keep CI on the same minor the
+      # tool targets locally.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run check
+      - run: npm test
+      # Audit only what ships: dev tooling never runs for users, and auditing it would
+      # bury a real runtime finding under permanent noise.
+      - name: Audit production dependencies
+        run: npm run audit

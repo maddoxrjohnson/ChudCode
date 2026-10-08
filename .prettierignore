@@ -1,0 +1,5 @@
+node_modules/
+package-lock.json
+assets/vendor/
+data/seed/*.json
+coverage/

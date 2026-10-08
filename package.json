@@ -1,0 +1,47 @@
+{
+  "name": "chudcode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A mock technical interviewer you can code against: original interview-style problems in a local web UI with an editor, hidden tests, a timer, hints, and spaced review of the patterns you miss.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Maddox Johnson",
+  "homepage": "https://github.com/maddoxrjohnson/ChudCode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maddoxrjohnson/ChudCode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maddoxrjohnson/ChudCode/issues"
+  },
+  "keywords": [
+    "interview",
+    "coding-interview",
+    "leetcode",
+    "practice",
+    "mcp",
+    "claude-code"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit": "npm audit --omit=dev --audit-level=moderate"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.5",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}
