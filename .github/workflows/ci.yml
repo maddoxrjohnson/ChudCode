@@ -32,3 +32,16 @@ jobs:
       # bury a real runtime finding under permanent noise.
       - name: Audit production dependencies
         run: npm run audit
+
+  editor-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run bundle:editor
+      # The committed bundle must match what the pinned esbuild and CodeMirror produce.
+      - run: git diff --exit-code -- assets/vendor

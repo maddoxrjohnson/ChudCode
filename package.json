@@ -32,7 +32,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "audit": "npm audit --omit=dev --audit-level=moderate"
+    "audit": "npm audit --omit=dev --audit-level=moderate",
+    "bundle:editor": "node scripts/bundle-editor.mjs",
+    "serve": "node scripts/serve.ts",
+    "solve": "node scripts/run.ts"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "6.20.3",

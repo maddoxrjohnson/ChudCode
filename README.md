@@ -35,11 +35,17 @@ Requires Node 22.18 or later and Python 3.12 or later.
 
 ```sh
 npm install
+npm run serve            # open the example problem in your browser, no agent needed
 npm test
-npm run check    # typecheck
+npm run check            # typecheck
 npm run lint
 npm run format
+npm run bundle:editor    # rebuild assets/vendor after editing assets/editor/entry.mjs
 ```
+
+The runner executes solutions in a separate process with memory, CPU, and wall-clock
+limits. It is not a security sandbox: code runs as you, with your filesystem and
+network. Treat it the way you would treat running a script you wrote yourself.
 
 ## License
 
