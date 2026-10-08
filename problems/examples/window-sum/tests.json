@@ -1,0 +1,109 @@
+{
+  "cases": [
+    {
+      "id": "ex1",
+      "label": "Example 1",
+      "visible": true,
+      "input": {
+        "nums": [2, 1, 5, 1, 3, 2],
+        "k": 3
+      },
+      "expected": 9
+    },
+    {
+      "id": "ex2",
+      "label": "Example 2",
+      "visible": true,
+      "input": {
+        "nums": [-4, -2, -7, -1],
+        "k": 2
+      },
+      "expected": -6
+    },
+    {
+      "id": "ex3",
+      "label": "Example 3",
+      "visible": true,
+      "input": {
+        "nums": [1, 2],
+        "k": 3
+      },
+      "expected": 0
+    },
+    {
+      "id": "empty",
+      "visible": false,
+      "input": {
+        "nums": [],
+        "k": 1
+      },
+      "expected": 0
+    },
+    {
+      "id": "single",
+      "visible": false,
+      "input": {
+        "nums": [7],
+        "k": 1
+      },
+      "expected": 7
+    },
+    {
+      "id": "k-equals-n",
+      "visible": false,
+      "input": {
+        "nums": [3, -1, 4],
+        "k": 3
+      },
+      "expected": 6
+    },
+    {
+      "id": "all-negative",
+      "visible": false,
+      "input": {
+        "nums": [-5, -3, -8, -2, -9],
+        "k": 2
+      },
+      "expected": -8
+    },
+    {
+      "id": "best-at-end",
+      "visible": false,
+      "input": {
+        "nums": [1, 1, 1, 1, 9, 9],
+        "k": 2
+      },
+      "expected": 18
+    },
+    {
+      "id": "best-at-start",
+      "visible": false,
+      "input": {
+        "nums": [9, 9, 1, 1, 1, 1],
+        "k": 2
+      },
+      "expected": 18
+    },
+    {
+      "id": "duplicates",
+      "visible": false,
+      "input": {
+        "nums": [4, 4, 4, 4],
+        "k": 2
+      },
+      "expected": 8
+    },
+    {
+      "id": "large-random",
+      "visible": false,
+      "gen": "large(100000, 33333)",
+      "expected": 2477188
+    },
+    {
+      "id": "large-alternating",
+      "visible": false,
+      "gen": "large_alternating(100000, 2)",
+      "expected": 0
+    }
+  ]
+}

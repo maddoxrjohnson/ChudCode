@@ -1,0 +1,16 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "text": "Recomputing the sum of every window from scratch costs O(n·k). What stays the same between one window and the next?"
+    },
+    {
+      "level": 2,
+      "text": "When the window slides one step to the right, exactly one element enters and one leaves. Adjust a running sum by those two values."
+    },
+    {
+      "level": 3,
+      "text": "Initialise the running sum with the first k elements, then for each i from k to n-1 add nums[i], subtract nums[i-k], and track the maximum."
+    }
+  ]
+}

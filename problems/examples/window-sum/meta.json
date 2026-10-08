@@ -1,0 +1,20 @@
+{
+  "slug": "window-sum",
+  "title": "Largest Window Sum",
+  "patterns": ["sliding-window"],
+  "difficulty": "easy",
+  "language": "python",
+  "signature": {
+    "style": "function",
+    "name": "max_window_sum",
+    "params": [
+      { "name": "nums", "type": "List[int]" },
+      { "name": "k", "type": "int" }
+    ],
+    "returns": "int"
+  },
+  "complexityTarget": { "time": "O(n)", "space": "O(1)" },
+  "source": { "kind": "hand" },
+  "createdAt": 1759881600000,
+  "timesServed": 0
+}
