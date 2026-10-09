@@ -19,3 +19,11 @@ follows pi-teach closely enough that the lineage is worth knowing, its header sa
 
 - `src/review.ts` re-implements pi-teach's Leitner scheduler (`src/review.ts`) with
   pattern and problem keys in place of quiz questions.
+- `src/mcp.ts` follows pi-teach's `src/mcp.ts`: a hand-written JSON-RPC dispatcher
+  and an inbox that holds browser events until the agent's long-polling wait tool asks
+  for them. ChudCode's inbox lets a new wait supersede an abandoned one and adds an
+  activity digest.
+- `src/store/paths.ts` keeps the same traversal guard and strict id validation as
+  pi-teach's `src/paths.ts`.
+- `mcp/launch.mjs` does what pi-teach's launcher does: check the Node version, install
+  runtime dependencies on first run, then import the TypeScript server.

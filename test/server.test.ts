@@ -9,7 +9,7 @@ import type { CandidateEvent } from "../src/server/hooks.ts";
 import { setHooks } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
 import { createSession, readSession } from "../src/store/sessions.ts";
-import { makeFixture, seedExample, type Fixture } from "./helpers.ts";
+import { makeFixture, openStream as openStreamAt, seedExample, type Fixture } from "./helpers.ts";
 
 let fixture: Fixture;
 let baseUrl: string;
@@ -45,61 +45,7 @@ const send = (method: string, path: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 const post = (path: string, body: unknown = {}) => send("POST", path, body);
-
-interface Frame {
-  type: string;
-  data: unknown;
-}
-
-/** An open SSE connection that resolves frames on demand. */
-async function openStream(path: string) {
-  const controller = new AbortController();
-  const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
-  if (!res.body) throw new Error("no body");
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const queue: Frame[] = [];
-
-  async function pump(): Promise<boolean> {
-    const { value, done } = await reader.read();
-    if (done) return false;
-    buffer += decoder.decode(value, { stream: true });
-    let idx: number;
-    while ((idx = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 2);
-      let type = "message";
-      let data = "";
-      for (const line of raw.split("\n")) {
-        if (line.startsWith("event: ")) type = line.slice(7);
-        else if (line.startsWith("data: ")) data += line.slice(6);
-      }
-      if (data) queue.push({ type, data: JSON.parse(data) });
-    }
-    return true;
-  }
-
-  return {
-    status: res.status,
-    async next(predicate: (frame: Frame) => boolean, timeoutMs = 5_000): Promise<Frame> {
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        const index = queue.findIndex(predicate);
-        if (index !== -1) return queue.splice(index, 1)[0] as Frame;
-        const more = await Promise.race([
-          pump(),
-          new Promise<boolean>((r) => setTimeout(() => r(true), 200)),
-        ]);
-        if (!more) break;
-      }
-      throw new Error("timed out waiting for an SSE frame");
-    },
-    close() {
-      controller.abort();
-    },
-  };
-}
+const openStream = (path: string) => openStreamAt(baseUrl, path);
 
 describe("pages", () => {
   it("serves the dashboard", async () => {

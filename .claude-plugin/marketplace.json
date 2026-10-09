@@ -1,0 +1,12 @@
+{
+  "name": "chudcode",
+  "owner": { "name": "Maddox Johnson" },
+  "description": "Mock coding interviews for Claude Code: a local interview pad with hidden tests, a timer, hints, and a scored debrief.",
+  "plugins": [
+    {
+      "name": "chudcode",
+      "source": "./",
+      "description": "A mock technical interviewer you can code against."
+    }
+  ]
+}

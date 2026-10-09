@@ -7,6 +7,7 @@
  */
 
 import type { SessionState } from "../../flow.ts";
+import { formatClock } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
 import { examplesHtml, statementHtml } from "./problem.ts";
@@ -138,13 +139,6 @@ export function sessionPage(state: SessionState, options: SessionPageOptions): s
     },
     module: "runtime/session/main.mjs",
   });
-}
-
-export function formatClock(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function rubricHtml(session: SessionState["session"]): string {

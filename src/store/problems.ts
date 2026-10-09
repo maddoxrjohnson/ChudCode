@@ -210,6 +210,23 @@ export function writeTests(slug: string, cases: TestCase[]): void {
   writeJson(path.join(problemDir(slug), "tests.json"), { cases });
 }
 
+/**
+ * Import every bundled example that is not already present. A fresh install has no
+ * problems until the agent authors one, so this gives the first session something
+ * to serve. Returns the slugs it imported.
+ */
+export function importAllExamples(): string[] {
+  const source = examplesDir();
+  if (!isDir(source)) return [];
+  const imported: string[] = [];
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !isValidSlug(entry.name) || problemExists(entry.name)) continue;
+    importExample(entry.name);
+    imported.push(entry.name);
+  }
+  return imported;
+}
+
 /** Copy a bundled example into the learner's problems directory if it is not there. */
 export function importExample(slug: string): ProblemBundle {
   if (problemExists(slug)) return readProblem(slug);

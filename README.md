@@ -9,7 +9,24 @@ them, probes edge cases and complexity after you submit, and scores the session 
 rubric. Patterns you miss come back on a spaced-review schedule with a fresh problem,
 not the one you already saw.
 
-**Status:** early development. Nothing is installable yet.
+**Status:** early development. Mock interviews work on the bundled example problem.
+Problem generation and spaced review are next.
+
+## Install
+
+ChudCode is a Claude Code plugin. It needs Node 22.18 or later and Python 3.12 or
+later on your PATH.
+
+```sh
+claude plugin marketplace add maddoxrjohnson/ChudCode
+claude plugin install chudcode@chudcode
+```
+
+Then, in Claude Code, say "give me a mock interview on sliding windows" or run
+`/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
+`/chudcode:dashboard` shows past sessions.
+
+To try a checkout without installing it: `claude --plugin-dir /path/to/ChudCode`.
 
 ## Why
 
@@ -27,7 +44,7 @@ make sure the patterns you keep missing are the ones you see again.
 - Problems generated per pattern and difficulty, validated against a reference solution
   before you ever see them. No copyrighted problem statements.
 - Leitner spaced review over patterns, and a dashboard of what is due.
-- Claude Code plugin first; Pi support through the same MCP server later.
+- Pi support through the same MCP server.
 
 ## Development
 

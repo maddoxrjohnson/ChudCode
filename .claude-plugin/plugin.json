@@ -1,0 +1,20 @@
+{
+  "name": "chudcode",
+  "displayName": "ChudCode",
+  "version": "0.1.0",
+  "description": "A mock technical interviewer you can code against: interview-style problems in a local web page with an editor, hidden tests, a timer, hints, follow-up questions, and a scored debrief.",
+  "author": {
+    "name": "Maddox Johnson"
+  },
+  "homepage": "https://github.com/maddoxrjohnson/ChudCode#readme",
+  "repository": "https://github.com/maddoxrjohnson/ChudCode",
+  "license": "MIT",
+  "keywords": ["interview", "coding-interview", "leetcode", "practice", "mock-interview"],
+  "mcpServers": {
+    "chudcode": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"],
+      "timeout": 3600000
+    }
+  }
+}

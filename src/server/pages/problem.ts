@@ -2,34 +2,12 @@
  * problem.ts: statement and examples, shared by the session page and the preview.
  */
 
+import { formatInput, formatValue } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
 import type { PublicCase, PublicProblem } from "../../store/problems.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
 
-/** `nums = [2, 1, 5], k = 3`, in the order the signature declares. */
-export function formatInput(input: Record<string, unknown>, order: string[]): string {
-  const keys = [
-    ...order.filter((k) => k in input),
-    ...Object.keys(input).filter((k) => !order.includes(k)),
-  ];
-  return keys.map((k) => `${k} = ${formatValue(input[k])}`).join(", ");
-}
-
-export function formatValue(value: unknown): string {
-  if (value === undefined) return "—";
-  if (value === null) return "None";
-  if (value === true) return "True";
-  if (value === false) return "False";
-  if (typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "number") return String(value);
-  if (Array.isArray(value)) return `[${value.map(formatValue).join(", ")}]`;
-  if (typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .map(([k, v]) => `${JSON.stringify(k)}: ${formatValue(v)}`)
-      .join(", ")}}`;
-  }
-  return String(value);
-}
+export { formatInput, formatValue };
 
 export function examplesHtml(cases: PublicCase[], paramOrder: string[]): string {
   if (cases.length === 0) return "";

@@ -5,10 +5,12 @@
  * With no hook registered (tests, the solo dev server) events are simply dropped.
  */
 
-import type { RunResult } from "../runner/types.ts";
+import type { RunResult, RunStatus } from "../runner/types.ts";
 
 export type CandidateEvent = { sessionId: string; at: number } & (
   | { kind: "started" }
+  /** A Run-button execution. Informational: it never wakes a waiting interviewer. */
+  | { kind: "run"; scope: "visible" | "custom"; status: RunStatus; passed: number; total: number }
   | { kind: "note"; text: string }
   | { kind: "message"; text: string }
   | { kind: "hint_used"; level: number }

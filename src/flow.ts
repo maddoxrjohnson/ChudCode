@@ -8,14 +8,22 @@
  */
 
 import { renderMarkdown } from "./markdown.ts";
+import {
+  makeKey,
+  relativeDay,
+  scheduleItems,
+  type ReviewEvent,
+  type ScheduleOptions,
+} from "./review.ts";
 import { pythonAdapter } from "./runner/adapters/python/adapter.ts";
 import type { CandidateRunResult } from "./runner/sanitize.ts";
 import type { CaseResult } from "./runner/types.ts";
-import { runCode } from "./runs.ts";
+import { runCode, type RunOutcome, type RunScope } from "./runs.ts";
 import { emitCandidateEvent } from "./server/hooks.ts";
 import { push, sessionChannel } from "./server/sse.ts";
 import { readConfig, type Config } from "./store/config.ts";
 import { publicView, readProblem, type Hint, type PublicProblem } from "./store/problems.ts";
+import { appendReviewEvents, readReviewEvents } from "./store/review-events.ts";
 import {
   appendEvent,
   readDraft,
@@ -23,8 +31,10 @@ import {
   readSession,
   recordSubmission,
   updateSession,
+  type Rubric,
   type Session,
   type SessionEvent,
+  type Verdict,
 } from "./store/sessions.ts";
 
 export class FlowError extends Error {
@@ -84,7 +94,11 @@ export function remaining(session: Session, now: number): number | null {
 
 // ── Candidate actions ─────────────────────────────────────────────────────────
 
-export function startSession(id: string, now = Date.now()): Session {
+export function startSession(
+  id: string,
+  now = Date.now(),
+  by: "candidate" | "interviewer" = "candidate",
+): Session {
   const session = updateSession(id, (s) => {
     if (s.phase === "done") throw new FlowError(409, "This session is finished");
     if (s.startedAt !== undefined) return;
@@ -94,7 +108,8 @@ export function startSession(id: string, now = Date.now()): Session {
   if (session.startedAt === now) {
     appendEvent(id, { type: "started", at: now });
     pushPhase(session);
-    emitCandidateEvent({ kind: "started", sessionId: id, at: now });
+    // Only a candidate's own press is news to the interviewer.
+    if (by === "candidate") emitCandidateEvent({ kind: "started", sessionId: id, at: now });
   }
   return session;
 }
@@ -198,6 +213,15 @@ export async function runVisible(
     at: Date.now(),
   });
   push(sessionChannel(id), "run", { runId, kind, result: candidate });
+  emitCandidateEvent({
+    kind: "run",
+    sessionId: id,
+    scope: kind,
+    status: result.status,
+    passed: result.passed,
+    total: result.total,
+    at: Date.now(),
+  });
   return { runId, candidate };
 }
 
@@ -265,6 +289,178 @@ export function candidateDone(id: string, now = Date.now()): Session {
     emitCandidateEvent({ kind: "candidate_done", sessionId: id, at: now });
   }
   return session;
+}
+
+// ── Interviewer actions ───────────────────────────────────────────────────────
+
+/** Run the candidate's current draft on the interviewer's behalf. */
+export async function interviewerRun(
+  id: string,
+  scope: RunScope,
+  showCandidate: boolean,
+  config: Config = readConfig(),
+): Promise<RunOutcome & { code: string }> {
+  const session = readSession(id);
+  if (session.phase === "done") throw new FlowError(409, "This session is finished");
+  const bundle = readProblem(session.problem);
+  const code = readDraft(id) ?? pythonAdapter.stub(bundle.meta.signature);
+  const outcome = await runCode({
+    bundle,
+    code,
+    scope,
+    limits: scope === "all" ? config.limits.submit : config.limits.run,
+    revealFailingInput: bundle.meta.revealFailingInput ?? config.revealFailingInput,
+  });
+  const { result } = outcome;
+  appendEvent(id, {
+    type: "run",
+    kind: "interviewer",
+    status: result.status,
+    passed: result.passed,
+    total: result.total,
+    at: Date.now(),
+  });
+  if (showCandidate)
+    push(sessionChannel(id), "run", {
+      runId: newRunId(),
+      kind: "interviewer",
+      result: outcome.candidate,
+    });
+  return { ...outcome, code };
+}
+
+export interface RubricScores {
+  correctness: number;
+  communication: number;
+  complexity: number;
+  codeQuality: number;
+  time: number;
+}
+
+export interface RecordInput {
+  rubric: RubricScores;
+  complexityOk: boolean;
+  notesMd: string;
+  strengths: string[];
+  improvements: string[];
+}
+
+export interface RecordOutcome {
+  session: Session;
+  reviewEvents: ReviewEvent[];
+  /** One line per pattern saying when it comes back for review. */
+  nextDue: string[];
+}
+
+/**
+ * Score the session, decide the verdict, and schedule its patterns for review.
+ *
+ * The verdict is mechanical where it can be: all hidden tests passed on the last
+ * submission, and the clock had not run out when the candidate finished. Whether the
+ * complexity met the target is the interviewer's call.
+ */
+export function recordSession(id: string, input: RecordInput, now = Date.now()): RecordOutcome {
+  const before = readSession(id);
+  if (before.phase === "done") throw new FlowError(409, "This session is already recorded");
+  for (const [key, value] of Object.entries(input.rubric)) {
+    if (!Number.isInteger(value) || value < 0 || value > 4) {
+      throw new FlowError(400, `rubric.${key} must be an integer from 0 to 4`);
+    }
+  }
+
+  const endedAt = before.endedAt ?? now;
+  const last = before.lastResult;
+  const allPassed =
+    last !== undefined && last.status === "ok" && last.passed === last.total && last.total > 0;
+  const withinTime = before.startedAt !== undefined && endedAt - before.startedAt <= before.timerMs;
+  const verdict: Verdict = {
+    correct: allPassed && withinTime && input.complexityOk,
+    allPassed,
+    withinTime,
+    complexityOk: input.complexityOk,
+  };
+  const rubric: Rubric = {
+    ...input.rubric,
+    notesMd: input.notesMd,
+    strengths: input.strengths,
+    improvements: input.improvements,
+  };
+
+  const session = updateSession(id, (s) => {
+    s.phase = "done";
+    s.endedAt = endedAt;
+    s.rubric = rubric;
+    s.verdict = verdict;
+  });
+  appendEvent(id, { type: "rubric", at: now });
+
+  const reviewEvents = reviewEventsFor(session, verdict.correct, now);
+  appendReviewEvents(reviewEvents);
+  const nextDue = nextDueLines(session, now);
+
+  push(sessionChannel(id), "rubric", {
+    rubric,
+    verdict,
+    notesHtml: renderMarkdown(input.notesMd),
+    nextDue: nextDue.join(" "),
+  });
+  pushPhase(session);
+  return { session, reviewEvents, nextDue };
+}
+
+/**
+ * End a session without a debrief. Counts as a miss for its patterns unless the
+ * reason is `interrupted`, which means the session did not reflect the candidate.
+ */
+export function abandonSession(id: string, reason: string, now = Date.now()): RecordOutcome {
+  const before = readSession(id);
+  if (before.phase === "done") throw new FlowError(409, "This session is already finished");
+  const trimmed = reason.trim() || "abandoned";
+  const session = updateSession(id, (s) => {
+    s.phase = "done";
+    s.endedAt = s.endedAt ?? now;
+    s.abandonedReason = trimmed;
+  });
+  appendEvent(id, { type: "abandoned", reason: trimmed, at: now });
+  const reviewEvents = trimmed === "interrupted" ? [] : reviewEventsFor(session, false, now);
+  appendReviewEvents(reviewEvents);
+  pushPhase(session);
+  return { session, reviewEvents, nextDue: reviewEvents.length ? nextDueLines(session, now) : [] };
+}
+
+function reviewEventsFor(session: Session, correct: boolean, now: number): ReviewEvent[] {
+  const keys = [
+    ...session.patterns.map((p) => makeKey("pattern", p)),
+    makeKey("problem", session.problem),
+  ];
+  return keys.map((key) => {
+    const event: ReviewEvent = {
+      key,
+      at: now,
+      correct,
+      session: session.id,
+      difficulty: session.difficulty,
+      hintsUsed: session.hintsUsed.length,
+    };
+    if (session.startedAt !== undefined && session.endedAt !== undefined) {
+      event.timeMs = session.endedAt - session.startedAt;
+    }
+    return event;
+  });
+}
+
+export function scheduleOptions(config: Config = readConfig()): ScheduleOptions | undefined {
+  return config.reviewIntervalsDays ? { intervalsDays: config.reviewIntervalsDays } : undefined;
+}
+
+function nextDueLines(session: Session, now: number): string[] {
+  const items = scheduleItems(readReviewEvents(), scheduleOptions());
+  return session.patterns.flatMap((pattern) => {
+    const item = items.find((i) => i.key === makeKey("pattern", pattern));
+    return item
+      ? [`${pattern} comes back for review ${relativeDay(item.dueAt, now)} (box ${item.box}).`]
+      : [];
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
