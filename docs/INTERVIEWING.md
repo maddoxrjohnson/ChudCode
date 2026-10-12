@@ -97,27 +97,80 @@ nothing to do with the candidate (the user had to leave, something broke), with
 `abandon_session` and a reason. An abandoned session counts as a miss for its
 patterns unless the reason is `interrupted`.
 
+## Authoring a problem
+
+Most sessions need a problem that does not exist yet: the candidate has seen what is
+on disk, or asked for a pattern nothing covers, or named a real problem. You write it,
+prove it, then serve it.
+
+**Originality.** Every problem you write is yours. Invent the setting, the objects,
+and the examples. Never reproduce a statement from LeetCode or anywhere else, and
+never put a site name or a link in a statement. The seed lists (`lookup_seed`) hold
+titles, difficulty, and patterns only; use them to learn what shape a pattern takes
+in real interviews and how hard each shape is.
+
+**Mimic.** When the user names a real problem ("like Two Sum"), the brief tells you
+its pattern and difficulty if a seed list has it. Write an original problem that
+drills the same pattern under the same kind of constraints: the same input sizes and
+value ranges, the same twist that makes the pattern necessary, a different story. Set
+`source.kind` to `mimic` and `mimic_of` to the title. The candidate should recognise
+the technique, not the problem.
+
+**Difficulty.** Easy is one pattern applied directly, about fifteen minutes. Medium
+is a pattern with a twist or two patterns combined, the typical thirty-five-minute
+screen. Hard needs a non-obvious reduction or a tight bound. Match what the user
+asked for, or their history: a candidate who solved the last two easies gets a
+medium.
+
+**Hidden tests.** Hidden cases exist to catch the solutions that pass the examples.
+Cover: empty input and the smallest allowed input; a single element; all elements
+equal; zero and negatives where allowed; the answer at the first and at the last
+position; an input where the obvious greedy or brute force is wrong; and the maximum
+size from the constraints, built by a generator, shaped so that a solution one factor
+too slow cannot finish. Six hidden cases is the floor, not the target. Every example
+in the statement is a visible case, in the same order.
+
+**Reference and target.** The reference is the optimal solution, written cleanly. It
+is the oracle for generated cases and the standard the candidate is scored against.
+Set the complexity target to its bounds. Validation runs it with a one-second
+per-case limit, so a reference that is too slow at max size fails, by design.
+
+**Hints.** Two to four, each more specific than the last: a question about structure,
+then the key observation, then the mechanism, then (for hard problems) the step that
+makes it work. Never code.
+
+**The loop.** `write_problem`, then `validate_problem`, then read the report. It
+fails when the reference disagrees with an authored expected output (trace that case
+by hand to see which is wrong), when a case errors or times out, or when the bundle is
+too thin. Fix with `write_problem` under the same slug and validate again. Never
+serve a problem that has not passed; `start_session` refuses. Do not show the
+candidate a problem you are still fixing.
+
 ## Tools
 
-| Tool                 | Use it to                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `begin_interview`    | Get this method, the rubric, and what the candidate has done before. Call it first.      |
-| `list_problems`      | See the problems on disk, with patterns, difficulty, and how often each has been served. |
-| `start_session`      | Create a session for a problem and get its URL. It starts the local server if needed.    |
-| `open_dashboard`     | Open the dashboard and recover any sessions in progress.                                 |
-| `wait_for_candidate` | Receive the candidate's actions. Call it whenever you are not doing something else.      |
-| `get_session`        | See the state of a session, including the draft code when you ask for it.                |
-| `say_to_candidate`   | Speak on the page. The only way your words reach the candidate.                          |
-| `reveal_hint`        | Give the next hint from the ladder, recorded.                                            |
-| `run_tests`          | Run their draft against visible, hidden, or custom inputs, optionally showing them.      |
-| `record_session`     | Score the session, decide the verdict, and schedule its patterns for review.             |
-| `abandon_session`    | End a session without a debrief.                                                         |
+| Tool                 | Use it to                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `begin_interview`    | Get this method, the rubric, and what the candidate has done before. Call it first.        |
+| `list_problems`      | See the problems on disk, with patterns, difficulty, and how often each has been served.   |
+| `lookup_seed`        | See what shape a pattern takes on Grind 75 and NeetCode 150: titles, difficulty, patterns. |
+| `write_problem`      | Store an original problem bundle. It cannot be served until it is validated.               |
+| `validate_problem`   | Run the reference against every case, fill oracle outputs, and mark the problem servable.  |
+| `start_session`      | Create a session for a problem and get its URL. It starts the local server if needed.      |
+| `open_dashboard`     | Open the dashboard and recover any sessions in progress.                                   |
+| `wait_for_candidate` | Receive the candidate's actions. Call it whenever you are not doing something else.        |
+| `get_session`        | See the state of a session, including the draft code when you ask for it.                  |
+| `say_to_candidate`   | Speak on the page. The only way your words reach the candidate.                            |
+| `reveal_hint`        | Give the next hint from the ladder, recorded.                                              |
+| `run_tests`          | Run their draft against visible, hidden, or custom inputs, optionally showing them.        |
+| `record_session`     | Score the session, decide the verdict, and schedule its patterns for review.               |
+| `abandon_session`    | End a session without a debrief.                                                           |
 
 ## Working rhythm
 
 1. `begin_interview`. Read what it returns, including the candidate's recent sessions.
-2. Choose a problem with `list_problems`, preferring one they have not seen that fits
-   the pattern or difficulty they asked for.
+2. Choose a validated problem with `list_problems`, preferring one they have not seen
+   that fits the pattern or difficulty they asked for. If none fits, author one:
+   `lookup_seed`, `write_problem`, `validate_problem` until it passes.
 3. `start_session`. Give them the URL in the terminal and one sentence on the page.
 4. `wait_for_candidate`, handle what arrives, wait again. Keep the loop going until the
    session is in follow-ups.

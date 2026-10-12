@@ -9,8 +9,9 @@ them, probes edge cases and complexity after you submit, and scores the session 
 rubric. Patterns you miss come back on a spaced-review schedule with a fresh problem,
 not the one you already saw.
 
-**Status:** early development. Mock interviews work on the bundled example problem.
-Problem generation and spaced review are next.
+**Status:** early development. Mock interviews work, and the interviewer writes its
+own problems: an original bundle per request, validated against its reference
+solution before it is served. Spaced review is next.
 
 ## Install
 
@@ -35,15 +36,21 @@ about thirty-five minutes while explaining yourself to another person. Grinding 
 problem list trains the first half. ChudCode is built to train the whole thing, and to
 make sure the patterns you keep missing are the ones you see again.
 
-## Planned
+## What works
 
 - In-browser editor with Run (visible examples) and Submit (hidden tests), autocomplete
   off by default to match real interview pads.
 - Interview flow: clarifying questions, approach note, timer, hint ladder, follow-up
   questions, and a five-dimension rubric.
-- Problems generated per pattern and difficulty, validated against a reference solution
-  before you ever see them. No copyrighted problem statements.
+- Problems written per pattern and difficulty, or modelled on the shape of a real
+  problem you name, and validated against a reference solution before you ever see
+  them. The Grind 75 and NeetCode 150 lists are vendored as titles and patterns only;
+  no problem statements are stored. See `docs/PROBLEM-FORMAT.md`.
+
+## Planned
+
 - Leitner spaced review over patterns, and a dashboard of what is due.
+- Interview trend research per company, feeding problem selection.
 - Pi support through the same MCP server.
 
 ## Development
@@ -53,6 +60,7 @@ Requires Node 22.18 or later and Python 3.12 or later.
 ```sh
 npm install
 npm run serve            # open the example problem in your browser, no agent needed
+npm run validate -- window-sum   # lint a problem bundle and run its reference against every case
 npm test
 npm run check            # typecheck
 npm run lint

@@ -14,9 +14,11 @@ import * as path from "node:path";
 import { clipText, formatClock, formatInput, formatValue, plural } from "./format.ts";
 import { remaining, type SessionState } from "./flow.ts";
 import type { RunResult, TestCase } from "./runner/types.ts";
+import { describeLists, lookupSeed, matchSeedTitle, type SeedEntry } from "./seed.ts";
 import { docsDir } from "./store/paths.ts";
 import { listProblems, patterns, type ProblemBundle, type ProblemMeta } from "./store/problems.ts";
 import { listSessions, type Session } from "./store/sessions.ts";
+import type { ValidationReport } from "./validate.ts";
 
 function readDoc(name: string): string {
   return fs.readFileSync(path.join(docsDir(), name), "utf8");
@@ -82,13 +84,16 @@ export function interviewBrief(request: BriefRequest, hostBrief: string, now = D
     parts.push(`The user wants a mock coding interview.${asked}`);
   }
   if (request.title) {
+    parts.push(seedTitleText(request.title));
     parts.push(
-      "Choose the available problem whose pattern and constraints come closest to the one they named. Do not reproduce the named problem's statement.",
+      "Treat the named problem as a shape, not a script. Author an original problem with `write_problem` that drills the same pattern under the same kind of constraints, with its own story and examples, and set `source.kind` to `mimic` with `mimic_of` naming the title. Never reproduce the named problem's statement. A validated problem on disk that already matches and has not been served is also fine.",
     );
   }
+  if (request.pattern) parts.push(seedPatternText(request.pattern));
 
   parts.push(recentSessionsText(now));
   parts.push(problemsText());
+  parts.push(authoringText());
   parts.push(readDoc("INTERVIEWING.md"));
   parts.push(readDoc("RUBRIC.md"));
   parts.push(hostBrief);
@@ -141,6 +146,39 @@ export function patternListText(): string {
   return patterns()
     .map((p) => `- \`${p.id}\`: ${p.name}. ${p.blurb}`)
     .join("\n");
+}
+
+/** `- Two Sum (easy; arrays-hashing) — Grind 75 (week 1) and NeetCode 150` */
+export function seedLine(entry: SeedEntry): string {
+  return `- ${entry.title} (${entry.difficulty}; ${entry.patterns.join(", ")}) — ${describeLists(entry)}`;
+}
+
+/** What the seed lists say about a title the user named. */
+export function seedTitleText(title: string): string {
+  const match = matchSeedTitle(title);
+  if (!match) {
+    return `No seed list has a problem named **${title}**. Go by what you know of it: its pattern, its constraints, and the twist that makes the pattern necessary. \`lookup_seed\` with a few words of the title may find it under another name.`;
+  }
+  return `**${match.title}** is on ${describeLists(match)}: ${match.difficulty}, ${match.patterns.join(", ")}.`;
+}
+
+/** The shapes a pattern takes in real interviews, from the seed lists. */
+export function seedPatternText(pattern: string, limit = 10): string {
+  const entries = lookupSeed({ pattern });
+  if (entries.length === 0) return "";
+  const shown = entries.slice(0, limit).map((e) => `${e.title} (${e.difficulty})`);
+  const more =
+    entries.length > limit ? `, and ${entries.length - limit} more via \`lookup_seed\`` : "";
+  return `## Seed problems for ${pattern}\n\nThe shapes interviewers ask on this pattern, from Grind 75 and NeetCode 150: ${shown.join(", ")}${more}. Use them to choose a realistic shape and difficulty for an original problem; do not reproduce any of them.`;
+}
+
+function authoringText(): string {
+  return [
+    "## Authoring",
+    "If no validated problem on disk fits the request and the candidate's history, write one: `lookup_seed` for the shape, `write_problem`, then `validate_problem` until it passes. The method below says what makes a good one. The field-by-field bundle format is in `" +
+      path.join(docsDir(), "PROBLEM-FORMAT.md") +
+      "` if the `write_problem` schema is not enough.",
+  ].join("\n\n");
 }
 
 // ── Event prompts ─────────────────────────────────────────────────────────────
@@ -308,6 +346,71 @@ export function resultText(
     .filter((c) => c.status === "pass")
     .map((c) => byId.get(c.id)?.label ?? c.id);
   if (passed.length > 0) lines.push("", `Passed: ${passed.join(", ")}`);
+  return lines.join("\n");
+}
+
+/** What `write_problem` returns. */
+export function writtenProblemText(bundle: ProblemBundle, lint: string[]): string {
+  const { meta } = bundle;
+  const visible = bundle.tests.filter((c) => c.visible).length;
+  const lines = [
+    `Wrote \`${meta.slug}\`: ${meta.title} (${meta.difficulty}; ${meta.patterns.join(", ")}) with ${visible} visible and ${bundle.tests.length - visible} hidden cases, ${plural(bundle.hints.length, "hint")}. Not yet validated.`,
+  ];
+  if (lint.length > 0) {
+    lines.push(
+      "",
+      `Lint found ${plural(lint.length, "problem")} that will fail validation:`,
+      ...lint.map((l) => `- ${l}`),
+      "",
+      `Fix them with \`write_problem\` (same slug), then call \`validate_problem\`.`,
+    );
+  } else {
+    lines.push(`Call \`validate_problem\` with slug "${meta.slug}".`);
+  }
+  return lines.join("\n");
+}
+
+/** What `validate_problem` returns. */
+export function validationReportText(report: ValidationReport, bundle: ProblemBundle): string {
+  const lines = [`## Validation of \`${report.slug}\``, ""];
+  lines.push(
+    report.lint.length === 0
+      ? "Shape: ok."
+      : `Shape: ${plural(report.lint.length, "problem")}:\n${report.lint.map((l) => `- ${l}`).join("\n")}`,
+  );
+  lines.push(
+    "",
+    "Reference run:",
+    resultText(
+      report.run,
+      bundle.tests,
+      bundle.meta.signature.params.map((p) => p.name),
+    ),
+  );
+  if (report.disagreements.length > 0) {
+    lines.push(
+      "",
+      `The reference disagrees with the authored expected output on ${plural(report.disagreements.length, "case")}. One of them is wrong; trace the case by hand to see which.`,
+    );
+  }
+  if (report.broken.length > 0) {
+    lines.push(
+      "",
+      `${plural(report.broken.length, "case")} did not run cleanly (${report.broken.map((c) => `${c.id}: ${c.status}`).join(", ")}). A timeout on the max-size case means the reference is slower than its complexity target; an error means the reference or a generator is broken.`,
+    );
+  }
+  if (report.filled.length > 0) {
+    lines.push(
+      "",
+      `Oracle cases filled from the reference: ${report.filled.join(", ")}${report.passed ? " (written to tests.json)" : " (not written until validation passes)"}.`,
+    );
+  }
+  lines.push(
+    "",
+    report.passed
+      ? `Validated. \`${report.slug}\` can be served: call \`start_session\`.`
+      : `Not validated. Fix the bundle with \`write_problem\` (same slug) and call \`validate_problem\` again.`,
+  );
   return lines.join("\n");
 }
 

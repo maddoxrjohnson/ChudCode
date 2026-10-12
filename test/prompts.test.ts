@@ -42,7 +42,10 @@ describe("interviewBrief", () => {
     expect(brief).toContain("review session");
     expect(brief).toContain("pattern **stack**");
     expect(brief).toContain("something like **Two Sum**");
-    expect(brief).toContain("Do not reproduce the named problem's statement");
+    expect(brief).toContain("Never reproduce the named problem's statement");
+    expect(brief).toContain("**Two Sum** is on Grind 75 (week 1) and NeetCode 150");
+    expect(brief).toContain("## Seed problems for stack");
+    expect(brief).toContain("## Authoring");
     expect(brief).toContain("## Recent sessions");
     expect(brief).toContain("## Problems on disk");
     expect(brief).toContain("# Interviewing");

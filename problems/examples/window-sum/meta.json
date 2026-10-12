@@ -16,5 +16,7 @@
   "complexityTarget": { "time": "O(n)", "space": "O(1)" },
   "source": { "kind": "hand" },
   "createdAt": 1759881600000,
+  "validatedAt": 1759881600000,
+  "validation": { "passed": 12, "total": 12 },
   "timesServed": 0
 }

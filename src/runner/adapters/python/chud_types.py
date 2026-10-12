@@ -133,6 +133,8 @@ def to_json(value, type_str=""):
 
     Duck typing decides the conversion, except that an absent node (None) for a declared
     ListNode or TreeNode becomes [], the way an empty structure is written in a test.
+    The declared type is carried into list elements, so a None inside a returned
+    List[Optional[ListNode]] becomes [] too.
     """
     if value is None and _strip_optional(type_str) in ("ListNode", "TreeNode"):
         return []
@@ -143,7 +145,9 @@ def to_json(value, type_str=""):
     if isinstance(value, bool) or value is None or isinstance(value, (int, float, str)):
         return value
     if isinstance(value, (list, tuple)):
-        return [to_json(v) for v in value]
+        inner = _LIST.match(_strip_optional(type_str))
+        element_type = inner.group(1) if inner else ""
+        return [to_json(v, element_type) for v in value]
     if isinstance(value, (set, frozenset)):
         return sorted((to_json(v) for v in value), key=_sort_key)
     if isinstance(value, dict):

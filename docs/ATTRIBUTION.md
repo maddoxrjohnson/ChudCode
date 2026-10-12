@@ -27,3 +27,14 @@ follows pi-teach closely enough that the lineage is worth knowing, its header sa
   pi-teach's `src/paths.ts`.
 - `mcp/launch.mjs` does what pi-teach's launcher does: check the Node version, install
   runtime dependencies on first run, then import the TypeScript server.
+
+## Tech Interview Handbook
+
+`data/seed/grind75.json` is the Grind 75 question list from Tech Interview Handbook
+by Yangshun Tay (https://github.com/yangshun/tech-interview-handbook), copied
+verbatim from `apps/website/contents/_components/QuestionGroups.json`. It holds
+problem titles, difficulty, topics, and links; no problem statements. Tech Interview
+Handbook is MIT licensed; its notice is in `data/seed/LICENSE.tech-interview-handbook`.
+
+`data/seed/neetcode150.json` is hand-entered from the public NeetCode 150 list and
+holds titles, difficulty, and categories only.

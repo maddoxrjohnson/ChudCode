@@ -1,0 +1,843 @@
+{
+  "Week 1": [
+    {
+      "slug": "two-sum",
+      "title": "Two Sum",
+      "url": "https://leetcode.com/problems/two-sum/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 1,
+      "topic": "array",
+      "routines": ["hashing"]
+    },
+    {
+      "slug": "valid-parentheses",
+      "title": "Valid Parentheses",
+      "url": "https://leetcode.com/problems/valid-parentheses/",
+      "duration": 20,
+      "epi": 3,
+      "difficulty": "Easy",
+      "id": 20,
+      "topic": "stack",
+      "routines": []
+    },
+    {
+      "slug": "merge-two-sorted-lists",
+      "title": "Merge Two Sorted Lists",
+      "url": "https://leetcode.com/problems/merge-two-sorted-lists/",
+      "duration": 20,
+      "epi": 0,
+      "difficulty": "Easy",
+      "id": 21,
+      "topic": "linked-list",
+      "routines": []
+    },
+    {
+      "slug": "best-time-to-buy-and-sell-stock",
+      "title": "Best Time to Buy and Sell Stock",
+      "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+      "duration": 20,
+      "epi": 0,
+      "difficulty": "Easy",
+      "id": 121,
+      "topic": "array",
+      "routines": []
+    },
+    {
+      "slug": "valid-palindrome",
+      "title": "Valid Palindrome",
+      "url": "https://leetcode.com/problems/valid-palindrome/",
+      "duration": 15,
+      "epi": 2,
+      "difficulty": "Easy",
+      "id": 125,
+      "topic": "string",
+      "routines": ["palindrome"]
+    },
+    {
+      "slug": "invert-binary-tree",
+      "title": "Invert Binary Tree",
+      "url": "https://leetcode.com/problems/invert-binary-tree/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 226,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "valid-anagram",
+      "title": "Valid Anagram",
+      "url": "https://leetcode.com/problems/valid-anagram/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 242,
+      "topic": "string",
+      "routines": ["anagram"]
+    },
+    {
+      "slug": "binary-search",
+      "title": "Binary Search",
+      "url": "https://leetcode.com/problems/binary-search/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 792,
+      "topic": "binary-search",
+      "routines": []
+    },
+    {
+      "slug": "flood-fill",
+      "title": "Flood Fill",
+      "url": "https://leetcode.com/problems/flood-fill/",
+      "duration": 20,
+      "epi": 2,
+      "difficulty": "Easy",
+      "id": 733,
+      "topic": "graph",
+      "routines": ["matrix", "depth-first-search"]
+    },
+    {
+      "slug": "lowest-common-ancestor-of-a-binary-search-tree",
+      "title": "Lowest Common Ancestor of a Binary Search Tree",
+      "url": "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/",
+      "duration": 20,
+      "epi": 1,
+      "difficulty": "Medium",
+      "id": 235,
+      "topic": "binary-search-tree",
+      "routines": []
+    },
+    {
+      "slug": "balanced-binary-tree",
+      "title": "Balanced Binary Tree",
+      "url": "https://leetcode.com/problems/balanced-binary-tree/",
+      "duration": 15,
+      "epi": 0,
+      "difficulty": "Easy",
+      "id": 110,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "linked-list-cycle",
+      "title": "Linked List Cycle",
+      "url": "https://leetcode.com/problems/linked-list-cycle/",
+      "duration": 20,
+      "epi": 1,
+      "difficulty": "Easy",
+      "id": 141,
+      "topic": "linked-list",
+      "routines": ["two-pointers"]
+    }
+  ],
+  "Week 2": [
+    {
+      "slug": "implement-queue-using-stacks",
+      "title": "Implement Queue using Stacks",
+      "url": "https://leetcode.com/problems/implement-queue-using-stacks/",
+      "duration": 20,
+      "epi": 3,
+      "difficulty": "Easy",
+      "id": 232,
+      "topic": "stack",
+      "routines": []
+    },
+    {
+      "slug": "first-bad-version",
+      "title": "First Bad Version",
+      "url": "https://leetcode.com/problems/first-bad-version/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 278,
+      "topic": "binary-search",
+      "routines": []
+    },
+    {
+      "slug": "ransom-note",
+      "title": "Ransom Note",
+      "url": "https://leetcode.com/problems/ransom-note/",
+      "duration": 15,
+      "epi": 0,
+      "difficulty": "Easy",
+      "id": 383,
+      "topic": "hash-table",
+      "routines": []
+    },
+    {
+      "slug": "climbing-stairs",
+      "title": "Climbing Stairs",
+      "url": "https://leetcode.com/problems/climbing-stairs/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 70,
+      "topic": "dynamic-programming",
+      "routines": []
+    },
+    {
+      "slug": "longest-palindrome",
+      "title": "Longest Palindrome",
+      "url": "https://leetcode.com/problems/longest-palindrome/",
+      "duration": 20,
+      "epi": 2,
+      "difficulty": "Easy",
+      "id": 409,
+      "topic": "string",
+      "routines": ["palindrome"]
+    },
+    {
+      "slug": "reverse-linked-list",
+      "title": "Reverse Linked List",
+      "url": "https://leetcode.com/problems/reverse-linked-list/",
+      "duration": 20,
+      "epi": 1,
+      "difficulty": "Easy",
+      "id": 206,
+      "topic": "linked-list",
+      "routines": []
+    },
+    {
+      "slug": "majority-element",
+      "title": "Majority Element",
+      "url": "https://leetcode.com/problems/majority-element/",
+      "duration": 20,
+      "epi": 2,
+      "difficulty": "Easy",
+      "id": 169,
+      "topic": "array",
+      "routines": ["sorting"]
+    },
+    {
+      "slug": "add-binary",
+      "title": "Add Binary",
+      "url": "https://leetcode.com/problems/add-binary/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 67,
+      "topic": "binary",
+      "routines": []
+    },
+    {
+      "slug": "diameter-of-binary-tree",
+      "title": "Diameter of Binary Tree",
+      "url": "https://leetcode.com/problems/diameter-of-binary-tree/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 543,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "middle-of-the-linked-list",
+      "title": "Middle of the Linked List",
+      "url": "https://leetcode.com/problems/middle-of-the-linked-list/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 908,
+      "topic": "linked-list",
+      "routines": ["two-pointers"]
+    },
+    {
+      "slug": "maximum-depth-of-binary-tree",
+      "title": "Maximum Depth of Binary Tree",
+      "url": "https://leetcode.com/problems/maximum-depth-of-binary-tree/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 104,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "contains-duplicate",
+      "title": "Contains Duplicate",
+      "url": "https://leetcode.com/problems/contains-duplicate/",
+      "duration": 15,
+      "epi": null,
+      "difficulty": "Easy",
+      "id": 217,
+      "topic": "array",
+      "routines": ["hash-table", "sorting"]
+    }
+  ],
+  "Week 3": [
+    {
+      "slug": "min-stack",
+      "title": "Min Stack",
+      "url": "https://leetcode.com/problems/min-stack/",
+      "duration": 20,
+      "epi": 0,
+      "difficulty": "Medium",
+      "id": 155,
+      "topic": "stack",
+      "routines": []
+    },
+    {
+      "slug": "maximum-subarray",
+      "title": "Maximum Subarray",
+      "url": "https://leetcode.com/problems/maximum-subarray/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 53,
+      "topic": "dynamic-programming",
+      "routines": []
+    },
+    {
+      "slug": "insert-interval",
+      "title": "Insert Interval",
+      "url": "https://leetcode.com/problems/insert-interval/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 57,
+      "topic": "array",
+      "routines": ["interval"]
+    },
+    {
+      "slug": "01-matrix",
+      "title": "01 Matrix",
+      "url": "https://leetcode.com/problems/01-matrix/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 542,
+      "topic": "graph",
+      "routines": ["breadth-first-search"]
+    },
+    {
+      "slug": "k-closest-points-to-origin",
+      "title": "K Closest Points to Origin",
+      "url": "https://leetcode.com/problems/k-closest-points-to-origin/",
+      "duration": 30,
+      "epi": 1,
+      "difficulty": "Medium",
+      "id": 1014,
+      "topic": "heap",
+      "routines": ["geometry"]
+    },
+    {
+      "slug": "longest-substring-without-repeating-characters",
+      "title": "Longest Substring Without Repeating Characters",
+      "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 3,
+      "topic": "string",
+      "routines": ["sliding-window"]
+    },
+    {
+      "slug": "3sum",
+      "title": "3Sum",
+      "url": "https://leetcode.com/problems/3sum/",
+      "duration": 30,
+      "epi": 0,
+      "difficulty": "Medium",
+      "id": 15,
+      "topic": "array",
+      "routines": ["two-pointers"]
+    },
+    {
+      "slug": "binary-tree-level-order-traversal",
+      "title": "Binary Tree Level Order Traversal",
+      "url": "https://leetcode.com/problems/binary-tree-level-order-traversal/",
+      "duration": 20,
+      "epi": 1,
+      "difficulty": "Medium",
+      "id": 102,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "clone-graph",
+      "title": "Clone Graph",
+      "url": "https://leetcode.com/problems/clone-graph/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 133,
+      "topic": "graph",
+      "routines": ["depth-first-search", "breadth-first-search"]
+    },
+    {
+      "slug": "evaluate-reverse-polish-notation",
+      "title": "Evaluate Reverse Polish Notation",
+      "url": "https://leetcode.com/problems/evaluate-reverse-polish-notation/",
+      "duration": 30,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 150,
+      "topic": "stack",
+      "routines": []
+    }
+  ],
+  "Week 4": [
+    {
+      "slug": "course-schedule",
+      "title": "Course Schedule",
+      "url": "https://leetcode.com/problems/course-schedule/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 207,
+      "topic": "graph",
+      "routines": ["topo-sort"]
+    },
+    {
+      "slug": "implement-trie-prefix-tree",
+      "title": "Implement Trie (Prefix Tree)",
+      "url": "https://leetcode.com/problems/implement-trie-prefix-tree/",
+      "duration": 35,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 208,
+      "topic": "trie",
+      "routines": []
+    },
+    {
+      "slug": "coin-change",
+      "title": "Coin Change",
+      "url": "https://leetcode.com/problems/coin-change/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 322,
+      "topic": "dynamic-programming",
+      "routines": []
+    },
+    {
+      "slug": "product-of-array-except-self",
+      "title": "Product of Array Except Self",
+      "url": "https://leetcode.com/problems/product-of-array-except-self/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 238,
+      "topic": "array",
+      "routines": ["prefix-sum"]
+    },
+    {
+      "slug": "validate-binary-search-tree",
+      "title": "Validate Binary Search Tree",
+      "url": "https://leetcode.com/problems/validate-binary-search-tree/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 98,
+      "topic": "binary-search-tree",
+      "routines": []
+    },
+    {
+      "slug": "number-of-islands",
+      "title": "Number of Islands",
+      "url": "https://leetcode.com/problems/number-of-islands/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 200,
+      "topic": "graph",
+      "routines": ["depth-first-search", " breadth-first-search"]
+    },
+    {
+      "slug": "rotting-oranges",
+      "title": "Rotting Oranges",
+      "url": "https://leetcode.com/problems/rotting-oranges/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 1036,
+      "topic": "graph",
+      "routines": ["breadth-first-search"]
+    },
+    {
+      "slug": "search-in-rotated-sorted-array",
+      "title": "Search in Rotated Sorted Array",
+      "url": "https://leetcode.com/problems/search-in-rotated-sorted-array/",
+      "duration": 30,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 33,
+      "topic": "binary-search",
+      "routines": []
+    }
+  ],
+  "Week 5": [
+    {
+      "slug": "combination-sum",
+      "title": "Combination Sum",
+      "url": "https://leetcode.com/problems/combination-sum/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 39,
+      "topic": "array",
+      "routines": ["backtracking"]
+    },
+    {
+      "slug": "permutations",
+      "title": "Permutations",
+      "url": "https://leetcode.com/problems/permutations/",
+      "duration": 30,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 46,
+      "topic": "recursion",
+      "routines": ["backtracking"]
+    },
+    {
+      "slug": "merge-intervals",
+      "title": "Merge Intervals",
+      "url": "https://leetcode.com/problems/merge-intervals/",
+      "duration": 30,
+      "epi": 3,
+      "difficulty": "Medium",
+      "id": 56,
+      "topic": "array",
+      "routines": ["interval"]
+    },
+    {
+      "slug": "lowest-common-ancestor-of-a-binary-tree",
+      "title": "Lowest Common Ancestor of a Binary Tree",
+      "url": "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 236,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "time-based-key-value-store",
+      "title": "Time Based Key-Value Store",
+      "url": "https://leetcode.com/problems/time-based-key-value-store/",
+      "duration": 35,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 1023,
+      "topic": "binary-search",
+      "routines": []
+    },
+    {
+      "slug": "accounts-merge",
+      "title": "Accounts Merge",
+      "url": "https://leetcode.com/problems/accounts-merge/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 721,
+      "topic": "graph",
+      "routines": ["depth-first-search", "union-find"]
+    },
+    {
+      "slug": "sort-colors",
+      "title": "Sort Colors",
+      "url": "https://leetcode.com/problems/sort-colors/",
+      "duration": 25,
+      "epi": 0,
+      "difficulty": "Medium",
+      "id": 75,
+      "topic": "array",
+      "routines": ["two-pointers"]
+    },
+    {
+      "slug": "word-break",
+      "title": "Word Break",
+      "url": "https://leetcode.com/problems/word-break/",
+      "duration": 30,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 139,
+      "topic": "trie",
+      "routines": []
+    }
+  ],
+  "Week 6": [
+    {
+      "slug": "partition-equal-subset-sum",
+      "title": "Partition Equal Subset Sum",
+      "url": "https://leetcode.com/problems/partition-equal-subset-sum/",
+      "duration": 30,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 416,
+      "topic": "dynamic-programming",
+      "routines": []
+    },
+    {
+      "slug": "string-to-integer-atoi",
+      "title": "String to Integer (atoi)",
+      "url": "https://leetcode.com/problems/string-to-integer-atoi/",
+      "duration": 25,
+      "epi": 0,
+      "difficulty": "Medium",
+      "id": 8,
+      "topic": "string",
+      "routines": []
+    },
+    {
+      "slug": "spiral-matrix",
+      "title": "Spiral Matrix",
+      "url": "https://leetcode.com/problems/spiral-matrix/",
+      "duration": 25,
+      "epi": 1,
+      "difficulty": "Medium",
+      "id": 54,
+      "topic": "matrix",
+      "routines": []
+    },
+    {
+      "slug": "subsets",
+      "title": "Subsets",
+      "url": "https://leetcode.com/problems/subsets/",
+      "duration": 30,
+      "epi": 3,
+      "difficulty": "Medium",
+      "id": 78,
+      "topic": "recursion",
+      "routines": ["backtracking"]
+    },
+    {
+      "slug": "binary-tree-right-side-view",
+      "title": "Binary Tree Right Side View",
+      "url": "https://leetcode.com/problems/binary-tree-right-side-view/",
+      "duration": 20,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 199,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "longest-palindromic-substring",
+      "title": "Longest Palindromic Substring",
+      "url": "https://leetcode.com/problems/longest-palindromic-substring/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 5,
+      "topic": "string",
+      "routines": ["palindrome", "two-pointer", "dynamic-programming"]
+    },
+    {
+      "slug": "unique-paths",
+      "title": "Unique Paths",
+      "url": "https://leetcode.com/problems/unique-paths/",
+      "duration": 20,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 62,
+      "topic": "dynamic-programming",
+      "routines": []
+    },
+    {
+      "slug": "construct-binary-tree-from-preorder-and-inorder-traversal",
+      "title": "Construct Binary Tree from Preorder and Inorder Traversal",
+      "url": "https://leetcode.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/",
+      "duration": 25,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 105,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "container-with-most-water",
+      "title": "Container With Most Water",
+      "url": "https://leetcode.com/problems/container-with-most-water/",
+      "duration": 35,
+      "epi": 2,
+      "difficulty": "Medium",
+      "id": 11,
+      "topic": "array",
+      "routines": ["greedy", "two-pointers"]
+    }
+  ],
+  "Week 7": [
+    {
+      "slug": "letter-combinations-of-a-phone-number",
+      "title": "Letter Combinations of a Phone Number",
+      "url": "https://leetcode.com/problems/letter-combinations-of-a-phone-number/",
+      "duration": 30,
+      "epi": 3,
+      "difficulty": "Medium",
+      "id": 17,
+      "topic": "recursion",
+      "routines": ["backtracking"]
+    },
+    {
+      "slug": "word-search",
+      "title": "Word Search",
+      "url": "https://leetcode.com/problems/word-search/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 79,
+      "topic": "graph",
+      "routines": ["backtracking"]
+    },
+    {
+      "slug": "find-all-anagrams-in-a-string",
+      "title": "Find All Anagrams in a String",
+      "url": "https://leetcode.com/problems/find-all-anagrams-in-a-string/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 438,
+      "topic": "string",
+      "routines": ["anagram"]
+    },
+    {
+      "slug": "minimum-height-trees",
+      "title": "Minimum Height Trees",
+      "url": "https://leetcode.com/problems/minimum-height-trees/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 310,
+      "topic": "graph",
+      "routines": ["topo-sort"]
+    },
+    {
+      "slug": "task-scheduler",
+      "title": "Task Scheduler",
+      "url": "https://leetcode.com/problems/task-scheduler/",
+      "duration": 35,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 621,
+      "topic": "heap",
+      "routines": []
+    },
+    {
+      "slug": "lru-cache",
+      "title": "LRU Cache",
+      "url": "https://leetcode.com/problems/lru-cache/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 146,
+      "topic": "linked-list",
+      "routines": ["hash-table"]
+    },
+    {
+      "slug": "kth-smallest-element-in-a-bst",
+      "title": "Kth Smallest Element in a BST",
+      "url": "https://leetcode.com/problems/kth-smallest-element-in-a-bst/",
+      "duration": 25,
+      "epi": null,
+      "difficulty": "Medium",
+      "id": 230,
+      "topic": "binary-search-tree",
+      "routines": []
+    },
+    {
+      "slug": "minimum-window-substring",
+      "title": "Minimum Window Substring",
+      "url": "https://leetcode.com/problems/minimum-window-substring/",
+      "duration": 30,
+      "epi": 3,
+      "difficulty": "Hard",
+      "id": 76,
+      "topic": "string",
+      "routines": ["sliding-window"]
+    }
+  ],
+  "Week 8": [
+    {
+      "slug": "serialize-and-deserialize-binary-tree",
+      "title": "Serialize and Deserialize Binary Tree",
+      "url": "https://leetcode.com/problems/serialize-and-deserialize-binary-tree/",
+      "duration": 40,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 297,
+      "topic": "binary-tree",
+      "routines": []
+    },
+    {
+      "slug": "trapping-rain-water",
+      "title": "Trapping Rain Water",
+      "url": "https://leetcode.com/problems/trapping-rain-water/",
+      "duration": 35,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 42,
+      "topic": "stack",
+      "routines": ["monotonic-stack"]
+    },
+    {
+      "slug": "find-median-from-data-stream",
+      "title": "Find Median from Data Stream",
+      "url": "https://leetcode.com/problems/find-median-from-data-stream/",
+      "duration": 30,
+      "epi": 3,
+      "difficulty": "Hard",
+      "id": 295,
+      "topic": "heap",
+      "routines": []
+    },
+    {
+      "slug": "word-ladder",
+      "title": "Word Ladder",
+      "url": "https://leetcode.com/problems/word-ladder/",
+      "duration": 45,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 127,
+      "topic": "graph",
+      "routines": ["breadth-first-search"]
+    },
+    {
+      "slug": "basic-calculator",
+      "title": "Basic Calculator",
+      "url": "https://leetcode.com/problems/basic-calculator/",
+      "duration": 40,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 224,
+      "topic": "stack",
+      "routines": ["parsing"]
+    },
+    {
+      "slug": "maximum-profit-in-job-scheduling",
+      "title": "Maximum Profit in Job Scheduling",
+      "url": "https://leetcode.com/problems/maximum-profit-in-job-scheduling/",
+      "duration": 45,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 1352,
+      "topic": "binary-search",
+      "routines": ["dynamic-programming"]
+    },
+    {
+      "slug": "merge-k-sorted-lists",
+      "title": "Merge k Sorted Lists",
+      "url": "https://leetcode.com/problems/merge-k-sorted-lists/",
+      "duration": 30,
+      "epi": null,
+      "difficulty": "Hard",
+      "id": 23,
+      "topic": "heap",
+      "routines": []
+    },
+    {
+      "slug": "largest-rectangle-in-histogram",
+      "title": "Largest Rectangle in Histogram",
+      "url": "https://leetcode.com/problems/largest-rectangle-in-histogram/",
+      "duration": 35,
+      "epi": 3,
+      "difficulty": "Hard",
+      "id": 84,
+      "topic": "stack",
+      "routines": ["monotonic-stack"]
+    }
+  ]
+}

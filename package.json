@@ -35,7 +35,8 @@
     "audit": "npm audit --omit=dev --audit-level=moderate",
     "bundle:editor": "node scripts/bundle-editor.mjs",
     "serve": "node scripts/serve.ts",
-    "solve": "node scripts/run.ts"
+    "solve": "node scripts/run.ts",
+    "validate": "node scripts/validate.ts"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "6.20.3",

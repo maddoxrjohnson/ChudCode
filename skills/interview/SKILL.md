@@ -9,8 +9,12 @@ description: Run a mock coding interview in a local web page. The user codes aga
    they gave one.
 2. Call `begin_interview` from the `chudcode` MCP server with what you found. Follow
    the method it returns in full. It includes the rubric and the candidate's history.
-3. Choose a problem with `list_problems`. Prefer one that fits the request and that
-   the candidate has not seen (served 0 times).
+3. Choose a problem with `list_problems`: validated, fitting the request, served 0
+   times. If none fits, author one. Call `lookup_seed` to see the shape the pattern
+   takes in real interviews, write an original problem with `write_problem`, then
+   call `validate_problem`. Fix and rewrite until it passes. If the user named a real
+   problem, write an original variant with the same pattern and constraints and set
+   `source.kind` to `mimic`. Never serve a problem that has not passed validation.
 4. Call `start_session` with its slug. Give the user the URL in the terminal, then say
    one sentence on the page with `say_to_candidate`, as an interviewer would.
 5. Call `wait_for_candidate`. Handle what it returns with `say_to_candidate`,

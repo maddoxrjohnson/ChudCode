@@ -143,7 +143,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       name: "start_session",
       title: "Start Session",
       description:
-        "Create an interview session for a problem and return its URL. Starts the local server if needed and opens the page in the browser. " +
+        "Create an interview session for a validated problem and return its URL. Starts the local server if needed and opens the page in the browser. " +
         "The clock starts when the candidate presses Start on the page, unless start_now is true.",
       inputSchema: schema.obj(
         {
@@ -165,9 +165,9 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         if (!isValidSlug(slug) || !problemExists(slug))
           return fail(`No problem named ${slug}. Call list_problems.`);
         const bundle = readProblem(slug);
-        if (bundle.meta.validatedAt === undefined && bundle.meta.source.kind !== "hand") {
+        if (bundle.meta.validatedAt === undefined) {
           return fail(
-            `${slug} has not been validated. Only validated or hand-written problems can be served.`,
+            `${slug} has not passed validation. Call validate_problem first; only validated problems can be served.`,
           );
         }
         const config = readConfig();

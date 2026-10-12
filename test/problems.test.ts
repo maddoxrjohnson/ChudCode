@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   ProblemValidationError,
+  clearValidation,
   listProblems,
   publicView,
   readProblem,
@@ -159,7 +160,13 @@ describe("writeProblem and listProblems", () => {
     expect(listProblems().map((m) => m.slug)).toEqual(["two-pointer-thing", "window-sum"]);
     expect(listProblems({ pattern: "sliding-window" }).map((m) => m.slug)).toEqual(["window-sum"]);
     expect(listProblems({ difficulty: "hard" }).map((m) => m.slug)).toEqual(["two-pointer-thing"]);
-    expect(listProblems({ validatedOnly: true }).map((m) => m.slug)).toEqual(["two-pointer-thing"]);
+    expect(listProblems({ validatedOnly: true }).map((m) => m.slug)).toEqual([
+      "two-pointer-thing",
+      "window-sum",
+    ]);
+    expect(listProblems({ difficulty: "easy", validatedOnly: true }).map((m) => m.slug)).toEqual([
+      "window-sum",
+    ]);
   });
 
   it("updates meta without touching the rest of the bundle", () => {
@@ -172,5 +179,9 @@ describe("writeProblem and listProblems", () => {
     expect(meta.timesServed).toBe(3);
     expect(readProblem("window-sum").meta.validatedAt).toBe(42);
     expect(() => updateMeta("window-sum", { slug: "other" })).toThrow(/cannot change/);
+    const cleared = clearValidation("window-sum");
+    expect(cleared.validatedAt).toBeUndefined();
+    expect(cleared.timesServed).toBe(3);
+    expect(readProblem("window-sum").meta).not.toHaveProperty("validation");
   });
 });

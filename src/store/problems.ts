@@ -205,6 +205,18 @@ export function updateMeta(slug: string, patch: Partial<ProblemMeta>): ProblemMe
   return merged;
 }
 
+/** Forget a validation result, because the bundle changed or failed a re-check. */
+export function clearValidation(slug: string): ProblemMeta {
+  const dir = problemDir(slug);
+  const current = readJson<Record<string, unknown>>(path.join(dir, "meta.json"));
+  if (!current) throw new Error(`No problem named ${slug}`);
+  delete current["validatedAt"];
+  delete current["validation"];
+  const meta = validateMeta(current, []);
+  writeJson(path.join(dir, "meta.json"), meta);
+  return meta;
+}
+
 /** Overwrite tests.json after validation filled in oracle outputs. */
 export function writeTests(slug: string, cases: TestCase[]): void {
   writeJson(path.join(problemDir(slug), "tests.json"), { cases });

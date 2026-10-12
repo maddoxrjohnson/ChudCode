@@ -169,13 +169,16 @@ describe("protocol", () => {
       "begin_interview",
       "get_session",
       "list_problems",
+      "lookup_seed",
       "open_dashboard",
       "record_session",
       "reveal_hint",
       "run_tests",
       "say_to_candidate",
       "start_session",
+      "validate_problem",
       "wait_for_candidate",
+      "write_problem",
     ]);
     expect(session.toolNames().sort()).toEqual(tools.map((t) => t.name).sort());
   });
@@ -236,7 +239,7 @@ describe("an interview round trip", () => {
     expect(brief).toContain("pattern **sliding-window**");
     expect(brief).toContain("None yet. This is the candidate's first session.");
     expect(brief).toContain(
-      "`window-sum`: Largest Window Sum (easy; sliding-window) — hand-written, served 0 times",
+      "`window-sum`: Largest Window Sum (easy; sliding-window) — validated, served 0 times",
     );
     expect(brief).toContain("# Interviewing");
     expect(brief).toContain("# Rubric");

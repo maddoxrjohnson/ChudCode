@@ -40,6 +40,7 @@ import {
   type ToolResult,
 } from "./tools/index.ts";
 import { interviewTools } from "./tools/interview-tools.ts";
+import { problemTools } from "./tools/problem-tools.ts";
 import { sessionTools } from "./tools/session-tools.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -365,7 +366,10 @@ export class McpSession {
       recover: () => recoverSessions(inbox, this.created),
     };
     this.tools = new Map(
-      [...sessionTools(host), ...interviewTools()].map((tool) => [tool.name, tool]),
+      [...sessionTools(host), ...interviewTools(), ...problemTools()].map((tool) => [
+        tool.name,
+        tool,
+      ]),
     );
   }
 
