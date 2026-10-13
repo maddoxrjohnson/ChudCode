@@ -43,6 +43,7 @@ import { interviewTools } from "./tools/interview-tools.ts";
 import { problemTools } from "./tools/problem-tools.ts";
 import { reviewTools } from "./tools/review-tools.ts";
 import { sessionTools } from "./tools/session-tools.ts";
+import { trendTools } from "./tools/trend-tools.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -367,9 +368,13 @@ export class McpSession {
       recover: () => recoverSessions(inbox, this.created),
     };
     this.tools = new Map(
-      [...sessionTools(host), ...interviewTools(), ...problemTools(), ...reviewTools()].map(
-        (tool) => [tool.name, tool],
-      ),
+      [
+        ...sessionTools(host),
+        ...interviewTools(),
+        ...problemTools(),
+        ...reviewTools(),
+        ...trendTools(),
+      ].map((tool) => [tool.name, tool]),
     );
   }
 

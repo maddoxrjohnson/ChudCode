@@ -7,6 +7,7 @@
  * validate again; `start_session` refuses anything that has not passed.
  */
 
+import { plural } from "../format.ts";
 import { readConfig } from "../store/config.ts";
 import { isValidSlug } from "../store/paths.ts";
 import {
@@ -19,6 +20,7 @@ import {
 } from "../store/problems.ts";
 import { lookupSeed, type SeedList, type SeedQuery } from "../seed.ts";
 import { patternListText, seedLine, validationReportText, writtenProblemText } from "../prompts.ts";
+import { trendById } from "../store/trends.ts";
 import { lintBundle, validateProblem } from "../validate.ts";
 import {
   fail,
@@ -169,8 +171,8 @@ export function problemTools(): ToolDef[] {
                 "For mimic: the title of the real problem whose shape this follows.",
               ),
               trend_ids: schema.list(
-                schema.str("A trend id."),
-                "Trend entries this problem was shaped by.",
+                schema.str("A trend id, e.g. t-5c1d9a0b2e."),
+                "The trend entries this problem's shape was drawn from, as listed in the brief or by list_trends. Cite them when a company's recent interviews shaped the problem.",
               ),
             },
             ["mimic_of", "trend_ids"],
@@ -238,6 +240,15 @@ export function problemTools(): ToolDef[] {
         if (reveal !== undefined) meta["revealFailingInput"] = reveal;
         if (source && !SOURCE_KINDS.includes(source["kind"] as (typeof SOURCE_KINDS)[number])) {
           return fail(`source.kind must be one of ${SOURCE_KINDS.join(", ")}`);
+        }
+        const trendIds = source?.["trend_ids"];
+        if (Array.isArray(trendIds) && trendIds.every((id) => typeof id === "string")) {
+          const unknown = (trendIds as string[]).filter((id) => trendById(id) === undefined);
+          if (unknown.length > 0) {
+            return fail(
+              `source.trend_ids names ${plural(unknown.length, "entry", "entries")} not on file: ${unknown.join(", ")}. Cite ids from the brief or from list_trends, or leave trend_ids out.`,
+            );
+          }
         }
 
         const bundle = {

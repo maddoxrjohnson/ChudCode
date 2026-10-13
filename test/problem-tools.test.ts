@@ -226,6 +226,40 @@ describe("write_problem", () => {
     expect(text(hand)).toContain("source.kind must be one of generated, mimic, review");
   });
 
+  it("checks the trend entries a problem cites", async () => {
+    const unknown = await call("write_problem", {
+      ...PARTNERED,
+      source: { kind: "generated", trend_ids: ["t-0123456789"] },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(text(unknown)).toContain("source.trend_ids names 1 entry not on file: t-0123456789");
+    expect(() => readProblem("values-with-a-partner")).toThrow();
+
+    const recorded = await call("record_trends", {
+      entries: [
+        {
+          pattern: "arrays-hashing",
+          company: "Stripe",
+          seen_at: "2026-09-14",
+          source_url: "https://example.com/posts/stripe",
+          shape_note: "Count values whose partner is present; n up to 10^5.",
+        },
+      ],
+    });
+    const id = /`(t-[0-9a-f]{10})`/.exec(text(recorded))?.[1];
+    expect(id).toMatch(/^t-[0-9a-f]{10}$/);
+    const cited = await call("write_problem", {
+      ...PARTNERED,
+      source: { kind: "generated", trend_ids: [id] },
+    });
+    expect(cited.isError).toBe(false);
+    expect(text(cited)).toContain(`Shaped by 1 trend entry: \`${id}\`.`);
+    expect(readProblem("values-with-a-partner").meta.source).toEqual({
+      kind: "generated",
+      trendIds: [id],
+    });
+  });
+
   it("refuses to overwrite a problem that has been served", async () => {
     seedExample();
     await call("start_session", { slug: "window-sum" });

@@ -20,6 +20,13 @@ import { describeLists, lookupSeed, matchSeedTitle, type SeedEntry } from "./see
 import { docsDir } from "./store/paths.ts";
 import { listProblems, patterns, type ProblemBundle, type ProblemMeta } from "./store/problems.ts";
 import { listSessions, type Session } from "./store/sessions.ts";
+import {
+  tallyCompanies,
+  tallyPatterns,
+  type AddResult,
+  type TrendEntry,
+  type TrendFilter,
+} from "./store/trends.ts";
 import type { ValidationReport } from "./validate.ts";
 
 function readDoc(name: string): string {
@@ -246,6 +253,86 @@ function reviewDirectiveText(progress: Progress, requestedPattern?: string): str
   ].join(" ");
 }
 
+// ── Trends ────────────────────────────────────────────────────────────────────
+
+/** `- \`t-5c1d9a0b2e\` graphs at Stripe (new grad SWE, medium, seen 2026-09-14): … — source: https://…` */
+export function trendLine(entry: TrendEntry, withSource = true): string {
+  const facts = [entry.role, entry.difficulty, `seen ${entry.seenAt}`].filter(Boolean).join(", ");
+  const source = withSource ? ` — source: ${entry.sourceUrl}` : "";
+  return `- \`${entry.id}\` ${entry.pattern} at ${entry.company} (${facts}): ${entry.shapeNote}${source}`;
+}
+
+function patternTallyText(entries: readonly TrendEntry[]): string {
+  return tallyPatterns(entries)
+    .map((t) => `${t.pattern} ×${t.count}`)
+    .join(", ");
+}
+
+/** What `list_trends` returns. */
+export function trendListText(
+  entries: readonly TrendEntry[],
+  filter: TrendFilter,
+  limit: number,
+): string {
+  const scope = [
+    filter.company && `for ${filter.company}`,
+    filter.pattern && `on ${filter.pattern}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const suffix = scope ? ` ${scope}` : "";
+  const ids = `Pattern ids for \`record_trends\`: ${patterns()
+    .map((p) => p.id)
+    .join(", ")}.`;
+  if (entries.length === 0) {
+    return [
+      `No trend entries on file${suffix}. The research skill finds them: recent interview-experience posts for a company, paraphrased into pattern and constraints and saved with \`record_trends\`.`,
+      ids,
+    ].join("\n\n");
+  }
+  const lines = [
+    `${plural(entries.length, "trend entry", "trend entries")} on file${suffix}, most recent first. Patterns: ${patternTallyText(entries)}.`,
+    "",
+    ...entries.slice(0, limit).map((entry) => trendLine(entry)),
+  ];
+  if (entries.length > limit) {
+    lines.push(
+      `…and ${entries.length - limit} more. Narrow by company or pattern, or raise the limit.`,
+    );
+  }
+  if (!filter.company) {
+    const companies = tallyCompanies(entries).map((c) => `${c.company} (${c.count})`);
+    lines.push("", `Companies: ${companies.join(", ")}.`);
+  }
+  lines.push("", ids);
+  return lines.join("\n");
+}
+
+/** What `record_trends` returns. */
+export function recordedTrendsText(result: AddResult): string {
+  const lines: string[] = [];
+  if (result.added.length > 0) {
+    lines.push(
+      `Recorded ${plural(result.added.length, "new trend entry", "new trend entries")}:`,
+      ...result.added.map((entry) => trendLine(entry, false)),
+    );
+  } else {
+    lines.push("Nothing new to record.");
+  }
+  if (result.skipped.length > 0) {
+    const skipped = result.skipped.map((e) => `\`${e.id}\` ${e.pattern} at ${e.company}`);
+    lines.push(
+      "",
+      `Already on file (${result.skipped.length}): ${skipped.join("; ")}. A duplicate never overwrites; edit trends.json by hand to change a note.`,
+    );
+  }
+  lines.push(
+    "",
+    "The brief from `begin_interview` includes these when `company` names the company. A problem written from an entry cites its id in `trend_ids` under `source`.",
+  );
+  return lines.join("\n");
+}
+
 function authoringText(): string {
   return [
     "## Authoring",
@@ -430,6 +517,11 @@ export function writtenProblemText(bundle: ProblemBundle, lint: string[]): strin
   const lines = [
     `Wrote \`${meta.slug}\`: ${meta.title} (${meta.difficulty}; ${meta.patterns.join(", ")}) with ${visible} visible and ${bundle.tests.length - visible} hidden cases, ${plural(bundle.hints.length, "hint")}. Not yet validated.`,
   ];
+  if (meta.source.trendIds?.length) {
+    lines.push(
+      `Shaped by ${plural(meta.source.trendIds.length, "trend entry", "trend entries")}: ${meta.source.trendIds.map((id) => `\`${id}\``).join(", ")}.`,
+    );
+  }
   if (lint.length > 0) {
     lines.push(
       "",
