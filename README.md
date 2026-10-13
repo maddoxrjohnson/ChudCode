@@ -10,8 +10,9 @@ rubric. Patterns you miss come back on a spaced-review schedule with a fresh pro
 not the one you already saw.
 
 **Status:** early development. Mock interviews work; the interviewer writes its own
-problems, validated against a reference solution before they are served; and the
-patterns you miss come back on a Leitner schedule with a problem you have not seen.
+problems, validated against a reference solution before they are served; the
+patterns you miss come back on a Leitner schedule with a problem you have not seen;
+and research into what a company has been asking shapes the problems you get for it.
 
 ## Install
 
@@ -26,8 +27,9 @@ claude plugin install chudcode@chudcode
 Then, in Claude Code, say "give me a mock interview on sliding windows" or run
 `/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
 `/chudcode:review` serves a fresh problem on the pattern you are most overdue to see
-again. `/chudcode:dashboard` opens the page with your review schedule, streak, and past
-sessions.
+again. `/chudcode:research <company>` finds what that company has been asking lately,
+so an interview for it has the right shape. `/chudcode:dashboard` opens the page with
+your review schedule, streak, and past sessions.
 
 To try a checkout without installing it: `claude --plugin-dir /path/to/ChudCode`.
 
@@ -53,10 +55,14 @@ make sure the patterns you keep missing are the ones you see again.
   on the most overdue pattern. The dashboard shows every pattern's box, what is due,
   and your streak. Boxes and due dates are derived on every read from an append-only
   log of verdicts, so changing the schedule or the verdict rule re-scores history.
+- Company trends: the research skill reads recent interview-experience posts with
+  the host's web tools and records each problem as a pattern, a role, a date, a
+  source, and a short paraphrase of its shape, never a statement. Name the company
+  when you ask for an interview and the problem is written in the shape that company
+  has been asking, citing the entries it came from. See `docs/TRENDS-FORMAT.md`.
 
 ## Planned
 
-- Interview trend research per company, feeding problem selection.
 - Pi support through the same MCP server.
 
 ## Development

@@ -14,6 +14,8 @@ description: Open the ChudCode dashboard in the browser, or report the user's pr
 - To list problems in the terminal, call `list_problems`. Pass `pattern` or
   `difficulty` to filter.
 - To see one session in detail, call `get_session` with its id.
+- To report what a company has been asking in interviews, call `list_trends` with
+  the company. If nothing is on file, offer to research it.
 
 The server runs inside this session and stops when the session ends. Every session,
 submission, result, and review event stays on disk under `~/.chudcode/`.

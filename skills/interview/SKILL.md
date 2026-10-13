@@ -16,7 +16,9 @@ description: Run a mock coding interview in a local web page. The user codes aga
    takes in real interviews, write an original problem with `write_problem`, then
    call `validate_problem`. Fix and rewrite until it passes. If the user named a real
    problem, write an original variant with the same pattern and constraints and set
-   `source.kind` to `mimic`. Never serve a problem that has not passed validation.
+   `source.kind` to `mimic`. If the user named a company, the brief lists what it
+   has been asking; write the problem in that shape and cite the entries' ids in
+   the source's trend ids. Never serve a problem that has not passed validation.
 4. Call `start_session` with its slug. Give the user the URL in the terminal, then say
    one sentence on the page with `say_to_candidate`, as an interviewer would.
 5. Call `wait_for_candidate`. Handle what it returns with `say_to_candidate`,
