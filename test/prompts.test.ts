@@ -8,15 +8,18 @@ import { buildProgress } from "../src/progress.ts";
 import { DAY_MS, scheduleItems } from "../src/review.ts";
 import { patterns } from "../src/store/problems.ts";
 import {
+  BRIEF_TREND_LIMIT,
   dueListText,
   interviewBrief,
   nothingYetText,
   resultText,
   sessionLine,
   submissionPrompt,
+  trendsText,
 } from "../src/prompts.ts";
 import type { RunResult } from "../src/runner/types.ts";
 import { createSession, type Session } from "../src/store/sessions.ts";
+import { addTrends } from "../src/store/trends.ts";
 import { makeFixture, seedExample, type Fixture } from "./helpers.ts";
 
 let fixture: Fixture;
@@ -42,8 +45,23 @@ function session(): Session {
 describe("interviewBrief", () => {
   it("includes the request, the history, the docs, and the host brief", () => {
     seedExample();
-    const brief = interviewBrief({ mode: "review", pattern: "stack", title: "Two Sum" }, "## HOST");
+    addTrends([
+      {
+        pattern: "stack",
+        company: "Stripe",
+        seenAt: "2026-09-14",
+        sourceUrl: "https://example.com/stripe",
+        shapeNote: "Evaluate a stream of bracketed operations.",
+      },
+    ]);
+    const brief = interviewBrief(
+      { mode: "review", pattern: "stack", title: "Two Sum", company: "Stripe" },
+      "## HOST",
+    );
     expect(brief).toContain("review session");
+    expect(brief).toContain("the kind of problem **Stripe** asks");
+    expect(brief).toContain("## What Stripe has been asking");
+    expect(brief).toContain("stack at Stripe (seen 2026-09-14): Evaluate a stream");
     expect(brief).toContain("pattern **stack**");
     expect(brief).toContain("something like **Two Sum**");
     expect(brief).toContain("Never reproduce the named problem's statement");
@@ -55,6 +73,71 @@ describe("interviewBrief", () => {
     expect(brief).toContain("# Interviewing");
     expect(brief).toContain("# Rubric");
     expect(brief.trimEnd().endsWith("## HOST")).toBe(true);
+  });
+});
+
+describe("trendsText", () => {
+  const entry = (pattern: string, company: string, seenAt: string, note = "A shape.") => ({
+    pattern,
+    company,
+    seenAt,
+    sourceUrl: `https://example.com/${company.toLowerCase()}/${pattern}/${seenAt}`,
+    shapeNote: note,
+  });
+
+  it("is silent with no company and nothing on file, and a line when there is", () => {
+    expect(trendsText(undefined)).toBe("");
+    addTrends([entry("graphs", "Stripe", "2026-09-14"), entry("heap", "Databricks", "2026-09-01")]);
+    const out = trendsText(undefined);
+    expect(out).toContain("## Trends on file");
+    expect(out).toContain(
+      "2 trend entries from research into recent interviews: Stripe (1), Databricks (1).",
+    );
+    expect(out).toContain("The user named no company");
+  });
+
+  it("tells the interviewer when nothing is on file for the company named", () => {
+    const empty = trendsText("Stripe");
+    expect(empty).toContain("## What Stripe has been asking");
+    expect(empty).toContain("No trend entries on file for Stripe.");
+    expect(empty).toContain("`/chudcode:research Stripe`");
+    expect(empty).not.toContain("other companies");
+    addTrends([entry("heap", "Databricks", "2026-09-01")]);
+    expect(trendsText("Stripe")).toContain("1 entry is on file for other companies: Databricks.");
+  });
+
+  it("lists the company's entries with a tally and the authoring directive", () => {
+    addTrends([
+      entry("sliding-window", "Stripe", "2026-08-02", "At most k distinct, n up to 10^5."),
+      entry("graphs", "Stripe", "2026-09-14", "Grid regions with unblocking updates."),
+      entry("graphs", "Stripe", "2026-09-20"),
+      entry("heap", "Databricks", "2026-09-01"),
+    ]);
+    const out = trendsText("stripe");
+    expect(out).toContain("## What stripe has been asking");
+    expect(out).toContain(
+      "3 trend entries on file for stripe, most recent first. Patterns: graphs ×2, sliding-window ×1.",
+    );
+    const lines = out.split("\n").filter((l) => l.startsWith("- "));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(
+      /^- `t-[0-9a-f]{10}` graphs at Stripe \(seen 2026-09-20\): A shape\. — source: https:/,
+    );
+    expect(lines[2]).toContain("sliding-window at Stripe (seen 2026-08-02): At most k distinct");
+    expect(out).not.toContain("Databricks");
+    expect(out).toContain("Cite the entries you drew on in `trend_ids` under `source`");
+    expect(out).toContain("never reproduce the post");
+  });
+
+  it("shows a bounded number of entries and points at list_trends for the rest", () => {
+    addTrends(
+      Array.from({ length: BRIEF_TREND_LIMIT + 2 }, (_, i) =>
+        entry("dp-1d", "Stripe", `2026-09-${String(i + 1).padStart(2, "0")}`),
+      ),
+    );
+    const out = trendsText("Stripe");
+    expect(out.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(BRIEF_TREND_LIMIT);
+    expect(out).toContain("…and 2 more via `list_trends`.");
   });
 });
 

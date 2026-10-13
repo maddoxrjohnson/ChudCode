@@ -21,6 +21,8 @@ import { docsDir } from "./store/paths.ts";
 import { listProblems, patterns, type ProblemBundle, type ProblemMeta } from "./store/problems.ts";
 import { listSessions, type Session } from "./store/sessions.ts";
 import {
+  listTrends,
+  readTrends,
   tallyCompanies,
   tallyPatterns,
   type AddResult,
@@ -106,6 +108,7 @@ export function interviewBrief(request: BriefRequest, hostBrief: string, now = D
     );
   }
   if (request.pattern) parts.push(seedPatternText(request.pattern));
+  parts.push(trendsText(request.company));
 
   parts.push(recentSessionsText(now));
   parts.push(dueListText(progress, 5));
@@ -266,6 +269,52 @@ function patternTallyText(entries: readonly TrendEntry[]): string {
   return tallyPatterns(entries)
     .map((t) => `${t.pattern} ×${t.count}`)
     .join(", ");
+}
+
+/** How many entries to show in the brief before pointing at `list_trends`. */
+export const BRIEF_TREND_LIMIT = 8;
+
+/**
+ * The trends section of the brief. With a company: its entries and how to use them,
+ * or the fact that there are none. Without one: a line saying what is on file, or
+ * nothing at all when the file is empty.
+ */
+export function trendsText(company: string | undefined, entries = readTrends()): string {
+  if (company === undefined) {
+    if (entries.length === 0) return "";
+    const companies = tallyCompanies(entries).map((c) => `${c.company} (${c.count})`);
+    return `## Trends on file\n\n${plural(entries.length, "trend entry", "trend entries")} from research into recent interviews: ${companies.join(", ")}. The user named no company, so they do not steer this session; \`list_trends\` shows them.`;
+  }
+  const heading = `## What ${company} has been asking`;
+  const matching = listTrends({ company }, entries);
+  if (matching.length === 0) {
+    const others =
+      entries.length > 0
+        ? ` ${plural(entries.length, "entry is", "entries are")} on file for other companies: ${tallyCompanies(
+            entries,
+          )
+            .map((c) => c.company)
+            .join(", ")}.`
+        : "";
+    return [
+      heading,
+      `No trend entries on file for ${company}.${others} Tell the user in one sentence that nothing is on file for ${company} yet and that \`/chudcode:research ${company}\` would find what they have been asking; then go by what you know of ${company}'s interviews and the seed lists.`,
+    ].join("\n\n");
+  }
+  const lines = [
+    heading,
+    `${plural(matching.length, "trend entry", "trend entries")} on file for ${company}, most recent first. Patterns: ${patternTallyText(matching)}.`,
+    "",
+    ...matching.slice(0, BRIEF_TREND_LIMIT).map((entry) => trendLine(entry)),
+  ];
+  if (matching.length > BRIEF_TREND_LIMIT) {
+    lines.push(`…and ${matching.length - BRIEF_TREND_LIMIT} more via \`list_trends\`.`);
+  }
+  lines.push(
+    "",
+    `Pick the shape ${company} has asked most recently, or most often, unless the user asked for a pattern or a validated problem on disk already fits. Write an original problem of that shape: the same pattern, the same kind of input and bounds, the same twist, your own story and examples. Cite the entries you drew on in \`trend_ids\` under \`source\` when you call \`write_problem\`, and tell the user which entry shaped the problem when you give them the URL. A note is a shape, not a statement: never reproduce the post or the problem it describes.`,
+  );
+  return lines.join("\n");
 }
 
 /** What `list_trends` returns. */

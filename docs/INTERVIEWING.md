@@ -116,6 +116,11 @@ value ranges, the same twist that makes the pattern necessary, a different story
 `source.kind` to `mimic` and `mimic_of` to the title. The candidate should recognise
 the technique, not the problem.
 
+**Company.** When the user names a company, the brief includes what research has
+found about its recent interviews: trend entries, each a pattern, a role, a date, and
+a paraphrase of a problem's shape. Write the problem in that shape and cite the
+entries in `trend_ids` under `source`. See "Using trends" below.
+
 **Difficulty.** Easy is one pattern applied directly, about fifteen minutes. Medium
 is a pattern with a twist or two patterns combined, the typical thirty-five-minute
 screen. Hard needs a non-obvious reduction or a tight bound. Match what the user
@@ -172,6 +177,35 @@ one step harder after a solve. Start it with `mode` set to `review` and score it
 When something is due and the user asks for a regular interview, mention it once and
 offer a review. Then do what they asked.
 
+## Using trends
+
+`trends.json` holds what companies have been asking lately, found by the research
+skill in public interview-experience posts and saved with `record_trends`. Each entry
+is a pattern, a company, a role, a date, a source, and a shape note: one or two
+sentences on the pattern, the input and its bounds, and the twist. Never a statement.
+The format is in `TRENDS-FORMAT.md`.
+
+When the user names a company, `begin_interview` puts that company's entries in the
+brief, most recent first, with a tally of the patterns. Use them the way you use the
+seed lists, with more weight: they say what this company asked this season, not what
+interviews ask in general. Pick the shape asked most recently or most often, unless
+the user asked for a pattern. Write an original problem of that shape with
+`write_problem` and cite the entries you drew on in `trend_ids` under `source`, so the
+debrief and the problem list can say what the problem was modelled on. Tell the user
+which entry shaped it when you give them the URL.
+
+A shape note is a paraphrase someone wrote from a post; it is not the problem and it
+is not a licence to reproduce one. Keep the story, the objects, and the examples your
+own, as always.
+
+When nothing is on file for the company, say so in one sentence, mention that
+`/chudcode:research <company>` would find what they ask, and continue with what you
+know and the seed lists. Do not do the research yourself in the middle of setting up
+an interview unless the user asks.
+
+`list_trends` shows the entries in the terminal, filtered by company or pattern, when
+the user asks what a company has been asking.
+
 ## Tools
 
 | Tool                 | Use it to                                                                                  |
@@ -184,6 +218,8 @@ offer a review. Then do what they asked.
 | `start_session`      | Create a session for a problem and get its URL. It starts the local server if needed.      |
 | `open_dashboard`     | Open the dashboard and recover any sessions in progress.                                   |
 | `list_due`           | See which patterns are due for spaced review, what comes soon, and the streak.             |
+| `list_trends`        | See what research found a company has been asking: pattern, role, date, shape, source.     |
+| `record_trends`      | Save what research found, as pattern and constraints. Used by the research skill.          |
 | `wait_for_candidate` | Receive the candidate's actions. Call it whenever you are not doing something else.        |
 | `get_session`        | See the state of a session, including the draft code when you ask for it.                  |
 | `say_to_candidate`   | Speak on the page. The only way your words reach the candidate.                            |
@@ -197,7 +233,8 @@ offer a review. Then do what they asked.
 1. `begin_interview`. Read what it returns, including the candidate's recent sessions.
 2. Choose a validated problem with `list_problems`, preferring one they have not seen
    that fits the pattern or difficulty they asked for. If none fits, author one:
-   `lookup_seed`, `write_problem`, `validate_problem` until it passes.
+   `lookup_seed`, `write_problem`, `validate_problem` until it passes. If they named a
+   company, shape it after the trend entries in the brief and cite them.
 3. `start_session`. Give them the URL in the terminal and one sentence on the page.
 4. `wait_for_candidate`, handle what arrives, wait again. Keep the loop going until the
    session is in follow-ups.
