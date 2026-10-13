@@ -8,7 +8,9 @@ description: Run a mock coding interview in a local web page. The user codes aga
 1. Note the pattern, difficulty, company, or problem title in the user's request, if
    they gave one.
 2. Call `begin_interview` from the `chudcode` MCP server with what you found. Follow
-   the method it returns in full. It includes the rubric and the candidate's history.
+   the method it returns in full. It includes the rubric, the candidate's history,
+   and what is due for review. If something is due, offer a review session in one
+   sentence, then continue with what the user asked unless they take the offer.
 3. Choose a problem with `list_problems`: validated, fitting the request, served 0
    times. If none fits, author one. Call `lookup_seed` to see the shape the pattern
    takes in real interviews, write an original problem with `write_problem`, then

@@ -146,6 +146,32 @@ too thin. Fix with `write_problem` under the same slug and validate again. Never
 serve a problem that has not passed; `start_session` refuses. Do not show the
 candidate a problem you are still fixing.
 
+## Spaced review
+
+Every recorded session leaves a verdict against each of the problem's patterns:
+solved or not. The verdict moves the pattern between Leitner boxes, and the box
+decides when the pattern comes back: one day after a miss, then three, seven,
+twenty-one, and sixty days as it keeps being solved. A miss at any box sends it back
+to the start. Hints do not change the schedule, but they are recorded and should
+shape the next session's difficulty.
+
+`list_due` shows the schedule: what is due now, most overdue first, what comes due
+soon, and the practice streak. The brief from `begin_interview` includes the same
+list.
+
+A review session (`begin_interview` with `mode` set to `review`) is an ordinary
+interview with two rules. The pattern is chosen for the candidate: the most overdue
+one, unless they asked for a specific pattern that is due. And the problem is one
+they have not seen. The point is to find out whether the pattern stuck, and a
+remembered problem does not test that. Use a validated problem on disk tagged with
+the pattern that has been served 0 times, or write a new one with `source.kind` set
+to `review`. Pick the difficulty from history: the same as last time after a miss,
+one step harder after a solve. Start it with `mode` set to `review` and score it with
+`record_session` like any other session; that is what moves the box.
+
+When something is due and the user asks for a regular interview, mention it once and
+offer a review. Then do what they asked.
+
 ## Tools
 
 | Tool                 | Use it to                                                                                  |
@@ -157,6 +183,7 @@ candidate a problem you are still fixing.
 | `validate_problem`   | Run the reference against every case, fill oracle outputs, and mark the problem servable.  |
 | `start_session`      | Create a session for a problem and get its URL. It starts the local server if needed.      |
 | `open_dashboard`     | Open the dashboard and recover any sessions in progress.                                   |
+| `list_due`           | See which patterns are due for spaced review, what comes soon, and the streak.             |
 | `wait_for_candidate` | Receive the candidate's actions. Call it whenever you are not doing something else.        |
 | `get_session`        | See the state of a session, including the draft code when you ask for it.                  |
 | `say_to_candidate`   | Speak on the page. The only way your words reach the candidate.                            |

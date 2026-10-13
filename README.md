@@ -9,9 +9,9 @@ them, probes edge cases and complexity after you submit, and scores the session 
 rubric. Patterns you miss come back on a spaced-review schedule with a fresh problem,
 not the one you already saw.
 
-**Status:** early development. Mock interviews work, and the interviewer writes its
-own problems: an original bundle per request, validated against its reference
-solution before it is served. Spaced review is next.
+**Status:** early development. Mock interviews work; the interviewer writes its own
+problems, validated against a reference solution before they are served; and the
+patterns you miss come back on a Leitner schedule with a problem you have not seen.
 
 ## Install
 
@@ -25,7 +25,9 @@ claude plugin install chudcode@chudcode
 
 Then, in Claude Code, say "give me a mock interview on sliding windows" or run
 `/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
-`/chudcode:dashboard` shows past sessions.
+`/chudcode:review` serves a fresh problem on the pattern you are most overdue to see
+again. `/chudcode:dashboard` opens the page with your review schedule, streak, and past
+sessions.
 
 To try a checkout without installing it: `claude --plugin-dir /path/to/ChudCode`.
 
@@ -46,10 +48,14 @@ make sure the patterns you keep missing are the ones you see again.
   problem you name, and validated against a reference solution before you ever see
   them. The Grind 75 and NeetCode 150 lists are vendored as titles and patterns only;
   no problem statements are stored. See `docs/PROBLEM-FORMAT.md`.
+- Spaced review: every scored session moves the problem's patterns between Leitner
+  boxes (1, 3, 7, 21, 60 days). A review session serves a problem you have not seen
+  on the most overdue pattern. The dashboard shows every pattern's box, what is due,
+  and your streak. Boxes and due dates are derived on every read from an append-only
+  log of verdicts, so changing the schedule or the verdict rule re-scores history.
 
 ## Planned
 
-- Leitner spaced review over patterns, and a dashboard of what is due.
 - Interview trend research per company, feeding problem selection.
 - Pi support through the same MCP server.
 
