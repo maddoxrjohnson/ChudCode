@@ -45,3 +45,26 @@ jobs:
       - run: npm run bundle:editor
       # The committed bundle must match what the pinned esbuild and CodeMirror produce.
       - run: git diff --exit-code -- assets/vendor
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      # Only Chromium: the page is a loopback tool, and one engine catches the bugs
+      # that matter (editor input, SSE, dialogs) without tripling the job's time.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e:browser -- e2e-artifacts
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: e2e-artifacts
+          if-no-files-found: ignore

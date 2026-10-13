@@ -72,6 +72,7 @@ npm run check            # typecheck
 npm run lint
 npm run format
 npm run bundle:editor    # rebuild assets/vendor after editing assets/editor/entry.mjs
+npm run e2e:browser      # drive the interview page in headless Chromium (npx playwright install chromium first)
 ```
 
 The runner executes solutions in a separate process with memory, CPU, and wall-clock

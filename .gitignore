@@ -6,6 +6,9 @@ coverage/
 # Local state created by dev scripts that point CHUDCODE_DIR at the repo
 .chudcode/
 
+# Screenshots from npm run e2e:browser
+e2e-artifacts/
+
 # Python bytecode from running the harness or reference solutions locally
 __pycache__/
 *.pyc
