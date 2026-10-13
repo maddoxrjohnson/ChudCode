@@ -4,7 +4,11 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { buildProgress } from "../src/progress.ts";
+import { DAY_MS, scheduleItems } from "../src/review.ts";
+import { patterns } from "../src/store/problems.ts";
 import {
+  dueListText,
   interviewBrief,
   nothingYetText,
   resultText,
@@ -131,6 +135,49 @@ describe("resultText and submissionPrompt", () => {
     );
     expect(passing).toContain("Every case passed");
     expect(passing).toContain("`record_session`");
+  });
+});
+
+describe("dueListText", () => {
+  const now = Date.UTC(2026, 9, 10, 12);
+  const progress = (events: Parameters<typeof scheduleItems>[0]) =>
+    buildProgress({
+      items: scheduleItems(events),
+      taxonomy: patterns(),
+      sessionTimes: events.map((e) => e.at),
+      now,
+    });
+
+  it("says when nothing has happened yet, and when the next review comes", () => {
+    expect(dueListText(progress([]), 5)).toContain("no session has been recorded yet");
+    const later = progress([
+      { key: "pattern:trees", at: now - DAY_MS, correct: true, session: "20261009-1200-t-0001" },
+    ]);
+    expect(dueListText(later, 5)).toContain(
+      "Nothing is due. The next pattern comes due in 2 days.",
+    );
+    expect(dueListText(later, 5)).toContain("Due soon: trees in 2 days.");
+    expect(dueListText(later, 5)).toContain("Streak: 1 day.");
+  });
+
+  it("lists due patterns most overdue first with their box and last result", () => {
+    const out = dueListText(
+      progress([
+        {
+          key: "pattern:trees",
+          at: now - 3 * DAY_MS,
+          correct: true,
+          session: "s-1",
+          difficulty: "medium",
+        },
+        { key: "pattern:stack", at: now - 2 * DAY_MS, correct: false, session: "s-2" },
+      ]),
+      5,
+    );
+    expect(out.split("\n").slice(2, 4)).toEqual([
+      "- stack: box 0, 1 day overdue; missed 2 days ago, 1 attempt",
+      "- trees: box 1, due today; solved 3 days ago (medium), 1 attempt",
+    ]);
   });
 });
 

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DAY_MS,
+  dueText,
   makeKey,
   nextBox,
   parseKey,
@@ -166,6 +167,17 @@ describe("relativeDay", () => {
     expect(relativeDay(T0 - DAY_MS, T0)).toBe("yesterday");
     expect(relativeDay(T0 + 5 * DAY_MS, T0)).toBe("in 5 days");
     expect(relativeDay(T0 - 3 * DAY_MS, T0)).toBe("3 days ago");
+  });
+});
+
+describe("dueText", () => {
+  it("says when something is due or how overdue it is", () => {
+    expect(dueText(T0, T0)).toBe("due today");
+    expect(dueText(T0 + DAY_MS, T0)).toBe("due tomorrow");
+    expect(dueText(T0 + 4 * DAY_MS, T0)).toBe("due in 4 days");
+    expect(dueText(T0 - 0.3 * DAY_MS, T0)).toBe("due today");
+    expect(dueText(T0 - DAY_MS, T0)).toBe("1 day overdue");
+    expect(dueText(T0 - 6 * DAY_MS, T0)).toBe("6 days overdue");
   });
 });
 

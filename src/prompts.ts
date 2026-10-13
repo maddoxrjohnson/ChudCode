@@ -13,6 +13,8 @@ import * as path from "node:path";
 
 import { clipText, formatClock, formatInput, formatValue, plural } from "./format.ts";
 import { remaining, type SessionState } from "./flow.ts";
+import { loadProgress, type Progress } from "./progress.ts";
+import { dueText, relativeDay, type ReviewItem } from "./review.ts";
 import type { RunResult, TestCase } from "./runner/types.ts";
 import { describeLists, lookupSeed, matchSeedTitle, type SeedEntry } from "./seed.ts";
 import { docsDir } from "./store/paths.ts";
@@ -76,12 +78,19 @@ export function interviewBrief(request: BriefRequest, hostBrief: string, now = D
   const asked = asks.length
     ? ` They asked for ${asks.join(", ")}.`
     : " They named no pattern or difficulty.";
+  const progress = loadProgress(now);
   if (request.mode === "review") {
     parts.push(
       `The user wants a review session: a fresh problem on a pattern that is due.${asked}`,
     );
+    parts.push(reviewDirectiveText(progress, request.pattern));
   } else {
     parts.push(`The user wants a mock coding interview.${asked}`);
+    if (progress.due.length > 0) {
+      parts.push(
+        `${plural(progress.due.length, "pattern is", "patterns are")} due for spaced review (listed below). Mention that in one sentence and offer a review session, then do what the user asked.`,
+      );
+    }
   }
   if (request.title) {
     parts.push(seedTitleText(request.title));
@@ -92,6 +101,7 @@ export function interviewBrief(request: BriefRequest, hostBrief: string, now = D
   if (request.pattern) parts.push(seedPatternText(request.pattern));
 
   parts.push(recentSessionsText(now));
+  parts.push(dueListText(progress, 5));
   parts.push(problemsText());
   parts.push(authoringText());
   parts.push(readDoc("INTERVIEWING.md"));
@@ -170,6 +180,70 @@ export function seedPatternText(pattern: string, limit = 10): string {
   const more =
     entries.length > limit ? `, and ${entries.length - limit} more via \`lookup_seed\`` : "";
   return `## Seed problems for ${pattern}\n\nThe shapes interviewers ask on this pattern, from Grind 75 and NeetCode 150: ${shown.join(", ")}${more}. Use them to choose a realistic shape and difficulty for an original problem; do not reproduce any of them.`;
+}
+
+/** `- sliding-window: box 0, 2 days overdue; missed 3 days ago (easy), 1 attempt` */
+export function dueLine(item: ReviewItem, now: number): string {
+  const last = `${item.lastCorrect ? "solved" : "missed"} ${relativeDays(item.lastAt, now)}${item.lastDifficulty ? ` (${item.lastDifficulty})` : ""}`;
+  return `- ${item.id}: box ${item.box}, ${dueText(item.dueAt, now)}; ${last}, ${plural(item.attempts, "attempt")}`;
+}
+
+/** What `list_due` returns and what the brief includes: due now, due soon, the streak. */
+export function dueListText(progress: Progress, limit: number): string {
+  const { now } = progress;
+  const lines = ["## Due for review", ""];
+  if (progress.due.length === 0) {
+    lines.push(
+      progress.summary.total === 0
+        ? "Nothing is due: no session has been recorded yet."
+        : progress.summary.nextDueAt === null
+          ? "Nothing is due."
+          : `Nothing is due. The next pattern comes due ${relativeDay(progress.summary.nextDueAt, now)}.`,
+    );
+  } else {
+    lines.push(...progress.due.slice(0, limit).map((item) => dueLine(item, now)));
+    if (progress.due.length > limit)
+      lines.push(
+        `…and ${progress.due.length - limit} more. Call \`list_due\` with a higher limit.`,
+      );
+  }
+  if (progress.dueSoon.length > 0) {
+    lines.push(
+      "",
+      `Due soon: ${progress.dueSoon.map((item) => `${item.id} ${relativeDay(item.dueAt, now)}`).join(", ")}.`,
+    );
+  }
+  const mastered = `${progress.summary.mastered} of ${progress.patterns.length} patterns mastered`;
+  lines.push(
+    "",
+    `Streak: ${plural(progress.streakDays, "day")}. ${mastered}; ${plural(progress.summary.total, "pattern")} exercised so far.`,
+  );
+  return lines.join("\n");
+}
+
+/** How to run a review session, given what is due. */
+function reviewDirectiveText(progress: Progress, requestedPattern?: string): string {
+  const target = requestedPattern
+    ? progress.due.find((item) => item.id === requestedPattern)
+    : progress.due[0];
+  if (!target) {
+    const fallback =
+      progress.dueSoon[0] ??
+      [...progress.due, ...progress.dueSoon].sort((a, b) => a.dueAt - b.dueAt)[0];
+    return [
+      requestedPattern && progress.due.length > 0
+        ? `**${requestedPattern}** is not due. ${progress.due[0]?.id} is the most overdue pattern; serve that unless the user insists.`
+        : "Nothing is due for review right now. Tell the user so in one sentence.",
+      fallback
+        ? `Offer a regular interview on **${fallback.id}**, which comes due ${relativeDay(fallback.dueAt, progress.now)}, or on whatever they prefer.`
+        : "Offer a regular interview on a pattern of their choice.",
+    ].join(" ");
+  }
+  return [
+    `Serve **${target.id}**: it is ${dueText(target.dueAt, progress.now)} in box ${target.box}, last ${target.lastCorrect ? "solved" : "missed"} ${relativeDays(target.lastAt, progress.now)}.`,
+    "A review needs a problem the candidate has not seen: the point is the pattern, not the problem. Use a validated problem on disk tagged with the pattern that has been served 0 times if one exists; otherwise write an original one with `write_problem`, `source.kind` set to `review`, then `validate_problem` until it passes.",
+    `Match the difficulty to history: the same as last time after a miss, one step harder after a solve. Call \`start_session\` with \`mode: "review"\`.`,
+  ].join(" ");
 }
 
 function authoringText(): string {

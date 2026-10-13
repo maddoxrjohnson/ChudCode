@@ -182,6 +182,13 @@ export function relativeDay(at: number, now: number): string {
   return days > 0 ? `in ${days} days` : `${-days} days ago`;
 }
 
+/** "due today", "due tomorrow", "due in 5 days", "1 day overdue", "3 days overdue". */
+export function dueText(dueAt: number, now: number): string {
+  const overdue = Math.round((now - dueAt) / DAY_MS);
+  if (overdue <= 0) return `due ${relativeDay(dueAt, now)}`;
+  return overdue === 1 ? "1 day overdue" : `${overdue} days overdue`;
+}
+
 /**
  * Consecutive calendar days with at least one session, counting back from today.
  * A day that has not had a session yet does not break the streak until it is over,

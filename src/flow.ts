@@ -8,13 +8,7 @@
  */
 
 import { renderMarkdown } from "./markdown.ts";
-import {
-  makeKey,
-  relativeDay,
-  scheduleItems,
-  type ReviewEvent,
-  type ScheduleOptions,
-} from "./review.ts";
+import { makeKey, relativeDay, type ReviewEvent } from "./review.ts";
 import { pythonAdapter } from "./runner/adapters/python/adapter.ts";
 import type { CandidateRunResult } from "./runner/sanitize.ts";
 import type { CaseResult } from "./runner/types.ts";
@@ -23,9 +17,10 @@ import { emitCandidateEvent } from "./server/hooks.ts";
 import { push, sessionChannel } from "./server/sse.ts";
 import { readConfig, type Config } from "./store/config.ts";
 import { publicView, readProblem, type Hint, type PublicProblem } from "./store/problems.ts";
-import { appendReviewEvents, readReviewEvents } from "./store/review-events.ts";
+import { appendReviewEvents, reviewItems, rewriteReviewEvents } from "./store/review-events.ts";
 import {
   appendEvent,
+  listSessions,
   readDraft,
   readEvents,
   readSession,
@@ -428,7 +423,8 @@ export function abandonSession(id: string, reason: string, now = Date.now()): Re
   return { session, reviewEvents, nextDue: reviewEvents.length ? nextDueLines(session, now) : [] };
 }
 
-function reviewEventsFor(session: Session, correct: boolean, now: number): ReviewEvent[] {
+/** One review event per key the session exercised: each of its patterns and the problem. */
+export function reviewEventsFor(session: Session, correct: boolean, now: number): ReviewEvent[] {
   const keys = [
     ...session.patterns.map((p) => makeKey("pattern", p)),
     makeKey("problem", session.problem),
@@ -449,12 +445,32 @@ function reviewEventsFor(session: Session, correct: boolean, now: number): Revie
   });
 }
 
-export function scheduleOptions(config: Config = readConfig()): ScheduleOptions | undefined {
-  return config.reviewIntervalsDays ? { intervalsDays: config.reviewIntervalsDays } : undefined;
+/**
+ * The review events a finished session implies: its verdict when it was recorded, a
+ * miss when it was abandoned for a reason that counts. Sessions still in progress
+ * and interrupted ones imply nothing. Stamped with the session's end time, so a
+ * rebuilt log reproduces the schedule and the streak.
+ */
+export function eventsFromSessions(sessions: readonly Session[]): ReviewEvent[] {
+  const events: ReviewEvent[] = [];
+  for (const session of sessions) {
+    const at = session.endedAt ?? session.createdAt;
+    if (session.verdict) events.push(...reviewEventsFor(session, session.verdict.correct, at));
+    else if (session.abandonedReason !== undefined && session.abandonedReason !== "interrupted")
+      events.push(...reviewEventsFor(session, false, at));
+  }
+  return events.sort((a, b) => a.at - b.at);
+}
+
+/** Regenerate review/events.jsonl from the sessions on disk. Returns the new log. */
+export function rebuildReviewLog(): ReviewEvent[] {
+  const events = eventsFromSessions(listSessions(Number.MAX_SAFE_INTEGER));
+  rewriteReviewEvents(events);
+  return events;
 }
 
 function nextDueLines(session: Session, now: number): string[] {
-  const items = scheduleItems(readReviewEvents(), scheduleOptions());
+  const items = reviewItems();
   return session.patterns.flatMap((pattern) => {
     const item = items.find((i) => i.key === makeKey("pattern", pattern));
     return item

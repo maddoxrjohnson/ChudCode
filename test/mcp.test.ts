@@ -18,7 +18,8 @@ import {
 import { setHooks } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
 import { readProblem } from "../src/store/problems.ts";
-import { readReviewEvents } from "../src/store/review-events.ts";
+import { DAY_MS } from "../src/review.ts";
+import { appendReviewEvents, readReviewEvents } from "../src/store/review-events.ts";
 import { readSession } from "../src/store/sessions.ts";
 import { makeFixture, openStream, seedExample, type Fixture } from "./helpers.ts";
 
@@ -168,6 +169,7 @@ describe("protocol", () => {
       "abandon_session",
       "begin_interview",
       "get_session",
+      "list_due",
       "list_problems",
       "lookup_seed",
       "open_dashboard",
@@ -241,9 +243,49 @@ describe("an interview round trip", () => {
     expect(brief).toContain(
       "`window-sum`: Largest Window Sum (easy; sliding-window) — validated, served 0 times",
     );
+    expect(brief).toContain("## Due for review");
+    expect(brief).toContain("Nothing is due: no session has been recorded yet.");
     expect(brief).toContain("# Interviewing");
     expect(brief).toContain("# Rubric");
     expect(brief).toContain(HOST_BRIEF);
+  });
+
+  it("lists what is due and steers a review session at the most overdue pattern", async () => {
+    const now = Date.now();
+    appendReviewEvents([
+      {
+        key: "pattern:stack",
+        at: now - 9 * DAY_MS,
+        correct: false,
+        session: "20260101-0900-a-0001",
+      },
+      { key: "problem:a", at: now - 9 * DAY_MS, correct: false, session: "20260101-0900-a-0001" },
+      { key: "pattern:heap", at: now - 4 * DAY_MS, correct: true, session: "20260105-0900-b-0002" },
+      { key: "pattern:graphs", at: now - DAY_MS, correct: true, session: "20260108-0900-c-0003" },
+    ]);
+    const due = await call("list_due");
+    expect(due.isError).toBe(false);
+    const listed = text(due);
+    expect(listed).toMatch(/^## Due for review/);
+    expect(listed).toContain("- stack: box 0, 8 days overdue; missed 9 days ago, 1 attempt");
+    expect(listed).toContain("- heap: box 1, 1 day overdue; solved 4 days ago, 1 attempt");
+    expect(listed).not.toContain("- a:");
+    expect(listed).toContain("Due soon: graphs in 2 days.");
+    expect(listed).toContain("Streak: 1 day.");
+    expect(listed).toContain("0 of 21 patterns mastered; 3 patterns exercised so far.");
+
+    const limited = await call("list_due", { limit: 1 });
+    expect(text(limited)).toContain("…and 1 more");
+
+    const review = text(await call("begin_interview", { mode: "review" }));
+    expect(review).toContain(
+      "Serve **stack**: it is 8 days overdue in box 0, last missed 9 days ago.",
+    );
+    expect(review).toContain("`source.kind` set to `review`");
+    const other = text(await call("begin_interview", { mode: "review", pattern: "graphs" }));
+    expect(other).toContain("**graphs** is not due. stack is the most overdue pattern");
+    const plain = text(await call("begin_interview"));
+    expect(plain).toContain("2 patterns are due for spaced review");
   });
 
   it("runs a session from Start to the debrief", async () => {
