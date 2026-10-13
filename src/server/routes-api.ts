@@ -20,6 +20,7 @@
 import type * as http from "node:http";
 
 import * as flow from "../flow.ts";
+import { loadProgress } from "../progress.ts";
 import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
@@ -44,7 +45,11 @@ export async function handleApi(
   if (resource === "events" && req.method === "GET") return handleEvents(req, res, url);
 
   if (resource === "dashboard" && req.method === "GET") {
-    return sendJson(res, { sessions: listSessions(20), problems: listProblems() });
+    return sendJson(res, {
+      sessions: listSessions(20),
+      problems: listProblems(),
+      progress: loadProgress(),
+    });
   }
 
   if (resource === "problems" && id !== undefined && action === undefined && req.method === "GET") {

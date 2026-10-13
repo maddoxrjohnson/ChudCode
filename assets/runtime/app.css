@@ -784,3 +784,113 @@ textarea:focus,
 .error-text {
   color: var(--danger);
 }
+
+/* ── Dashboard ───────────────────────────────────────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow);
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stat.attention .stat-value {
+  color: var(--warn);
+}
+
+.due-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.due-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.grid th[scope="row"] {
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.grid tr.inactive th[scope="row"] {
+  color: var(--muted);
+}
+
+.grid .box-head,
+.grid td.box {
+  text-align: center;
+  width: 4.2rem;
+  white-space: nowrap;
+}
+
+.grid .box-head.mastered,
+.grid td.box.mastered {
+  background: var(--ok-bg);
+}
+
+.grid td.box {
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.grid td.box.fresh {
+  color: var(--muted);
+}
+
+.grid td.box.due {
+  color: var(--warn);
+}
+
+.grid td.box.mastered.current {
+  color: var(--ok);
+}
+
+.grid tr.is-due th[scope="row"] {
+  color: var(--warn);
+}
+
+.grid td:last-child {
+  white-space: nowrap;
+}
+
+.last-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--muted);
+}

@@ -5,6 +5,7 @@
 import type * as http from "node:http";
 
 import { sessionState } from "../flow.ts";
+import { loadProgress } from "../progress.ts";
 import { readConfig } from "../store/config.ts";
 import { assetsDir, isValidSessionId, isValidSlug, safeJoin } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
@@ -25,7 +26,14 @@ export function handlePage(
   if (req.method !== "GET" && req.method !== "HEAD") throw new HttpError(405, "Method not allowed");
 
   if (segments.length === 0) {
-    return sendHtml(res, dashboardPage({ sessions: listSessions(20), problems: listProblems() }));
+    return sendHtml(
+      res,
+      dashboardPage({
+        sessions: listSessions(20),
+        problems: listProblems(),
+        progress: loadProgress(),
+      }),
+    );
   }
 
   const [head, ...rest] = segments;

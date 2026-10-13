@@ -1,9 +1,15 @@
 /**
- * dashboard.ts: the landing page. Recent sessions and available problems now; the
- * pattern mastery grid and due-for-review list arrive with spaced review.
+ * dashboard.ts: the landing page. Where every pattern sits in the review boxes, what
+ * is due, the practice streak, recent sessions, and the problems on disk.
+ *
+ * Everything is rendered on the server from `Progress`, so the page reads without
+ * JavaScript; its module only reloads it when a session changes.
  */
 
+import { plural } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
+import type { PatternStanding, Progress } from "../../progress.ts";
+import { dueText, MASTERED_BOX, relativeDay, type ReviewItem } from "../../review.ts";
 import type { ProblemMeta } from "../../store/problems.ts";
 import type { Session } from "../../store/sessions.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
@@ -11,53 +17,177 @@ import { difficultyBadge, page, topbar } from "./layout.ts";
 export interface DashboardData {
   sessions: Session[];
   problems: ProblemMeta[];
+  progress: Progress;
 }
 
 export function dashboardPage(data: DashboardData): string {
-  const sessions = data.sessions.length
-    ? `<table class="table">
+  const { progress } = data;
+  return page({
+    title: "Dashboard",
+    bodyClass: "plain dashboard",
+    body: `${topbar({ title: "Dashboard" })}
+<main class="narrow">
+  ${statsHtml(progress)}
+  <section id="due">
+    <h2>Due for review</h2>
+    ${dueHtml(progress)}
+  </section>
+  <section id="patterns">
+    <h2>Patterns</h2>
+    ${gridHtml(progress)}
+  </section>
+  <section id="sessions">
+    <h2>Recent sessions</h2>
+    ${sessionsHtml(data.sessions)}
+  </section>
+  <section id="problems">
+    <h2>Problems</h2>
+    ${problemsHtml(data.problems, progress)}
+  </section>
+</main>`,
+    module: "runtime/dashboard/main.mjs",
+  });
+}
+
+// ── Sections ──────────────────────────────────────────────────────────────────
+
+function statsHtml(progress: Progress): string {
+  const stat = (id: string, value: string, label: string, cls = "") =>
+    `<div class="stat ${cls}" id="stat-${id}"><span class="stat-value">${escapeHtml(value)}</span><span class="stat-label">${escapeHtml(label)}</span></div>`;
+  const due = progress.due.length;
+  return `<section class="stats">
+  ${stat("streak", String(progress.streakDays), "day streak")}
+  ${stat("due", String(due), "due for review", due > 0 ? "attention" : "")}
+  ${stat("mastered", `${progress.summary.mastered}/${progress.patterns.length}`, "patterns mastered")}
+  ${stat("sessions", String(progress.sessionsScored), progress.sessionsScored === 1 ? "session scored" : "sessions scored")}
+</section>`;
+}
+
+function dueHtml(progress: Progress): string {
+  const { now } = progress;
+  const names = new Map(progress.patterns.map((p) => [p.id, p.name]));
+  if (progress.due.length === 0) {
+    const next =
+      progress.summary.total === 0
+        ? "Finish an interview and its patterns start their review schedule."
+        : progress.summary.nextDueAt === null
+          ? "Nothing is due."
+          : `Nothing is due. Next up: ${names.get(nextDueItem(progress)?.id ?? "") ?? ""} ${relativeDay(progress.summary.nextDueAt, now)}.`;
+    return `<p class="muted" id="due-empty">${escapeHtml(next)}</p>`;
+  }
+  const items = progress.due
+    .map(
+      (item) => `<li data-pattern="${escapeHtml(item.id)}">
+  <strong>${escapeHtml(names.get(item.id) ?? item.id)}</strong>
+  <span class="badge warn">${escapeHtml(dueText(item.dueAt, now))}</span>
+  <span class="muted">${escapeHtml(lastWords(item, now))} · box ${item.box}</span>
+</li>`,
+    )
+    .join("\n");
+  return `<ul class="due-list">${items}</ul>
+<p class="muted small">Ask your agent for a review session. It writes a fresh problem on the pattern; you never see the same one twice.</p>`;
+}
+
+function nextDueItem(progress: Progress): ReviewItem | undefined {
+  return progress.dueSoon[0];
+}
+
+function gridHtml(progress: Progress): string {
+  const { now } = progress;
+  const heads = progress.intervalsDays
+    .map(
+      (days, box) =>
+        `<th class="box-head ${box >= MASTERED_BOX ? "mastered" : ""}" title="Box ${box}: a pattern here comes back after ${plural(days, "day")}">${escapeHtml(intervalLabel(days))}</th>`,
+    )
+    .join("");
+  const rows = progress.patterns
+    .map((p) => rowHtml(p, progress.intervalsDays.length, now))
+    .join("\n");
+  return `<div class="table-scroll">
+<table class="table grid" id="pattern-grid">
+<thead><tr><th>Pattern</th><th class="box-head" title="Not exercised yet">New</th>${heads}<th>Last</th></tr></thead>
+<tbody>
+${rows}
+</tbody>
+</table>
+</div>
+<p class="muted small">A solved session moves a pattern one box to the right; a miss sends it back to the first box. Boxes shaded green count as mastered.</p>`;
+}
+
+function rowHtml(p: PatternStanding, boxes: number, now: number): string {
+  const cell = (classes: string[], content: string, title?: string) =>
+    `<td class="${["box", ...classes].join(" ")}"${title ? ` title="${escapeHtml(title)}"` : ""}>${content}</td>`;
+  const cells = [p.box === null ? cell(["current", "fresh"], "○") : cell([], "")];
+  for (let box = 0; box < boxes; box += 1) {
+    if (p.box !== box) {
+      cells.push(cell([], ""));
+      continue;
+    }
+    const classes = ["current"];
+    if (p.due) classes.push("due");
+    if (p.mastered) classes.push("mastered");
+    const title = p.dueAt === null ? undefined : `Box ${box} · ${dueText(p.dueAt, now)}`;
+    cells.push(cell(classes, "●", title));
+  }
+  const last =
+    p.lastAt === null || p.lastSession === null
+      ? `<span class="muted">—</span>`
+      : `<a class="last-link" href="/s/${escapeHtml(p.lastSession)}">${escapeHtml(`${p.lastCorrect ? "solved" : "missed"} ${relativeDay(p.lastAt, now)}`)}</a>`;
+  const rowClasses = [p.box === null ? "inactive" : "", p.due ? "is-due" : ""].filter(Boolean);
+  return `<tr data-pattern="${escapeHtml(p.id)}" data-box="${p.box ?? ""}"${rowClasses.length ? ` class="${rowClasses.join(" ")}"` : ""}>
+  <th scope="row">${escapeHtml(p.name)}</th>
+  ${cells.join("")}
+  <td>${last}</td>
+</tr>`;
+}
+
+function sessionsHtml(sessions: Session[]): string {
+  if (sessions.length === 0)
+    return `<p class="muted">No sessions yet. Ask your agent to start an interview.</p>`;
+  return `<table class="table">
 <thead><tr><th>When</th><th>Problem</th><th>Mode</th><th>Result</th><th>Hints</th></tr></thead>
-<tbody>${data.sessions
-        .map(
-          (s) => `<tr>
+<tbody>${sessions
+    .map(
+      (s) => `<tr>
   <td><a href="/s/${escapeHtml(s.id)}">${escapeHtml(formatDate(s.createdAt))}</a></td>
   <td>${escapeHtml(s.problemTitle)} ${difficultyBadge(s.difficulty)}</td>
   <td>${escapeHtml(s.mode)}</td>
   <td>${sessionResult(s)}</td>
   <td>${s.hintsUsed.length}</td>
 </tr>`,
-        )
-        .join("\n")}</tbody>
-</table>`
-    : `<p class="muted">No sessions yet. Ask your agent to start an interview.</p>`;
+    )
+    .join("\n")}</tbody>
+</table>`;
+}
 
-  const problems = data.problems.length
-    ? `<ul class="problem-list">${data.problems
-        .map(
-          (
-            p,
-          ) => `<li><a href="/p/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a> ${difficultyBadge(p.difficulty)}
-  <span class="muted">${p.patterns.map(escapeHtml).join(", ")}${p.validatedAt ? "" : " · unvalidated"}</span></li>`,
-        )
-        .join("\n")}</ul>`
-    : `<p class="muted">No problems yet.</p>`;
+function problemsHtml(problems: ProblemMeta[], progress: Progress): string {
+  if (problems.length === 0) return `<p class="muted">No problems yet.</p>`;
+  const items = problems
+    .map((p) => {
+      const item = progress.problems[p.slug];
+      const notes = [
+        p.patterns.join(", "),
+        p.validatedAt ? "" : "unvalidated",
+        item ? lastWords(item, progress.now) : "",
+      ].filter(Boolean);
+      return `<li><a href="/p/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a> ${difficultyBadge(p.difficulty)}
+  <span class="muted">${escapeHtml(notes.join(" · "))}</span></li>`;
+    })
+    .join("\n");
+  return `<ul class="problem-list">${items}</ul>`;
+}
 
-  return page({
-    title: "Dashboard",
-    bodyClass: "plain dashboard",
-    body: `${topbar({ title: "Dashboard" })}
-<main class="narrow">
-  <section>
-    <h2>Recent sessions</h2>
-    ${sessions}
-  </section>
-  <section>
-    <h2>Problems</h2>
-    ${problems}
-  </section>
-</main>`,
-    module: "runtime/plain/main.mjs",
-  });
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function lastWords(item: ReviewItem, now: number): string {
+  return `${item.lastCorrect ? "solved" : "missed"} ${relativeDay(item.lastAt, now)}`;
+}
+
+/** "1 day", "3 days", "3 weeks", "2 months". */
+export function intervalLabel(days: number): string {
+  if (days >= 56 && days % 30 < 3) return plural(Math.round(days / 30), "month");
+  if (days >= 14 && days % 7 === 0) return plural(days / 7, "week");
+  return plural(days, "day");
 }
 
 function sessionResult(session: Session): string {
@@ -65,6 +195,7 @@ function sessionResult(session: Session): string {
     return session.verdict.correct
       ? `<span class="badge ok">solved</span>`
       : `<span class="badge warn">not solved</span>`;
+  if (session.abandonedReason) return `<span class="muted">abandoned</span>`;
   if (session.lastResult) return `${session.lastResult.passed}/${session.lastResult.total} passed`;
   return `<span class="muted">${escapeHtml(session.phase)}</span>`;
 }

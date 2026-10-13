@@ -48,12 +48,25 @@ const post = (path: string, body: unknown = {}) => send("POST", path, body);
 const openStream = (path: string) => openStreamAt(baseUrl, path);
 
 describe("pages", () => {
-  it("serves the dashboard", async () => {
+  it("serves the dashboard with the pattern grid, as HTML and as JSON", async () => {
     const res = await get("/");
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("ChudCode");
     expect(html).toContain("Largest Window Sum");
+    expect(html).toContain('<tr data-pattern="sliding-window" data-box=""');
+    expect(html).toContain("Finish an interview and its patterns start their review schedule.");
+
+    const api = await get("/api/dashboard");
+    expect(api.status).toBe(200);
+    const body = (await api.json()) as {
+      sessions: unknown[];
+      progress: { patterns: unknown[]; streakDays: number; problems: Record<string, unknown> };
+    };
+    expect(body.sessions).toHaveLength(1);
+    expect(body.progress.patterns).toHaveLength(21);
+    expect(body.progress.streakDays).toBe(0);
+    expect(body.progress.problems).toEqual({});
   });
 
   it("serves the session page without leaking the solution or hidden cases", async () => {
@@ -273,6 +286,27 @@ describe.skipIf(!pythonAvailable())("running code over HTTP", () => {
     const submission = events.find((e) => e.kind === "submission");
     expect(submission && submission.kind === "submission" && submission.result.total).toBe(12);
     expect(readSession(sessionId).submissions).toBe(1);
+  });
+});
+
+describe("the dashboard stream", () => {
+  it("tells an open dashboard to reload when a session starts", async () => {
+    const other = createSession({
+      problem: "window-sum",
+      problemTitle: "Largest Window Sum",
+      patterns: ["sliding-window"],
+      difficulty: "easy",
+      mode: "interview",
+      timerMs: 60_000,
+    }).id;
+    const stream = await openStream("/api/events?scope=dashboard");
+    try {
+      await post(`/api/sessions/${other}/start`);
+      const frame = await stream.next((f) => f.type === "reload");
+      expect(frame.data).toEqual({ sessionId: other });
+    } finally {
+      stream.close();
+    }
   });
 });
 

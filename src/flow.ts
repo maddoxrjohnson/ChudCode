@@ -14,7 +14,7 @@ import type { CandidateRunResult } from "./runner/sanitize.ts";
 import type { CaseResult } from "./runner/types.ts";
 import { runCode, type RunOutcome, type RunScope } from "./runs.ts";
 import { emitCandidateEvent } from "./server/hooks.ts";
-import { push, sessionChannel } from "./server/sse.ts";
+import { DASHBOARD_CHANNEL, push, sessionChannel } from "./server/sse.ts";
 import { readConfig, type Config } from "./store/config.ts";
 import { publicView, readProblem, type Hint, type PublicProblem } from "./store/problems.ts";
 import { appendReviewEvents, reviewItems, rewriteReviewEvents } from "./store/review-events.ts";
@@ -103,6 +103,7 @@ export function startSession(
   if (session.startedAt === now) {
     appendEvent(id, { type: "started", at: now });
     pushPhase(session);
+    notifyDashboard(id);
     // Only a candidate's own press is news to the interviewer.
     if (by === "candidate") emitCandidateEvent({ kind: "started", sessionId: id, at: now });
   }
@@ -400,6 +401,7 @@ export function recordSession(id: string, input: RecordInput, now = Date.now()):
     nextDue: nextDue.join(" "),
   });
   pushPhase(session);
+  notifyDashboard(id);
   return { session, reviewEvents, nextDue };
 }
 
@@ -420,6 +422,7 @@ export function abandonSession(id: string, reason: string, now = Date.now()): Re
   const reviewEvents = trimmed === "interrupted" ? [] : reviewEventsFor(session, false, now);
   appendReviewEvents(reviewEvents);
   pushPhase(session);
+  notifyDashboard(id);
   return { session, reviewEvents, nextDue: reviewEvents.length ? nextDueLines(session, now) : [] };
 }
 
@@ -486,6 +489,11 @@ function requireCoding(id: string): Session {
   if (session.phase === "briefing") throw new FlowError(409, "Press Start before running code");
   if (session.phase === "done") throw new FlowError(409, "This session is finished");
   return session;
+}
+
+/** An open dashboard reloads when a session starts, is scored, or is created. */
+export function notifyDashboard(sessionId: string): void {
+  push(DASHBOARD_CHANNEL, "reload", { sessionId });
 }
 
 function pushPhase(session: Session): void {

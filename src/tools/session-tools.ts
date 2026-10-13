@@ -2,8 +2,14 @@
  * session-tools.ts: tools that set a session up, inspect it, or end it early.
  */
 
-import { abandonSession, sessionState, startSession as startClock } from "../flow.ts";
+import {
+  abandonSession,
+  notifyDashboard,
+  sessionState,
+  startSession as startClock,
+} from "../flow.ts";
 import { openUrl } from "../open-browser.ts";
+import { loadProgress } from "../progress.ts";
 import {
   interviewBrief,
   patternListText,
@@ -12,6 +18,7 @@ import {
   sessionSummaryText,
 } from "../prompts.ts";
 import * as server from "../server/server.ts";
+import { plural } from "../format.ts";
 import { readConfig, shouldAutoOpen } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import {
@@ -98,7 +105,13 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         importAllExamples();
         host.recover();
         if (shouldAutoOpen(readConfig())) openUrl(base);
-        return ok(`Dashboard: ${base}`, { url: base });
+        const progress = loadProgress();
+        const standing = `${plural(progress.due.length, "pattern")} due for review; ${plural(progress.streakDays, "day")} streak; ${progress.summary.mastered} of ${progress.patterns.length} patterns mastered.`;
+        return ok(`Dashboard: ${base}\n${standing}`, {
+          url: base,
+          due: progress.due.length,
+          streakDays: progress.streakDays,
+        });
       },
     },
     {
@@ -185,6 +198,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         });
         updateMeta(slug, { timesServed: bundle.meta.timesServed + 1, lastServedAt: Date.now() });
         host.created(session.id);
+        notifyDashboard(session.id);
         if (optionalBool(args, "start_now")) startClock(session.id, Date.now(), "interviewer");
 
         const url = server.urlForSession(session.id) ?? base;

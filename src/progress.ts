@@ -56,14 +56,16 @@ export interface Progress {
   summary: ReviewSummary;
   /** Consecutive days with a recorded session, ending today or yesterday. */
   streakDays: number;
+  /** Sessions that produced a verdict. */
+  sessionsScored: number;
   /** The review item for each problem the candidate has been scored on, by slug. */
-  problems: Map<string, ReviewItem>;
+  problems: Record<string, ReviewItem>;
 }
 
 export interface ProgressInput {
   items: readonly ReviewItem[];
   taxonomy: readonly PatternInfo[];
-  /** Times of the sessions that count toward the streak. */
+  /** When each session that counts was recorded, one entry per session. */
   sessionTimes: readonly number[];
   now: number;
   intervalsDays?: readonly number[];
@@ -121,7 +123,8 @@ export function buildProgress(input: ProgressInput): Progress {
     dueSoon,
     summary: summarize(patternItems, now),
     streakDays: streak(input.sessionTimes, now, input.tzOffsetMinutes ?? 0),
-    problems: new Map(
+    sessionsScored: input.sessionTimes.length,
+    problems: Object.fromEntries(
       input.items.filter((item) => item.kind === "problem").map((item) => [item.id, item]),
     ),
   };
@@ -135,7 +138,7 @@ export function loadProgress(now = Date.now()): Progress {
     items: scheduleItems(events, scheduleOptions(config)),
     taxonomy: patterns(),
     // A day counts when a verdict was recorded; the log holds exactly those moments.
-    sessionTimes: events.map((event) => event.at),
+    sessionTimes: [...new Map(events.map((event) => [event.session, event.at])).values()],
     now,
     intervalsDays: config.reviewIntervalsDays ?? DEFAULT_INTERVALS_DAYS,
     tzOffsetMinutes: -new Date(now).getTimezoneOffset(),

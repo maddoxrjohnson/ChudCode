@@ -36,7 +36,7 @@ describe("buildProgress", () => {
   const progress = buildProgress({
     items: scheduleItems(events),
     taxonomy: TAXONOMY,
-    sessionTimes: events.map((e) => e.at),
+    sessionTimes: [...new Set(events.map((e) => e.at))],
     now: T0,
   });
 
@@ -71,14 +71,15 @@ describe("buildProgress", () => {
   });
 
   it("keeps problems apart from patterns", () => {
-    expect([...progress.problems.keys()].sort()).toEqual(["bracket-run", "island-count"]);
-    expect(progress.problems.get("island-count")?.lastCorrect).toBe(true);
+    expect(Object.keys(progress.problems).sort()).toEqual(["bracket-run", "island-count"]);
+    expect(progress.problems["island-count"]?.lastCorrect).toBe(true);
     expect(progress.due.every((item) => item.kind === "pattern")).toBe(true);
   });
 
   it("counts the streak from the session days, in the given time zone", () => {
     // Sessions on days -6, -5, -1 relative to T0 (noon UTC): yesterday only, so 1.
     expect(progress.streakDays).toBe(1);
+    expect(progress.sessionsScored).toBe(6);
     const dense = buildProgress({
       items: [],
       taxonomy: TAXONOMY,
@@ -108,6 +109,7 @@ describe("loadProgress", () => {
       dueAt: T0 + DAY_MS,
     });
     expect(standard.due).toEqual([]);
+    expect(standard.sessionsScored).toBe(1);
     expect(standard.dueSoon.map((item) => item.id)).toEqual(["sliding-window"]);
 
     writeJson(configFile(), { reviewIntervalsDays: [1, 1] });
