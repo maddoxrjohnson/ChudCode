@@ -14,6 +14,8 @@ problems, validated against a reference solution before they are served; the
 patterns you miss come back on a Leitner schedule with a problem you have not seen;
 and research into what a company has been asking shapes the problems you get for it.
 
+![The interview page: the statement on the left, the editor with three passing examples in the middle, the interviewer's chat on the right](docs/screenshots/session-ran.png)
+
 ## Install
 
 ChudCode needs Node 22.18 or later and Python 3.12 or later on your PATH. It runs
@@ -95,6 +97,22 @@ make sure the patterns you keep missing are the ones you see again.
   when you ask for an interview and the problem is written in the shape that company
   has been asking, citing the entries it came from. See `docs/TRENDS-FORMAT.md`.
 
+## What it looks like
+
+After a passing submission and the follow-ups, the interviewer scores the session.
+The debrief lands on the page: five rubric scores, strengths, things to work on, and
+when the pattern comes back.
+
+![The page after the debrief: 12 of 12 cases passed, the rubric card with scores, strengths, and things to work on](docs/screenshots/session-debrief.png)
+
+The dashboard shows every pattern's place in the review schedule, what is due, the
+streak, and past sessions.
+
+![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, and recent sessions](docs/screenshots/dashboard.png)
+
+The screenshots come from `npm run e2e:browser -- <dir>`, which drives the real page.
+How the pieces fit is in `docs/ARCHITECTURE.md`.
+
 ## Development
 
 Requires Node 22.18 or later and Python 3.12 or later.
@@ -109,11 +127,14 @@ npm run lint
 npm run format
 npm run bundle:editor    # rebuild assets/vendor after editing assets/editor/entry.mjs
 npm run e2e:browser      # drive the interview page in headless Chromium (npx playwright install chromium first)
+npm run e2e:claude       # a real `claude -p` session interviews a scripted candidate (signed-in claude; costs tokens)
 ```
 
 The runner executes solutions in a separate process with memory, CPU, and wall-clock
 limits. It is not a security sandbox: code runs as you, with your filesystem and
-network. Treat it the way you would treat running a script you wrote yourself.
+network. Treat it the way you would treat running a script you wrote yourself. To run
+it in a container with no network and a read-only filesystem instead, set
+`CHUDCODE_RUNNER=docker`; see `docs/RUNNER.md`.
 
 ## License
 

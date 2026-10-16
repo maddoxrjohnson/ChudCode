@@ -277,6 +277,14 @@ export function agentOutbox(): AgentOutbox {
   return new AgentOutbox((entry) => push(AGENT_CHANNEL, "candidate", entry));
 }
 
+function statementOf(session: Session): string | undefined {
+  try {
+    return readProblem(session.problem).statement;
+  } catch {
+    return undefined;
+  }
+}
+
 function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
   if (event.kind === "run") {
     inbox.recordRun?.(event.sessionId, event.scope, event.passed, event.total);
@@ -306,7 +314,7 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
       );
     case "message":
       return inbox.push(
-        messagePrompt(session, event.text, event.at),
+        messagePrompt(session, event.text, event.at, statementOf(session)),
         `message:${event.sessionId}:${event.at}`,
         notDone,
       );
@@ -362,7 +370,7 @@ export function recoverSessions(
       if (!event || event.type !== "message") continue;
       if (event.from === "interviewer") break;
       inbox.push(
-        messagePrompt(session, event.markdown, event.at),
+        messagePrompt(session, event.markdown, event.at, statementOf(session)),
         `message:${session.id}:${event.at}`,
       );
       break;

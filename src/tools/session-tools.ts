@@ -210,6 +210,10 @@ export function sessionTools(host: ToolHost): ToolDef[] {
             `The candidate sees the statement, ${bundle.tests.filter((c) => c.visible).length} examples, a ${timerMinutes}-minute clock, and ${bundle.hints.length} hints they can take. ${bundle.tests.length - bundle.tests.filter((c) => c.visible).length} hidden cases run on Submit.`,
             `Target complexity: ${bundle.meta.complexityTarget.time} time, ${bundle.meta.complexityTarget.space} space.`,
             `Give the user the URL and say one sentence on the page with say_to_candidate. ${thenWait()}`,
+            "",
+            "The statement as the candidate sees it, so you can answer clarifying questions from it:",
+            "",
+            bundle.statement.trim(),
           ].join("\n"),
           { sessionId: session.id, url },
         );

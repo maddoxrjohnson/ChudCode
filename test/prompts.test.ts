@@ -9,8 +9,10 @@ import { DAY_MS, scheduleItems } from "../src/review.ts";
 import { patterns } from "../src/store/problems.ts";
 import {
   BRIEF_TREND_LIMIT,
+  constraintsSection,
   dueListText,
   interviewBrief,
+  messagePrompt,
   nothingYetText,
   resultText,
   sessionLine,
@@ -155,6 +157,22 @@ describe("sessionLine", () => {
     expect(sessionLine(s, s.createdAt + 5 * 60_000)).toContain(
       "coding · 30:00 left · 1 hint used · 2 submissions (last 10/12)",
     );
+  });
+});
+
+describe("messagePrompt", () => {
+  it("quotes the statement's constraints so a clarifying question is answered from them", () => {
+    const statement = seedExample().statement;
+    expect(constraintsSection(statement)).toContain("1 <= k <= 10^5");
+    expect(constraintsSection(statement)).not.toContain("Follow-up");
+    expect(constraintsSection("# Title\n\nNo sections.")).toBeNull();
+    expect(constraintsSection("## Constraints\n\n- `n >= 1`\n")).toBe("- `n >= 1`");
+
+    const s = session();
+    const prompt = messagePrompt(s, "Can k exceed n?", s.createdAt, statement);
+    expect(prompt).toContain("> Can k exceed n?");
+    expect(prompt).toContain("The statement's constraints:\n\n- `0 <= len(nums) <= 10^5`");
+    expect(messagePrompt(s, "hi", s.createdAt)).not.toContain("constraints:");
   });
 });
 

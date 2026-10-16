@@ -462,13 +462,27 @@ export function notePrompt(session: Session, text: string, now = Date.now()): st
   ].join("\n\n");
 }
 
-export function messagePrompt(session: Session, text: string, now = Date.now()): string {
+export function messagePrompt(
+  session: Session,
+  text: string,
+  now = Date.now(),
+  statement?: string,
+): string {
+  const constraints = statement === undefined ? null : constraintsSection(statement);
   return [
     `The candidate said:\n\n> ${text.replace(/\n/g, "\n> ")}`,
+    ...(constraints ? [`The statement's constraints:\n\n${constraints}`] : []),
     "Reply with `say_to_candidate`. Answer clarifying questions the way the statement would, no more. " +
       thenWait(),
     footer(session, now),
   ].join("\n\n");
+}
+
+/** The body of a statement's `## Constraints` section, or null when it has none. */
+export function constraintsSection(statement: string): string | null {
+  const match = /^## Constraints[ \t]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(statement);
+  const body = match?.[1]?.trim();
+  return body ? body : null;
 }
 
 export function hintUsedPrompt(

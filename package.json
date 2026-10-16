@@ -36,6 +36,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e:browser": "node scripts/e2e-browser.ts",
+    "e2e:claude": "node scripts/e2e-claude.ts",
     "check": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
