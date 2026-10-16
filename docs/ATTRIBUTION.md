@@ -27,6 +27,11 @@ follows pi-teach closely enough that the lineage is worth knowing, its header sa
   pi-teach's `src/paths.ts`.
 - `mcp/launch.mjs` does what pi-teach's launcher does: check the Node version, install
   runtime dependencies on first run, then import the TypeScript server.
+- `pi/bridge.ts` and `pi/status.ts` follow pi-teach's `src/bridge.ts` and
+  `src/status-widget.ts`: wake the agent with `sendUserMessage`, as a follow-up when it
+  is mid-turn, and show which session is connected. ChudCode's bridge runs in a
+  different process from the server, so it adds the SSE subscription, sequence
+  numbers, and replay; it drops pi-teach's reply-from-final-text fallback.
 
 ## Tech Interview Handbook
 

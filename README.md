@@ -1,6 +1,6 @@
 # ChudCode
 
-A mock technical interviewer you can code against, inside Claude Code.
+A mock technical interviewer you can code against, inside Claude Code or Pi.
 
 ChudCode generates original interview-style coding problems, serves them in a local
 web page with a code editor, hidden tests, and a timer, and plays the interviewer. It
@@ -16,8 +16,10 @@ and research into what a company has been asking shapes the problems you get for
 
 ## Install
 
-ChudCode is a Claude Code plugin. It needs Node 22.18 or later and Python 3.12 or
-later on your PATH.
+ChudCode needs Node 22.18 or later and Python 3.12 or later on your PATH. It runs
+TypeScript directly, with no build step.
+
+### Claude Code
 
 ```sh
 claude plugin marketplace add maddoxrjohnson/ChudCode
@@ -32,6 +34,38 @@ so an interview for it has the right shape. `/chudcode:dashboard` opens the page
 your review schedule, streak, and past sessions.
 
 To try a checkout without installing it: `claude --plugin-dir /path/to/ChudCode`.
+
+### Pi
+
+Pi gets the same tools from the same MCP server, through Pi's MCP adapter, plus an
+extension for the slash commands and the bridge that pushes the candidate's actions
+into the conversation. Clone the repository somewhere stable and install both:
+
+```sh
+git clone https://github.com/maddoxrjohnson/ChudCode ~/ChudCode
+(cd ~/ChudCode && npm ci --omit=dev)
+pi install ~/ChudCode
+```
+
+Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your clone:
+
+```json
+{
+  "mcpServers": {
+    "chudcode": {
+      "command": "node",
+      "args": ["/home/you/ChudCode/mcp/launch.mjs"],
+      "env": { "CHUDCODE_HOST": "pi" },
+      "exposure": "direct"
+    }
+  }
+}
+```
+
+`CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
+are `/interview`, `/review`, `/research <company>`, and `/dashboard`. While the
+interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
+below the editor.
 
 ## Why
 
@@ -60,10 +94,6 @@ make sure the patterns you keep missing are the ones you see again.
   source, and a short paraphrase of its shape, never a statement. Name the company
   when you ask for an interview and the problem is written in the shape that company
   has been asking, citing the entries it came from. See `docs/TRENDS-FORMAT.md`.
-
-## Planned
-
-- Pi support through the same MCP server.
 
 ## Development
 

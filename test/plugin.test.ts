@@ -46,6 +46,15 @@ describe("Claude Code plugin", () => {
   });
 });
 
+describe("Pi package", () => {
+  const pkg = readJson("package.json");
+
+  it("points Pi at an extension entry that exists", () => {
+    expect(pkg["pi"]).toEqual({ extensions: ["./pi/index.ts"] });
+    expect(fs.existsSync(path.join(packageRoot(), "pi/index.ts"))).toBe(true);
+  });
+});
+
 describe("skills", () => {
   const known = new McpSession(new CandidateInbox()).toolNames();
 

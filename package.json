@@ -20,10 +20,17 @@
     "leetcode",
     "practice",
     "mcp",
-    "claude-code"
+    "claude-code",
+    "pi-package",
+    "pi-extension"
   ],
   "engines": {
     "node": ">=22.18.0"
+  },
+  "pi": {
+    "extensions": [
+      "./pi/index.ts"
+    ]
   },
   "scripts": {
     "test": "vitest run",
