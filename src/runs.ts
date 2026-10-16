@@ -4,9 +4,10 @@
  */
 
 import { pythonAdapter } from "./runner/adapters/python/adapter.ts";
+import { DockerRunner } from "./runner/docker-runner.ts";
 import { processRunner } from "./runner/process-runner.ts";
 import { sanitizeForCandidate, type CandidateRunResult } from "./runner/sanitize.ts";
-import type { CaseResult, Limits, RunResult, TestCase } from "./runner/types.ts";
+import type { CaseResult, Limits, RunResult, Runner, TestCase } from "./runner/types.ts";
 import type { ProblemBundle } from "./store/problems.ts";
 
 export type RunScope = "visible" | "all" | { custom: Array<Record<string, unknown>> };
@@ -28,12 +29,23 @@ export interface RunOutcome {
 
 export class InvalidCustomInput extends Error {}
 
+let docker: DockerRunner | null = null;
+
+/** ProcessRunner unless CHUDCODE_RUNNER=docker. Read per run, so tests can switch it. */
+export function activeRunner(env: NodeJS.ProcessEnv = process.env): Runner {
+  if (env["CHUDCODE_RUNNER"] !== "docker") return processRunner;
+  const image = env["CHUDCODE_DOCKER_IMAGE"];
+  if (!docker || (image !== undefined && docker.image !== image))
+    docker = new DockerRunner(image === undefined ? {} : { image });
+  return docker;
+}
+
 export async function runCode(options: RunOptions): Promise<RunOutcome> {
   const { bundle } = options;
   const cases = selectCases(bundle, options.scope);
   const byId = new Map(cases.map((c) => [c.id, c]));
 
-  const request: Parameters<typeof processRunner.run>[0] = {
+  const request: Parameters<Runner["run"]>[0] = {
     adapter: pythonAdapter,
     source: options.code,
     signature: bundle.meta.signature,
@@ -52,7 +64,7 @@ export async function runCode(options: RunOptions): Promise<RunOutcome> {
     };
   }
 
-  const result = await processRunner.run(request);
+  const result = await activeRunner().run(request);
   const candidate = sanitizeForCandidate(result, cases, {
     revealFailingInput: options.revealFailingInput,
   });

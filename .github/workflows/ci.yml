@@ -24,6 +24,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: npm ci
+      # The DockerRunner tests run only when the image is present; they never pull it.
+      - run: docker pull -q python:3.12-slim
       - run: npm run format:check
       - run: npm run lint
       - run: npm run check

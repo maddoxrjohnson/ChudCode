@@ -9,7 +9,8 @@
  *
  * This is deliberately not a security sandbox: the code runs as the user, with the
  * user's filesystem and network. It protects the machine from runaway solutions, not
- * from hostile ones. A DockerRunner behind the same interface is the upgrade path.
+ * from hostile ones. DockerRunner (docker-runner.ts) reuses all of this and only changes
+ * the command it spawns, through `prepare`.
  */
 
 import { spawn } from "node:child_process";
@@ -41,6 +42,23 @@ class RunQueue {
   }
 }
 
+/** The environment every run sees. Nothing else from the user's environment leaks in. */
+export const RUN_ENV: Readonly<Record<string, string>> = {
+  LANG: "C.UTF-8",
+  LC_ALL: "C.UTF-8",
+  PYTHONIOENCODING: "utf-8",
+  PYTHONDONTWRITEBYTECODE: "1",
+  PYTHONHASHSEED: "0",
+};
+
+/** What actually gets spawned for an adapter command. */
+export interface Prepared {
+  command: Command;
+  env: Record<string, string>;
+  /** Called on a wall-clock timeout, after the process group is killed. */
+  abort?: () => void;
+}
+
 interface SpawnOutcome {
   lines: HarnessLine[];
   stderr: string;
@@ -52,8 +70,18 @@ interface SpawnOutcome {
 }
 
 export class ProcessRunner implements Runner {
-  readonly name = "process";
+  readonly name: string = "process";
   private readonly queue = new RunQueue();
+
+  /** Turn an adapter command into what is spawned. Here: run it directly, as the user. */
+  // `limits` is unused here; DockerRunner turns it into cgroup caps.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected prepare(command: Command, workdir: string, _limits: Limits): Prepared {
+    return {
+      command,
+      env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", HOME: workdir, ...RUN_ENV },
+    };
+  }
 
   async run(request: RunRequest): Promise<RunResult> {
     return this.queue.enqueue(() => this.execute(request));
@@ -155,12 +183,13 @@ export class ProcessRunner implements Runner {
   }
 
   private spawnAndCollect(
-    command: Command,
+    adapterCommand: Command,
     workdir: string,
     limits: Limits,
     adapter: RunRequest["adapter"],
     onLine: (line: HarnessLine) => void,
   ): Promise<SpawnOutcome> {
+    const { command, env, abort } = this.prepare(adapterCommand, workdir, limits);
     return new Promise((resolve, reject) => {
       const started = Date.now();
       const stderrCap = limits.outputKb * 1024;
@@ -173,15 +202,7 @@ export class ProcessRunner implements Runner {
         cwd: workdir,
         detached: true,
         stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          PATH: process.env["PATH"] ?? "/usr/bin:/bin",
-          HOME: workdir,
-          LANG: "C.UTF-8",
-          LC_ALL: "C.UTF-8",
-          PYTHONIOENCODING: "utf-8",
-          PYTHONDONTWRITEBYTECODE: "1",
-          PYTHONHASHSEED: "0",
-        },
+        env,
       });
 
       const killGroup = () => {
@@ -200,6 +221,7 @@ export class ProcessRunner implements Runner {
       const timer = setTimeout(() => {
         timedOut = true;
         killGroup();
+        abort?.();
       }, limits.wallMs);
 
       const lines: HarnessLine[] = [];
