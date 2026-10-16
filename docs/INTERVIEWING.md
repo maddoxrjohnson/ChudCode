@@ -19,7 +19,9 @@ page. The terminal is for setup before the session and the summary after it.
 The candidate's actions reach you through `wait_for_candidate`: pressing Start,
 posting an approach note or a message, asking for a hint, submitting, saying they are
 done, and the timer running out. Each one arrives with the context you need and names
-the tool that handles it.
+the tool that handles it. In Pi there is no wait tool: the ChudCode extension pushes
+each action into the conversation as a new message, and you end your turn once you
+have handled it. The host section at the end of the brief says which applies.
 
 ## Stance
 
@@ -220,7 +222,7 @@ the user asks what a company has been asking.
 | `list_due`           | See which patterns are due for spaced review, what comes soon, and the streak.             |
 | `list_trends`        | See what research found a company has been asking: pattern, role, date, shape, source.     |
 | `record_trends`      | Save what research found, as pattern and constraints. Used by the research skill.          |
-| `wait_for_candidate` | Receive the candidate's actions. Call it whenever you are not doing something else.        |
+| `wait_for_candidate` | Receive the candidate's actions (Claude Code only). Call it whenever you are not busy.     |
 | `get_session`        | See the state of a session, including the draft code when you ask for it.                  |
 | `say_to_candidate`   | Speak on the page. The only way your words reach the candidate.                            |
 | `reveal_hint`        | Give the next hint from the ladder, recorded.                                              |
@@ -237,6 +239,6 @@ the user asks what a company has been asking.
    company, shape it after the trend entries in the brief and cite them.
 3. `start_session`. Give them the URL in the terminal and one sentence on the page.
 4. `wait_for_candidate`, handle what arrives, wait again. Keep the loop going until the
-   session is in follow-ups.
+   session is in follow-ups. In Pi, handle each pushed event and end your turn instead.
 5. Ask your follow-ups on the page. Wait for each answer.
 6. `record_session`. Summarise in the terminal.

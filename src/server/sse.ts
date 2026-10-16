@@ -17,6 +17,19 @@ interface Client {
 
 const channels = new Map<string, Set<Client>>();
 
+let onSubscribers: ((channel: string, count: number) => void) | null = null;
+
+/** Called whenever a channel gains or loses a subscriber. */
+export function setSubscriberListener(
+  listener: ((channel: string, count: number) => void) | null,
+): void {
+  onSubscribers = listener;
+}
+
+function notifySubscribers(channel: string): void {
+  onSubscribers?.(channel, subscriberCount(channel));
+}
+
 export function sessionChannel(sessionId: string): string {
   return `session:${sessionId}`;
 }
@@ -53,14 +66,15 @@ export function subscribe(
   }
   set.add(client);
   req.on("close", () => remove(channel, client));
+  notifySubscribers(channel);
 }
 
 function remove(channel: string, client: Client): void {
   clearInterval(client.keepalive);
   const set = channels.get(channel);
-  if (!set) return;
-  set.delete(client);
+  if (!set?.delete(client)) return;
   if (set.size === 0) channels.delete(channel);
+  notifySubscribers(channel);
 }
 
 /** Send one event to every subscriber of `channel`; returns how many received it. */

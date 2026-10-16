@@ -2,7 +2,8 @@
  * server.ts: the loopback HTTP server, one per process, started on demand.
  *
  * It binds 127.0.0.1 only. The port comes from config (0 means ephemeral) and is
- * written to ~/.chudcode/server.json so other processes can find a running server.
+ * written to ~/.chudcode/server.json so other processes can find a running server. That
+ * file also holds the agent token (see agent-auth.ts), so it is readable by the owner only.
  */
 
 import * as fs from "node:fs";
@@ -18,6 +19,7 @@ import { HttpError, sendHtml, sendJson, splitPath } from "./http.ts";
 import { errorPage, notFoundPage } from "./pages/layout.ts";
 import { handleApi } from "./routes-api.ts";
 import { handlePage } from "./routes-pages.ts";
+import { issueAgentToken, revokeAgentToken } from "./agent-auth.ts";
 import { closeAll } from "./sse.ts";
 
 let server: http.Server | null = null;
@@ -54,8 +56,13 @@ export async function start(options: StartOptions = {}): Promise<string> {
       }
       server = s;
       serverPort = address.port;
+      const agentToken = issueAgentToken();
       try {
-        writeJson(serverFile(), { port: serverPort, pid: process.pid, startedAt: Date.now() });
+        writeJson(
+          serverFile(),
+          { port: serverPort, pid: process.pid, startedAt: Date.now(), agentToken },
+          0o600,
+        );
       } catch {
         /* a missing state dir is not fatal for serving */
       }
@@ -75,6 +82,7 @@ export async function close(): Promise<void> {
   if (!s) return;
   server = null;
   serverPort = null;
+  revokeAgentToken();
   closeAll();
   await new Promise<void>((resolve) => s.close(() => resolve()));
   try {

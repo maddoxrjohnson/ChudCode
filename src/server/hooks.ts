@@ -19,8 +19,27 @@ export type CandidateEvent = { sessionId: string; at: number } & (
   | { kind: "candidate_done" }
 );
 
+/** One prompt the host bridge has been sent, as `GET /api/inbox` returns it. */
+export interface InboxEntry {
+  /** Random per server process, so a bridge can tell a restarted server from a gap. */
+  stream: string;
+  /** 1, 2, 3, ... within a stream. */
+  seq: number;
+  at: number;
+  prompt: string;
+}
+
+export interface InboxPage {
+  stream: string;
+  /** The highest seq issued so far, whether or not it is in `entries`. */
+  latest: number;
+  entries: InboxEntry[];
+}
+
 export interface ServerHooks {
   onCandidateEvent?(event: CandidateEvent): void;
+  /** Prompts after `since` for the host bridge. Only push-delivery hosts register it. */
+  agentInbox?(since: number): InboxPage;
   /** Whether an agent is currently waiting for candidate events. */
   isListening?(): boolean;
 }
@@ -33,6 +52,10 @@ export function setHooks(next: ServerHooks): void {
 
 export function emitCandidateEvent(event: CandidateEvent): void {
   hooks.onCandidateEvent?.(event);
+}
+
+export function agentInbox(since: number): InboxPage | null {
+  return hooks.agentInbox?.(since) ?? null;
 }
 
 export function agentListening(): boolean {

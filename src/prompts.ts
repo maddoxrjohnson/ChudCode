@@ -63,7 +63,47 @@ export function sessionLine(session: Session, now = Date.now()): string {
   return parts.join(" · ");
 }
 
-const DELIVERY_NOTE = "This arrived as the result of your `wait_for_candidate` call.";
+/**
+ * How candidate events reach the interviewer. Claude Code cannot be woken by a server,
+ * so the interviewer listens with `wait_for_candidate`; Pi's extension pushes each
+ * event into the conversation as a new message. The host is fixed for the life of the
+ * process, so the MCP entry point sets this once at startup.
+ */
+export type Delivery = "listen" | "push";
+
+let delivery: Delivery = "listen";
+
+export function setDelivery(next: Delivery): void {
+  delivery = next;
+}
+
+export function currentDelivery(): Delivery {
+  return delivery;
+}
+
+/** The sentence that ends an event prompt: what to do once the reply is sent. */
+export function thenWait(): string {
+  return delivery === "listen"
+    ? "Then call `wait_for_candidate`."
+    : "Then end your turn; their next action arrives as a new message.";
+}
+
+/** How to collect answers to follow-up questions. */
+function waitForAnswers(each: boolean): string {
+  if (delivery === "listen")
+    return each
+      ? "Wait for each answer with `wait_for_candidate`."
+      : "Wait for answers with `wait_for_candidate`.";
+  return each
+    ? "End your turn after each question; each answer arrives as a new message."
+    : "End your turn; their answers arrive as new messages.";
+}
+
+function deliveryNote(): string {
+  return delivery === "listen"
+    ? "This arrived as the result of your `wait_for_candidate` call."
+    : "The ChudCode extension pushed this from the candidate's page.";
+}
 
 // ── The brief ─────────────────────────────────────────────────────────────────
 
@@ -394,7 +434,7 @@ function authoringText(): string {
 // ── Event prompts ─────────────────────────────────────────────────────────────
 
 function footer(session: Session, now: number): string {
-  return `${sessionLine(session, now)}\n${DELIVERY_NOTE}`;
+  return `${sessionLine(session, now)}\n${deliveryNote()}`;
 }
 
 export function startedPrompt(session: Session, now = Date.now()): string {
@@ -405,8 +445,10 @@ export function startedPrompt(session: Session, now = Date.now()): string {
     `The candidate pressed Start. The clock is running: ${formatClock(session.timerMs)}.`,
     note,
     session.approachNote
-      ? "Respond to the note with `say_to_candidate` in one or two sentences: confirm it if it is sound, or ask the one question that would sharpen it. If they have not said what it costs, ask for the complexity. Then call `wait_for_candidate`."
-      : "Ask them, with `say_to_candidate`, to say in a sentence how they plan to approach it before they code. Then call `wait_for_candidate`.",
+      ? "Respond to the note with `say_to_candidate` in one or two sentences: confirm it if it is sound, or ask the one question that would sharpen it. If they have not said what it costs, ask for the complexity. " +
+        thenWait()
+      : "Ask them, with `say_to_candidate`, to say in a sentence how they plan to approach it before they code. " +
+        thenWait(),
     footer(session, now),
   ].join("\n\n");
 }
@@ -414,7 +456,8 @@ export function startedPrompt(session: Session, now = Date.now()): string {
 export function notePrompt(session: Session, text: string, now = Date.now()): string {
   return [
     `The candidate posted an approach note:\n\n> ${text.replace(/\n/g, "\n> ")}`,
-    "Reply with `say_to_candidate` in one or two sentences. Confirm a sound plan, probe a vague one, or ask what a brute-force plan costs. Then call `wait_for_candidate`.",
+    "Reply with `say_to_candidate` in one or two sentences. Confirm a sound plan, probe a vague one, or ask what a brute-force plan costs. " +
+      thenWait(),
     footer(session, now),
   ].join("\n\n");
 }
@@ -422,7 +465,8 @@ export function notePrompt(session: Session, text: string, now = Date.now()): st
 export function messagePrompt(session: Session, text: string, now = Date.now()): string {
   return [
     `The candidate said:\n\n> ${text.replace(/\n/g, "\n> ")}`,
-    "Reply with `say_to_candidate`. Answer clarifying questions the way the statement would, no more. Then call `wait_for_candidate`.",
+    "Reply with `say_to_candidate`. Answer clarifying questions the way the statement would, no more. " +
+      thenWait(),
     footer(session, now),
   ].join("\n\n");
 }
@@ -435,7 +479,8 @@ export function hintUsedPrompt(
 ): string {
   return [
     `The candidate took hint ${level} from the page: "${hintText}"`,
-    "No reply is required. If they have taken several hints in a row, you may ask with `say_to_candidate` what they will try now. Then call `wait_for_candidate`.",
+    "No reply is required. If they have taken several hints in a row, you may ask with `say_to_candidate` what they will try now. " +
+      thenWait(),
     footer(session, now),
   ].join("\n\n");
 }
@@ -449,8 +494,11 @@ export function submissionPrompt(
 ): string {
   const allPassed = result.status === "ok" && result.passed === result.total;
   const next = allPassed
-    ? "Every case passed. Move to follow-ups with `say_to_candidate`: ask for the time and space complexity, then one question about scale or a breaking input. Wait for each answer with `wait_for_candidate`. When you have what you need, call `record_session`."
-    : "Not every case passed. Ask with `say_to_candidate` what they think is failing before you say anything about the cases. If they are stuck, describe the shape of one failing input without quoting it. Then call `wait_for_candidate`.";
+    ? "Every case passed. Move to follow-ups with `say_to_candidate`: ask for the time and space complexity, then one question about scale or a breaking input. " +
+      waitForAnswers(true) +
+      " When you have what you need, call `record_session`."
+    : "Not every case passed. Ask with `say_to_candidate` what they think is failing before you say anything about the cases. If they are stuck, describe the shape of one failing input without quoting it. " +
+      thenWait();
   return [
     `The candidate submitted (submission ${number}).`,
     resultText(
@@ -467,7 +515,9 @@ export function submissionPrompt(
 export function timerExpiredPrompt(session: Session, now = Date.now()): string {
   return [
     "The timer ran out. The session is now in follow-ups; the candidate can still talk and run code but the clock has stopped.",
-    "With `say_to_candidate`, tell them time is up and ask where they got to and what they would do with ten more minutes. Ask for the complexity of what they have. Wait for answers with `wait_for_candidate`, then call `record_session`.",
+    "With `say_to_candidate`, tell them time is up and ask where they got to and what they would do with ten more minutes. Ask for the complexity of what they have. " +
+      waitForAnswers(false) +
+      " When you have them, call `record_session`.",
     footer(session, now),
   ].join("\n\n");
 }
@@ -477,7 +527,8 @@ export function candidateDonePrompt(session: Session, now = Date.now()): string 
     "The candidate says they are done. The clock has stopped and the session is in follow-ups.",
     session.submissions === 0
       ? "They never submitted. Ask with `say_to_candidate` whether they want to submit what they have, and what they expect it to do on the examples."
-      : "Ask two or three follow-ups with `say_to_candidate`: complexity, a breaking input, what changes at scale. Wait for each answer with `wait_for_candidate`.",
+      : "Ask two or three follow-ups with `say_to_candidate`: complexity, a breaking input, what changes at scale. " +
+        waitForAnswers(true),
     "When you have what you need, call `record_session`. If you need their code to score it, call `get_session` with `include_code: true`.",
     footer(session, now),
   ].join("\n\n");
@@ -486,7 +537,8 @@ export function candidateDonePrompt(session: Session, now = Date.now()): string 
 export function recoveredSessionPrompt(session: Session, now = Date.now()): string {
   return [
     "A session was already in progress when this interviewer connected.",
-    "Call `get_session` to see where it stands, greet the candidate briefly with `say_to_candidate` if they are mid-session, then call `wait_for_candidate`.",
+    "Call `get_session` to see where it stands, greet the candidate briefly with `say_to_candidate` if they are mid-session. " +
+      thenWait(),
     footer(session, now),
   ].join("\n\n");
 }

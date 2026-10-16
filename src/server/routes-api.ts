@@ -2,7 +2,9 @@
  * routes-api.ts: the JSON API the browser runtime talks to.
  *
  *   GET  /api/events?session=<id>           SSE for one session
- *   GET  /api/events?scope=dashboard|agent  SSE for the dashboard or the host bridge
+ *   GET  /api/events?scope=dashboard        SSE for the dashboard
+ *   GET  /api/events?scope=agent            SSE for the host bridge (agent token)
+ *   GET  /api/inbox?since=<seq>             prompts the bridge missed (agent token)
  *   GET  /api/sessions/<id>                 full candidate-safe state
  *   PUT  /api/sessions/<id>/draft           { code }
  *   POST /api/sessions/<id>/start
@@ -25,7 +27,8 @@ import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
 import { listSessions, sessionExists, writeDraft } from "../store/sessions.ts";
-import { agentListening } from "./hooks.ts";
+import { hasAgentToken } from "./agent-auth.ts";
+import { agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
@@ -43,6 +46,13 @@ export async function handleApi(
   if (resource === "health" && req.method === "GET") return sendJson(res, { ok: true });
 
   if (resource === "events" && req.method === "GET") return handleEvents(req, res, url);
+
+  if (resource === "inbox" && id === undefined && req.method === "GET") {
+    requireAgent(req);
+    const page = agentInbox(sinceParam(url));
+    if (!page) throw new HttpError(404, "This host listens for events; it has no inbox");
+    return sendJson(res, page);
+  }
 
   if (resource === "dashboard" && req.method === "GET") {
     return sendJson(res, {
@@ -75,7 +85,11 @@ function handleEvents(req: http.IncomingMessage, res: http.ServerResponse, url: 
       throw new HttpError(404, "No such session");
     return subscribe(sessionChannel(session), req, res);
   }
-  if (scope === DASHBOARD_CHANNEL || scope === AGENT_CHANNEL) return subscribe(scope, req, res);
+  if (scope === DASHBOARD_CHANNEL) return subscribe(scope, req, res);
+  if (scope === AGENT_CHANNEL) {
+    requireAgent(req);
+    return subscribe(scope, req, res);
+  }
   throw new HttpError(400, "Pass ?session=<id> or ?scope=dashboard|agent");
 }
 
@@ -147,6 +161,17 @@ async function handleSessionAction(
     default:
       throw new HttpError(404, "No such session action");
   }
+}
+
+function requireAgent(req: http.IncomingMessage): void {
+  if (!hasAgentToken(req))
+    throw new HttpError(401, "The agent channel needs the token in server.json");
+}
+
+function sinceParam(url: URL): number {
+  const raw = url.searchParams.get("since") ?? "0";
+  if (!/^\d{1,15}$/.test(raw)) throw new HttpError(400, "since must be a non-negative integer");
+  return Number(raw);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

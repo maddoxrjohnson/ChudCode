@@ -37,9 +37,13 @@ export interface Frame {
 }
 
 /** An open SSE connection that resolves frames on demand. */
-export async function openStream(baseUrl: string, path: string) {
+export async function openStream(
+  baseUrl: string,
+  path: string,
+  headers: Record<string, string> = {},
+) {
   const controller = new AbortController();
-  const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
+  const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal, headers });
   if (!res.body) throw new Error("no body");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

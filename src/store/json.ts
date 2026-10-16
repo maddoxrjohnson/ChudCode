@@ -34,14 +34,15 @@ export function readText(file: string): string | null {
   }
 }
 
-export function writeJson(file: string, value: unknown): void {
-  writeText(file, JSON.stringify(value, null, 2) + "\n");
+/** `mode` applies to the new file; pass 0o600 for anything holding a secret. */
+export function writeJson(file: string, value: unknown, mode?: number): void {
+  writeText(file, JSON.stringify(value, null, 2) + "\n", mode);
 }
 
-export function writeText(file: string, contents: string): void {
+export function writeText(file: string, contents: string, mode?: number): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, contents, "utf8");
+  fs.writeFileSync(tmp, contents, mode === undefined ? "utf8" : { encoding: "utf8", mode });
   fs.renameSync(tmp, file);
 }
 

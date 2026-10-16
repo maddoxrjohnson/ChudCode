@@ -16,6 +16,7 @@ import {
   problemLine,
   sessionLine,
   sessionSummaryText,
+  thenWait,
 } from "../prompts.ts";
 import * as server from "../server/server.ts";
 import { plural } from "../format.ts";
@@ -208,7 +209,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
             `Session ${session.id} is ready: ${url}`,
             `The candidate sees the statement, ${bundle.tests.filter((c) => c.visible).length} examples, a ${timerMinutes}-minute clock, and ${bundle.hints.length} hints they can take. ${bundle.tests.length - bundle.tests.filter((c) => c.visible).length} hidden cases run on Submit.`,
             `Target complexity: ${bundle.meta.complexityTarget.time} time, ${bundle.meta.complexityTarget.space} space.`,
-            "Give the user the URL, say one sentence on the page with say_to_candidate, then call wait_for_candidate.",
+            `Give the user the URL and say one sentence on the page with say_to_candidate. ${thenWait()}`,
           ].join("\n"),
           { sessionId: session.id, url },
         );

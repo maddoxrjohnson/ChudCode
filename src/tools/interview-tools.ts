@@ -3,7 +3,7 @@
  */
 
 import { interviewerRun, postMessage, recordSession, revealHint } from "../flow.ts";
-import { resultText, sessionLine } from "../prompts.ts";
+import { resultText, sessionLine, thenWait } from "../prompts.ts";
 import type { RunScope } from "../runs.ts";
 import { isValidSessionId } from "../store/paths.ts";
 import { readProblem } from "../store/problems.ts";
@@ -42,7 +42,7 @@ export function interviewTools(): ToolDef[] {
       async execute(args) {
         const id = requireSession(args);
         const message = postMessage(id, "interviewer", requireString(args, "markdown", 8_000));
-        return ok("Sent. Call wait_for_candidate.", { at: message.at });
+        return ok(`Sent. ${thenWait()}`, { at: message.at });
       },
     },
     {
@@ -62,7 +62,7 @@ export function interviewTools(): ToolDef[] {
         const level = optionalInt(args, "level", 1, 10);
         const reveal = revealHint(id, level);
         return ok(
-          `Revealed hint ${reveal.hint.level}: "${reveal.hint.text}"\n${reveal.remaining} hint${reveal.remaining === 1 ? "" : "s"} left. Call wait_for_candidate.`,
+          `Revealed hint ${reveal.hint.level}: "${reveal.hint.text}"\n${reveal.remaining} hint${reveal.remaining === 1 ? "" : "s"} left. ${thenWait()}`,
           { level: reveal.hint.level, remaining: reveal.remaining },
         );
       },

@@ -6,6 +6,9 @@
  * returns a self-contained prompt that names the tool to call next. Everything else
  * is an ordinary tool call.
  *
+ * Pi is different: its extension can start a turn, so with `CHUDCODE_HOST=pi` prompts go
+ * to an `AgentOutbox` that the extension subscribes to, and the wait tool is not listed.
+ *
  * `McpSession.handle` is a pure JSON-RPC dispatcher, so tests drive it without a child
  * process; `mcp-stdio.ts` wires it to stdin and stdout. The inbox and long-poll shape
  * follow pi-teach's src/mcp.ts (Josh Noll, MIT); see docs/ATTRIBUTION.md.
@@ -14,6 +17,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { AgentOutbox } from "./outbox.ts";
 import { readProblem } from "./store/problems.ts";
 import {
   candidateDonePrompt,
@@ -22,13 +26,20 @@ import {
   notePrompt,
   nothingYetText,
   recoveredSessionPrompt,
+  setDelivery,
   startedPrompt,
   submissionPrompt,
   timerExpiredPrompt,
 } from "./prompts.ts";
 import { setHooks, type CandidateEvent } from "./server/hooks.ts";
 import * as server from "./server/server.ts";
-import { push, sessionChannel } from "./server/sse.ts";
+import {
+  AGENT_CHANNEL,
+  push,
+  sessionChannel,
+  setSubscriberListener,
+  subscriberCount,
+} from "./server/sse.ts";
 import { packageRoot } from "./store/paths.ts";
 import { listSessions, readEvents, readSession, type Session } from "./store/sessions.ts";
 import {
@@ -74,6 +85,17 @@ This session cannot push the candidate's actions to you. You listen for them:
 - \`wait_for_candidate\` blocks until the candidate presses Start, posts an approach note or a message, takes a hint, submits, says they are done, or the timer runs out. It returns the full event and names the tool that handles it. Each wait lasts at most ${MAX_WAIT_SECONDS} seconds.
 
 Keep calling \`wait_for_candidate\` while the clock runs. A wait that returns nothing means the candidate is coding; call it again. Speak only when you have a reason: a question arrived, a submission landed, or several silent minutes have passed and one short check-in would help. The page shows "Interviewer listening" while a wait is open and "Interviewer away" when none is, so do not leave the candidate alone: end your turn only after \`record_session\` or \`abandon_session\`, or when the user talks to you in the terminal. The user can press Esc to interrupt a wait and talk to you here; answer, then resume waiting.
+
+\`say_to_candidate\` is the only way your words reach the page. Terminal text is for setup and the final summary.`;
+
+/** The host brief for Pi, where the extension pushes events instead. */
+export const PUSH_HOST_BRIEF = `## ChudCode tools in this session
+
+The ChudCode extension pushes the candidate's actions to you. Each press of Start, approach note, message, hint taken, submission, "I'm done", and timer expiry arrives as a new user message that quotes the event and names the tool that handles it. There is no tool to wait with, and none is needed.
+
+- \`start_session\` creates a session, starts the local server if needed, and returns the URL. \`open_dashboard\` opens the dashboard and recovers any session already in progress. URLs work only while this session runs.
+- Handle each event, reply with \`say_to_candidate\` when a reply is due, then end your turn. The next event starts a new one. Do not poll \`get_session\` to see whether anything happened.
+- The page shows "Interviewer listening" while the extension is connected. If the user types to you in the terminal mid-session, answer them; the candidate's events keep arriving.
 
 \`say_to_candidate\` is the only way your words reach the page. Terminal text is for setup and the final summary.`;
 
@@ -210,6 +232,12 @@ export class CandidateInbox {
 
 // ── Routing browser events into the inbox ─────────────────────────────────────
 
+/** Where candidate prompts go: the listening inbox or the pushing outbox. */
+export interface PromptSink {
+  push(prompt: string, key?: string, pending?: () => boolean): void;
+  recordRun?(sessionId: string, scope: string, passed: number, total: number): void;
+}
+
 export function activeSessions(): Session[] {
   return listSessions(10).filter((s) => s.phase !== "done");
 }
@@ -229,9 +257,29 @@ export function connectInbox(inbox: CandidateInbox): void {
   });
 }
 
-function routeEvent(inbox: CandidateInbox, event: CandidateEvent): void {
+/**
+ * Route candidate events to the outbox and publish each prompt on the agent channel.
+ * The page's presence badge follows whether the extension is subscribed.
+ */
+export function connectOutbox(outbox: AgentOutbox): void {
+  setSubscriberListener((channel, count) => {
+    if (channel === AGENT_CHANNEL) broadcastPresence(count > 0);
+  });
+  setHooks({
+    isListening: () => subscriberCount(AGENT_CHANNEL) > 0,
+    onCandidateEvent: (event) => routeEvent(outbox, event),
+    agentInbox: (since) => outbox.since(since),
+  });
+}
+
+/** An outbox that publishes on the agent channel. */
+export function agentOutbox(): AgentOutbox {
+  return new AgentOutbox((entry) => push(AGENT_CHANNEL, "candidate", entry));
+}
+
+function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
   if (event.kind === "run") {
-    inbox.recordRun(event.sessionId, event.scope, event.passed, event.total);
+    inbox.recordRun?.(event.sessionId, event.scope, event.passed, event.total);
     return;
   }
   let session: Session;
@@ -297,7 +345,7 @@ function routeEvent(inbox: CandidateInbox, event: CandidateEvent): void {
  * never got an interviewer reply.
  */
 export function recoverSessions(
-  inbox: CandidateInbox,
+  inbox: PromptSink,
   created: ReadonlySet<string>,
   now = Date.now(),
 ): void {
@@ -356,16 +404,19 @@ const WAIT_TOOL = {
 
 export class McpSession {
   private readonly tools: Map<string, ToolDef>;
-  private readonly inbox: CandidateInbox;
+  /** Null when the host is woken by pushes, so there is nothing to wait on. */
+  private readonly inbox: CandidateInbox | null;
   /** Sessions this process created; recovery never re-announces them. */
   private readonly created = new Set<string>();
 
-  constructor(inbox: CandidateInbox) {
-    this.inbox = inbox;
+  /** A `CandidateInbox` for a host that listens; an `AgentOutbox` for one that is pushed to. */
+  constructor(sink: CandidateInbox | AgentOutbox) {
+    this.inbox = sink instanceof CandidateInbox ? sink : null;
+    setDelivery(this.inbox ? "listen" : "push");
     const host = {
-      hostBrief: HOST_BRIEF,
+      hostBrief: this.inbox ? HOST_BRIEF : PUSH_HOST_BRIEF,
       created: (sessionId: string) => this.created.add(sessionId),
-      recover: () => recoverSessions(inbox, this.created),
+      recover: () => recoverSessions(sink, this.created),
     };
     this.tools = new Map(
       [
@@ -380,7 +431,7 @@ export class McpSession {
 
   /** Every tool this server lists, by name. */
   toolNames(): string[] {
-    return [...this.tools.keys(), WAIT_TOOL.name];
+    return [...this.tools.keys(), ...(this.inbox ? [WAIT_TOOL.name] : [])];
   }
 
   /** Handle one message. Resolve with the response, or `null` when none is due. */
@@ -388,7 +439,7 @@ export class McpSession {
     if (message.method === undefined) return null;
     if (message.id === undefined || message.id === null) {
       if (message.method === "notifications/cancelled")
-        this.inbox.cancel(message.params?.requestId);
+        this.inbox?.cancel(message.params?.requestId);
       return null;
     }
     const id = message.id;
@@ -420,7 +471,7 @@ export class McpSession {
         description: tool.description,
         inputSchema: tool.inputSchema,
       })),
-      WAIT_TOOL,
+      ...(this.inbox ? [WAIT_TOOL] : []),
     ];
   }
 
@@ -429,7 +480,7 @@ export class McpSession {
     name: unknown,
     args: Record<string, unknown>,
   ): Promise<JsonRpcResponse | null> {
-    if (name === WAIT_TOOL.name) return this.waitForCandidate(id, args);
+    if (name === WAIT_TOOL.name && this.inbox) return this.waitForCandidate(this.inbox, id, args);
     const tool = typeof name === "string" ? this.tools.get(name) : undefined;
     if (!tool) return error(id, -32602, `Unknown tool: ${String(name)}`);
 
@@ -448,6 +499,7 @@ export class McpSession {
   }
 
   private async waitForCandidate(
+    inbox: CandidateInbox,
     id: string | number,
     args: Record<string, unknown>,
   ): Promise<JsonRpcResponse | null> {
@@ -467,11 +519,11 @@ export class McpSession {
     } catch (err) {
       return result(id, toolResult(fail((err as Error).message)));
     }
-    recoverSessions(this.inbox, this.created);
-    const prompts = await this.inbox.wait(id, seconds * 1000);
+    recoverSessions(inbox, this.created);
+    const prompts = await inbox.wait(id, seconds * 1000);
     if (prompts === null) return null;
 
-    const digest = this.inbox.takeDigest();
+    const digest = inbox.takeDigest();
     if (prompts.length === 0) {
       return result(id, toolResult(ok(nothingYetText(seconds, activeSessions(), digest))));
     }
