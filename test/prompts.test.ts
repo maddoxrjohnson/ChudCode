@@ -15,11 +15,13 @@ import {
   messagePrompt,
   nextRequestedPrompt,
   nothingYetText,
+  prepareNextText,
   resultText,
   roadmapDirectiveText,
   roadmapListText,
   roadmapOutcomeLines,
   sessionLine,
+  setDelivery,
   submissionPrompt,
   trendsText,
 } from "../src/prompts.ts";
@@ -368,5 +370,44 @@ describe("roadmap text", () => {
 describe("nothingYetText", () => {
   it("tells the interviewer what to do with no session", () => {
     expect(nothingYetText(60, [], "")).toContain("No session is in progress");
+  });
+
+  it("keeps the interviewer listening while a roadmap debrief is open", () => {
+    const window = { roadmap: "grind75" as const, name: "Grind 75", leftMs: 61_000 };
+    const out = nothingYetText(60, [], "", 0, window);
+    expect(out).toContain("the debrief of their Grind 75 session");
+    expect(out).toContain("the window closes in 2 minutes");
+  });
+});
+
+describe("prepareNextText", () => {
+  const next = {
+    roadmap: "neetcode150" as const,
+    name: "NeetCode 150",
+    title: "Valid Anagram",
+    difficulty: "easy" as const,
+    stage: "Arrays & Hashing",
+    solved: 1,
+    total: 150,
+    prepared: null,
+  };
+  afterEach(() => setDelivery("listen"));
+
+  it("asks for the next step ahead of time, then a wait for the press", () => {
+    const out = prepareNextText(next);
+    expect(out).toContain('`mimic_of` to "Valid Anagram" exactly');
+    expect(out).toContain("Do not call `start_session`");
+    expect(out).toContain("(10 minutes after this debrief)");
+    expect(prepareNextText({ ...next, prepared: "anagram-ish" })).toContain(
+      "already has a problem written: `anagram-ish`. Nothing to write.",
+    );
+    expect(prepareNextText(null)).toBe("");
+  });
+
+  it("tells a pushed host to end its turn instead of waiting", () => {
+    setDelivery("push");
+    const out = prepareNextText(next);
+    expect(out).toContain("Then end your turn; a press of Next problem arrives as a new message.");
+    expect(out).not.toContain("wait_for_candidate");
   });
 });

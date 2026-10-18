@@ -24,6 +24,11 @@ description: Work through NeetCode 150 or Grind 75 in order, one interview at a 
    `record_session`. Do not end your turn during the session.
 5. In the terminal, give the verdict, two strengths, two things to work on, and where
    they stand on the roadmap: what was checked off and what comes next.
+6. Do what `record_session` says next: write and validate the next step ahead of
+   time without starting it, then keep calling `wait_for_candidate`. The page shows
+   a Next problem button; when the candidate presses it, call `start_session` with
+   the problem you wrote right away. End your turn once the wait says the window
+   has closed.
 
 When the user only asks how far along they are, call `list_roadmap` and answer from
 it: the solved count, which topics or weeks are open, and the next problem. Pass

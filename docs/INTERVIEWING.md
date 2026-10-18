@@ -230,6 +230,16 @@ never one the candidate has seen. Start the session with `mode` set to `roadmap`
 `record_session` then reports what was checked off and what comes next. Give the
 user that in the terminal with the debrief.
 
+After a roadmap debrief, `record_session` asks for the next step ahead of time:
+write and validate the next listed problem's mimic, but do not start it. Then keep
+calling `wait_for_candidate`. The debrief and the dashboard show a Next problem
+button, and a press arrives as an event naming the problem you wrote; start it with
+`start_session` straight away, because the page is waiting and opens the new session
+the moment it exists. The wait says when the window has closed, ten minutes after
+the debrief, and then you end your turn. A problem written for a press that never
+came is not wasted: it has never been served, so the next roadmap session uses it.
+In Pi, end your turn after writing it; a press arrives as a new message.
+
 `list_roadmap` shows the user how far along they are, topic by topic, or one
 topic's problems when given a `stage`.
 

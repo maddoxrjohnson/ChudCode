@@ -3,7 +3,14 @@
  */
 
 import { interviewerRun, postMessage, recordSession, revealHint } from "../flow.ts";
-import { resultText, roadmapOutcomeLines, sessionLine, thenWait } from "../prompts.ts";
+import { nextUp, sessionRoadmap } from "../next-up.ts";
+import {
+  prepareNextText,
+  resultText,
+  roadmapOutcomeLines,
+  sessionLine,
+  thenWait,
+} from "../prompts.ts";
 import { loadRoadmapProgress, ROADMAP_IDS, roadmapTitle } from "../roadmap.ts";
 import type { RunScope } from "../runs.ts";
 import { isValidSessionId } from "../store/paths.ts";
@@ -188,6 +195,8 @@ export function interviewTools(): ToolDef[] {
           title === undefined
             ? []
             : roadmapOutcomeLines(title, v?.correct ?? false, ROADMAP_IDS.map(loadRoadmapProgress));
+        const list = sessionRoadmap(outcome.session);
+        const prepare = title !== undefined && list ? prepareNextText(nextUp(list)) : "";
         const why = v
           ? [
               v.allPassed ? "all cases passed" : "not all cases passed",
@@ -202,6 +211,7 @@ export function interviewTools(): ToolDef[] {
             ...roadmapLines,
             sessionLine(outcome.session),
             `Summarise for the user in the terminal: verdict, two strengths, two improvements, next review${roadmapLines.length ? ", and where they stand on the roadmap" : ""}.`,
+            ...(prepare ? [prepare] : []),
           ].join("\n"),
           { correct: v?.correct ?? false },
         );

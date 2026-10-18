@@ -75,6 +75,7 @@ export const COMMANDS = {
           "and when the pattern comes back.",
           "when the pattern comes back, and where they stand on the roadmap.",
         ),
+        "After the debrief, write and validate the next step ahead of time as `record_session` asks, without starting it, then end your turn. A press of Next problem on the page arrives as a new message; start the session then.",
       ].join("\n\n"),
   },
   research: {

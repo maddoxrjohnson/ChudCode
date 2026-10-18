@@ -15,6 +15,7 @@ import { clipText, formatClock, formatInput, formatValue, plural } from "./forma
 import { remaining, type SessionState } from "./flow.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 import { dueText, relativeDay, type ReviewItem } from "./review.ts";
+import { NEXT_WINDOW_MS, type NextUp, type NextWindow } from "./next-up.ts";
 import type { ItemStanding, RoadmapProgress, StageStanding } from "./roadmap.ts";
 import type { RunResult, TestCase } from "./runner/types.ts";
 import { describeLists, lookupSeed, matchSeedTitle, type SeedEntry } from "./seed.ts";
@@ -435,6 +436,22 @@ export function nextRequestedPrompt(
   return parts.join("\n\n");
 }
 
+/**
+ * What `record_session` adds after a roadmap debrief: write the next step now, so the
+ * page's Next problem button opens it at once, then stay for the press.
+ */
+export function prepareNextText(next: NextUp | null): string {
+  if (!next) return "";
+  const write = next.prepared
+    ? `The next step on ${next.name}, **${next.title}**, already has a problem written: \`${next.prepared}\`. Nothing to write.`
+    : `Now write the next step ahead of time, so the candidate's **Next problem** button opens it at once: **${next.title}** (${next.difficulty}) in ${next.stage}. Write an original problem in its shape with \`write_problem\`, with \`source.kind\` set to \`mimic\` and \`mimic_of\` to "${next.title}" exactly, then \`validate_problem\` until it passes. Do not call \`start_session\`: a press of the button reaches you and says to.`;
+  const stay =
+    currentDelivery() === "listen"
+      ? `Then call \`wait_for_candidate\`: a press of Next problem on the debrief or the dashboard arrives there. Keep waiting until the wait says the window has closed (${plural(NEXT_WINDOW_MS / 60_000, "minute")} after this debrief), then end your turn.`
+      : "Then end your turn; a press of Next problem arrives as a new message.";
+  return `${write} ${stay}`;
+}
+
 /** What `record_session` adds for a roadmap session: what was checked off and what is next. */
 export function roadmapOutcomeLines(
   title: string,
@@ -718,11 +735,17 @@ export function nothingYetText(
   active: Session[],
   digest: string,
   now = Date.now(),
+  window: NextWindow | null = null,
 ): string {
   const lines = [`Nothing from the candidate in ${seconds} seconds.`];
-  if (active.length === 0) {
+  if (active.length === 0 && window) {
+    const minutes = Math.max(1, Math.ceil(window.leftMs / 60_000));
     lines.push(
-      "No session is in progress. Call `start_session` to begin one, or end your turn if the user is done.",
+      `No session is in progress. The candidate has the debrief of their ${window.name} session, and a press of **Next problem** reaches you through this wait. If you have not written the next step yet, do that first. Then call \`wait_for_candidate\` again; the window closes in ${plural(minutes, "minute")}.`,
+    );
+  } else if (active.length === 0) {
+    lines.push(
+      "No session is in progress, and nobody is waiting on the page. End your turn, unless you are about to start a session with `start_session`.",
     );
   } else {
     for (const session of active) lines.push(sessionLine(session, now));

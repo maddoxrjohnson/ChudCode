@@ -17,7 +17,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { pendingNext } from "./next-up.ts";
+import { nextWindow, pendingNext } from "./next-up.ts";
 import { AgentOutbox } from "./outbox.ts";
 import { loadRoadmapProgress, preparedProblem } from "./roadmap.ts";
 import { listProblems, readProblem } from "./store/problems.ts";
@@ -95,7 +95,7 @@ This session cannot push the candidate's actions to you. You listen for them:
 - \`start_session\` creates a session, starts the local server if needed, and returns the URL. \`open_dashboard\` opens the dashboard and recovers any session already in progress. URLs work only while this session runs.
 - \`wait_for_candidate\` blocks until the candidate presses Start, posts an approach note or a message, takes a hint, submits, says they are done, or the timer runs out. It returns the full event and names the tool that handles it. Each wait lasts at most ${MAX_WAIT_SECONDS} seconds.
 
-Keep calling \`wait_for_candidate\` while the clock runs. A wait that returns nothing means the candidate is coding; call it again. Speak only when you have a reason: a question arrived, a submission landed, or several silent minutes have passed and one short check-in would help. The page shows "Interviewer listening" while a wait is open and "Interviewer away" when none is, so do not leave the candidate alone: end your turn only after \`record_session\` or \`abandon_session\`, or when the user talks to you in the terminal. The user can press Esc to interrupt a wait and talk to you here; answer, then resume waiting.
+Keep calling \`wait_for_candidate\` while the clock runs. A wait that returns nothing means the candidate is coding; call it again. Speak only when you have a reason: a question arrived, a submission landed, or several silent minutes have passed and one short check-in would help. The page shows "Interviewer listening" while a wait is open and "Interviewer away" when none is, so do not leave the candidate alone: end your turn only after \`record_session\` or \`abandon_session\`, or when the user talks to you in the terminal. After a roadmap debrief, \`record_session\` asks you to stay a little longer for the page's Next problem button. The user can press Esc to interrupt a wait and talk to you here; answer, then resume waiting.
 
 \`say_to_candidate\` is the only way your words reach the page. Terminal text is for setup and the final summary.`;
 
@@ -597,7 +597,14 @@ export class McpSession {
 
     const digest = inbox.takeDigest();
     if (prompts.length === 0) {
-      return result(id, toolResult(ok(nothingYetText(seconds, activeSessions(), digest))));
+      const active = activeSessions();
+      const window = active.length === 0 ? nextWindow() : null;
+      // With nothing in progress and no debrief to answer, the text says to end the turn.
+      if (active.length === 0 && !window && !pendingNext()) inbox.release();
+      return result(
+        id,
+        toolResult(ok(nothingYetText(seconds, active, digest, Date.now(), window))),
+      );
     }
     const header =
       prompts.length === 1 ? "" : `${prompts.length} events arrived. Handle each one in order.\n\n`;

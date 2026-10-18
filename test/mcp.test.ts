@@ -16,7 +16,7 @@ import {
   waitSeconds,
   type JsonRpcResponse,
 } from "../src/mcp.ts";
-import { clearNext } from "../src/next-up.ts";
+import { clearNext, nextWindow, NEXT_WINDOW_MS } from "../src/next-up.ts";
 import { setHooks } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
 import { readProblem, updateMeta } from "../src/store/problems.ts";
@@ -452,6 +452,8 @@ describe("an interview round trip", () => {
 
     const unlisted = text(await call("start_session", { slug: "window-sum", mode: "roadmap" }));
     expect(unlisted).toContain("names no roadmap problem, so solving it checks nothing off");
+    const stray = /Session (\S+) is ready/.exec(unlisted)?.[1];
+    await call("abandon_session", { session_id: stray, reason: "interrupted" });
 
     updateMeta("window-sum", { source: { kind: "mimic", mimicOf: "Contains Duplicate" } });
     const id = await startSession({ start_now: true, mode: "roadmap" });
@@ -478,6 +480,19 @@ describe("an interview round trip", () => {
       /Grind 75: Contains Duplicate is checked off; 1 of 75 solved\. Next: Two Sum \(Week 1\)\./,
     );
     expect(recorded).toContain("and where they stand on the roadmap");
+    expect(recorded).toContain(
+      "Now write the next step ahead of time, so the candidate's **Next problem** button opens it at once: **Valid Anagram** (easy) in Arrays & Hashing.",
+    );
+    expect(recorded).toContain("Keep waiting until the wait says the window has closed");
+
+    // After the debrief the interviewer stays: an empty wait keeps the window open.
+    const idle = text(await call("wait_for_candidate", { timeout_seconds: 1 }));
+    expect(idle).toContain("a press of **Next problem** reaches you through this wait");
+    expect(idle).toContain("the window closes in 10 minutes");
+    expect(inbox.connected()).toBe(true);
+    const window = nextWindow();
+    expect(window).toMatchObject({ roadmap: "neetcode150", name: "NeetCode 150" });
+    expect(nextWindow(undefined, Date.now() + NEXT_WINDOW_MS)).toBeNull();
 
     const listed = await call("list_roadmap");
     expect(text(listed)).toContain("1 of 150 solved.");
@@ -490,6 +505,14 @@ describe("an interview round trip", () => {
     expect(stage).toContain("- new: Valid Anagram (easy)");
     expect((await call("list_roadmap", { stage: "nope" })).isError).toBe(true);
   }, 15_000);
+
+  it("tells an idle interviewer with nothing to answer to stop, and stops counting it connected", async () => {
+    await call("open_dashboard");
+    expect(inbox.connected()).toBe(true);
+    const idle = text(await call("wait_for_candidate", { timeout_seconds: 1 }));
+    expect(idle).toContain("nobody is waiting on the page. End your turn");
+    expect(inbox.connected()).toBe(false);
+  });
 
   it("takes a Next problem press from the page to the interviewer and the page to the new session", async () => {
     updateMeta("window-sum", { source: { kind: "mimic", mimicOf: "Contains Duplicate" } });
