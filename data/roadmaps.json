@@ -1,0 +1,23 @@
+{
+  "$comment": "NeetCode's topic tree for the NeetCode 150, as stages: each covers one NeetCode category from data/seed/neetcode150.json and requires the stages drawn before it on the public roadmap. Stages are listed in an order where every requirement comes first. Grind 75 needs no entry here: its stages are its weeks, each requiring the week before.",
+  "neetcode150": [
+    { "id": "arrays-hashing", "category": "Arrays & Hashing", "requires": [] },
+    { "id": "two-pointers", "category": "Two Pointers", "requires": ["arrays-hashing"] },
+    { "id": "stack", "category": "Stack", "requires": ["arrays-hashing"] },
+    { "id": "binary-search", "category": "Binary Search", "requires": ["two-pointers"] },
+    { "id": "sliding-window", "category": "Sliding Window", "requires": ["two-pointers"] },
+    { "id": "linked-list", "category": "Linked List", "requires": ["two-pointers"] },
+    { "id": "trees", "category": "Trees", "requires": ["binary-search", "linked-list"] },
+    { "id": "tries", "category": "Tries", "requires": ["trees"] },
+    { "id": "heap", "category": "Heap / Priority Queue", "requires": ["trees"] },
+    { "id": "backtracking", "category": "Backtracking", "requires": ["trees"] },
+    { "id": "graphs", "category": "Graphs", "requires": ["backtracking"] },
+    { "id": "dp-1d", "category": "1-D Dynamic Programming", "requires": ["backtracking"] },
+    { "id": "intervals", "category": "Intervals", "requires": ["heap"] },
+    { "id": "greedy", "category": "Greedy", "requires": ["heap"] },
+    { "id": "advanced-graphs", "category": "Advanced Graphs", "requires": ["heap", "graphs"] },
+    { "id": "dp-2d", "category": "2-D Dynamic Programming", "requires": ["graphs", "dp-1d"] },
+    { "id": "bit-manipulation", "category": "Bit Manipulation", "requires": ["dp-1d"] },
+    { "id": "math-geometry", "category": "Math & Geometry", "requires": ["bit-manipulation"] }
+  ]
+}

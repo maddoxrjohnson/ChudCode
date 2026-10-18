@@ -28,6 +28,8 @@ export interface SeedEntry {
   week?: number;
   /** NeetCode 150 only: the category heading. */
   category?: string;
+  /** Where the entry sits in each list's own order, from 0. */
+  positions: Partial<Record<SeedList, number>>;
 }
 
 export interface SeedQuery {
@@ -109,7 +111,9 @@ export function seedEntries(): SeedEntry[] {
   if (!grind || !neet) throw new Error(`Missing seed lists under ${seedDir}`);
 
   const neetByKey = new Map(neet.entries.map((e) => [titleKey(e.title), e]));
+  const neetPosition = new Map(neet.entries.map((e, i) => [titleKey(e.title), i]));
   const entries = new Map<string, SeedEntry>();
+  let grindPosition = 0;
 
   for (const [week, items] of Object.entries(grind)) {
     const weekNumber = Number(/\d+/.exec(week)?.[0]);
@@ -124,9 +128,13 @@ export function seedEntries(): SeedEntry[] {
         difficulty: parseDifficulty(item.difficulty, item.title),
         patterns: checkPatterns(patterns, item.title),
         lists: neetEntry ? ["grind75", "neetcode150"] : ["grind75"],
+        positions: { grind75: grindPosition++ },
       };
       if (Number.isFinite(weekNumber)) entry.week = weekNumber;
-      if (neetEntry) entry.category = neetEntry.category;
+      if (neetEntry) {
+        entry.category = neetEntry.category;
+        entry.positions.neetcode150 = neetPosition.get(key) as number;
+      }
       entries.set(key, entry);
     }
   }
@@ -141,6 +149,7 @@ export function seedEntries(): SeedEntry[] {
       patterns: checkPatterns(item.patterns, item.title),
       lists: ["neetcode150"],
       category: item.category,
+      positions: { neetcode150: neetPosition.get(key) as number },
     });
   }
 
@@ -212,7 +221,8 @@ export function seedListName(list: SeedList): string {
   return LIST_NAMES[list];
 }
 
-function titleKey(title: string): string {
+/** A title with case, punctuation, and "&" vs "and" removed, for exact matching. */
+export function titleKey(title: string): string {
   return title
     .toLowerCase()
     .replace(/&/g, "and")
