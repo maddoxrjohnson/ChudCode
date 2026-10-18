@@ -27,8 +27,8 @@ import sys
 import time
 import traceback
 
-# `-I` keeps the interpreter isolated from the user's environment, which also drops the
-# script's own directory from sys.path. Put it back so the helper module and the
+# `-P` keeps the working directory off sys.path, which also drops the
+# script's own directory. Put it back so the helper module and the
 # solution import from the workdir and nowhere else.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

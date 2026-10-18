@@ -15,6 +15,7 @@ import {
   MIN_HIDDEN_CASES,
   validateProblem,
 } from "../src/validate.ts";
+import { validationReportText } from "../src/prompts.ts";
 import { makeFixture, seedExample, type Fixture } from "./helpers.ts";
 
 let fixture: Fixture;
@@ -205,5 +206,35 @@ describe.skipIf(!pythonAvailable())("validateProblem", () => {
       readProblem("window-sum-thin").tests.find((c) => c.id === "large-random"),
     ).not.toHaveProperty("expected");
     expect(readProblem("window-sum-thin").meta.validatedAt).toBeUndefined();
+  });
+
+  it("builds a generated input the same way on every run, even from a set's order", async () => {
+    variant("window-sum-sets", (b) => {
+      b.generators +=
+        "\n\ndef from_set(n: int, k: int) -> dict:\n" +
+        "    # The order of a set of strings follows the hash seed, so the input does too.\n" +
+        '    return {"nums": [int(w[1:]) * (-1) ** int(w[1:]) for w in {f"w{i}" for i in range(n)}], "k": k}\n';
+      b.tests.push({ id: "from-set", visible: false, gen: "from_set(3000, 7)" });
+    });
+    const report = await validateProblem("window-sum-sets", LIMITS);
+    expect(report.filled).toEqual(["from-set"]);
+    expect(report.unstable).toEqual([]);
+    expect(report.passed).toBe(true);
+  });
+
+  it("fails a generator that builds a different input on a second run", async () => {
+    variant("window-sum-noisy", (b) => {
+      b.generators +=
+        "\n\ndef noisy(n: int, k: int) -> dict:\n" +
+        '    return {"nums": [random.randint(-100, 100) for _ in range(n)], "k": k}\n';
+      b.tests.push({ id: "noisy", visible: false, gen: "noisy(3000, 7)" });
+    });
+    const report = await validateProblem("window-sum-noisy", LIMITS);
+    expect(report.unstable).toEqual(["noisy"]);
+    expect(report.passed).toBe(false);
+    expect(readProblem("window-sum-noisy").meta.validatedAt).toBeUndefined();
+    expect(validationReportText(report, readProblem("window-sum-noisy"))).toContain(
+      "1 generated case built a different input on a second run (noisy)",
+    );
   });
 });

@@ -31,7 +31,7 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
         │                      │                                          │
         └──────────────────────┼──────────────────────────────────────────┘
                                ▼
-                 python3 -I harness.py   (one JSON line per case)
+                 python3 -s -P harness.py   (one JSON line per case)
 ```
 
 ## Modules

@@ -685,6 +685,7 @@ export function submissionPrompt(
       waitForAnswers(true) +
       " When you have what you need, call `record_session`."
     : "Not every case passed. Ask with `say_to_candidate` what they think is failing before you say anything about the cases. If they are stuck, describe the shape of one failing input without quoting it. " +
+      "The counts above are the result: never tell the candidate a failing case passed, and never promise a score. If you believe a test itself is broken, say you will look into it, and end the session with `abandon_session`, reason `interrupted`, rather than scoring it. " +
       thenWait();
   return [
     `The candidate submitted (submission ${number}).`,
@@ -858,6 +859,12 @@ export function validationReportText(report: ValidationReport, bundle: ProblemBu
     lines.push(
       "",
       `${plural(report.broken.length, "case")} did not run cleanly (${report.broken.map((c) => `${c.id}: ${c.status}`).join(", ")}). A timeout on the max-size case means the reference is slower than its complexity target; an error means the reference or a generator is broken.`,
+    );
+  }
+  if (report.unstable.length > 0) {
+    lines.push(
+      "",
+      `${plural(report.unstable.length, "generated case")} built a different input on a second run (${report.unstable.join(", ")}), so a stored output would not match what the candidate gets. Make the generator deterministic: draw every random choice from \`random.Random(seed)\`, and never take an order from a set or a dict's iteration when it decides the input.`,
     );
   }
   if (report.filled.length > 0) {

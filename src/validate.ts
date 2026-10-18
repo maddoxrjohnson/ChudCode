@@ -9,6 +9,11 @@
  * must finish inside the per-case limit, and a case with no `expected` takes the
  * reference's output as its oracle and is written back. Only a bundle that passes both
  * gets `validatedAt`, and only a bundle with `validatedAt` can be served.
+ *
+ * A generated case is built again on every run, so its stored output is only right if
+ * the generator builds the same input every time. When a passing run fills in
+ * generated cases, the reference runs once more, in a fresh process, against the
+ * filled outputs; a case that disagrees has a generator that is not deterministic.
  */
 
 import { canonical } from "./runner/compare.ts";
@@ -52,6 +57,8 @@ export interface ValidationReport {
   disagreements: Disagreement[];
   /** Cases that errored, timed out, or were skipped. */
   broken: CaseResult[];
+  /** Generated cases whose input changed between two runs of the reference. */
+  unstable: string[];
   validatedAt?: number;
 }
 
@@ -137,6 +144,24 @@ function sizeOf(value: unknown): number {
   return 1;
 }
 
+/** Run the reference again on the filled cases; the generated ones that now fail. */
+async function unstableCases(
+  bundle: ProblemBundle,
+  limits: Limits,
+  generated: ReadonlySet<string>,
+): Promise<string[]> {
+  const again = await runCode({
+    bundle,
+    code: bundle.reference,
+    scope: "all",
+    limits,
+    revealFailingInput: false,
+  });
+  return again.result.cases
+    .filter((c) => generated.has(c.id) && c.status !== "pass")
+    .map((c) => c.id);
+}
+
 /**
  * Lint the bundle and run its reference against every case. On a full pass, write
  * oracle outputs back to tests.json and stamp `validatedAt`; on any failure, make
@@ -191,7 +216,12 @@ export async function validateProblem(
     result.passed === result.total &&
     disagreements.length === 0 &&
     broken.length === 0;
-  const passed = lint.length === 0 && ranClean;
+  const generated = new Set(cases.filter((c) => c.gen !== undefined).map((c) => c.id));
+  const unstable =
+    lint.length === 0 && ranClean && filled.some((id) => generated.has(id))
+      ? await unstableCases({ ...bundle, tests: cases }, limits, generated)
+      : [];
+  const passed = lint.length === 0 && ranClean && unstable.length === 0;
 
   const report: ValidationReport = {
     slug,
@@ -202,6 +232,7 @@ export async function validateProblem(
     filled,
     disagreements,
     broken,
+    unstable,
   };
   if (passed) {
     if (filled.length > 0) writeTests(slug, cases);

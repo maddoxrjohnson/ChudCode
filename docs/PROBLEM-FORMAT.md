@@ -199,6 +199,12 @@ A case refers to it as `"gen": "large(100000, 33333)"`. Use a generator for ever
 max-size case, including when the input is a single integer at its limit, so that
 validation can tell the case is the max-size one.
 
+The input is built again on every run, so the generator must build the same input
+every time. Draw every random choice from `random.Random(seed)`. Runs pin
+`PYTHONHASHSEED`, so even the iteration order of a set of strings repeats, but an
+explicit order is clearer. Validation runs the reference twice when it fills in a
+generated case and fails the problem if any generated case comes out differently.
+
 ## checker.py
 
 ```python

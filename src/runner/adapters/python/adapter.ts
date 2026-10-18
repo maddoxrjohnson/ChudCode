@@ -1,10 +1,17 @@
 /**
  * adapter.ts: the Python language adapter.
  *
- * Lays out `solution.py` plus the harness files, spawns `python3 -I harness.py`, and
- * reads the harness's JSON-lines protocol back. `-I` isolates the interpreter from
- * the user's environment and site-packages, so a candidate's solution sees only the
- * standard library and the files in its workdir.
+ * Lays out `solution.py` plus the harness files, spawns `python3 -s -P harness.py`,
+ * and reads the harness's JSON-lines protocol back. `-s` drops the user's
+ * site-packages and `-P` keeps the working directory off `sys.path`, so a candidate's
+ * solution sees only the standard library and the files in its workdir. The runner
+ * builds the child's environment from scratch, so nothing from the user's shell
+ * reaches it either.
+ *
+ * Not `-I`: isolated mode also ignores every `PYTHON*` variable, and the runner needs
+ * `PYTHONHASHSEED=0` to hold. Without it, string hashing changes from process to
+ * process, so a generator that walks a set of strings builds a different input on
+ * every run than the one its expected output came from.
  */
 
 import * as fs from "node:fs";
@@ -19,6 +26,9 @@ import type {
   RawCaseResult,
   Signature,
 } from "../../types.ts";
+
+/** Interpreter flags for every run; see the header for why these and not `-I`. */
+export const PYTHON_FLAGS = ["-s", "-P"] as const;
 
 const TYPING_NAMES = ["List", "Optional", "Dict", "Tuple", "Set"] as const;
 const CHUD_TYPES = ["ListNode", "TreeNode"] as const;
@@ -64,7 +74,7 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   runCommand(): Command {
-    return { cmd: this.pythonBin, args: ["-I", "harness.py"] };
+    return { cmd: this.pythonBin, args: [...PYTHON_FLAGS, "harness.py"] };
   }
 
   harnessFiles(): Array<{ name: string; contents: string }> {
@@ -110,11 +120,12 @@ export class PythonAdapter implements LanguageAdapter {
 
 export const pythonAdapter = new PythonAdapter();
 
-/** Whether the configured interpreter exists and is Python 3. */
+/** Whether the configured interpreter exists and is Python 3.11 or later, which `-P` needs. */
 export function pythonAvailable(bin = pythonAdapter.pythonBin): boolean {
   try {
     const probe = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 5_000 });
-    return probe.status === 0 && /Python 3\./.test(probe.stdout + probe.stderr);
+    const minor = /Python 3\.(\d+)/.exec(probe.stdout + probe.stderr)?.[1];
+    return probe.status === 0 && minor !== undefined && Number(minor) >= 11;
   } catch {
     return false;
   }

@@ -49,7 +49,7 @@ describe("dockerArgs", () => {
     image: "python:3.12-slim",
     workdir: "/home/u/.chudcode/tmp/run-1",
     limits: LIMITS,
-    command: { cmd: "/usr/local/bin/python3", args: ["-I", "harness.py"] },
+    command: { cmd: "/usr/local/bin/python3", args: ["-s", "-P", "harness.py"] },
   });
   const pairs = (flag: string) => args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
 
@@ -70,7 +70,7 @@ describe("dockerArgs", () => {
   it("passes only the run environment and runs the image's interpreter", () => {
     expect(pairs("--env")).toEqual(expect.arrayContaining(["PYTHONHASHSEED=0", "HOME=/tmp"]));
     expect(pairs("--env").some((e) => e?.startsWith("PATH="))).toBe(false);
-    expect(args.slice(-4)).toEqual(["python:3.12-slim", "python3", "-I", "harness.py"]);
+    expect(args.slice(-5)).toEqual(["python:3.12-slim", "python3", "-s", "-P", "harness.py"]);
   });
 });
 
