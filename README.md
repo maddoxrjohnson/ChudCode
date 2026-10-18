@@ -31,7 +31,9 @@ claude plugin install chudcode@chudcode
 Then, in Claude Code, say "give me a mock interview on sliding windows" or run
 `/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
 `/chudcode:review` serves a fresh problem on the pattern you are most overdue to see
-again. `/chudcode:research <company>` finds what that company has been asking lately,
+again. `/chudcode:roadmap` takes you through NeetCode 150 in order, or Grind 75 if you
+name it: each step is an original problem in the shape of the next one on the list.
+`/chudcode:research <company>` finds what that company has been asking lately,
 so an interview for it has the right shape. `/chudcode:dashboard` opens the page with
 your review schedule, streak, and past sessions.
 
@@ -65,7 +67,7 @@ Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your cl
 ```
 
 `CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
-are `/interview`, `/review`, `/research <company>`, and `/dashboard`. While the
+are `/interview`, `/review`, `/roadmap`, `/research <company>`, and `/dashboard`. While the
 interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
 below the editor.
 
@@ -91,6 +93,11 @@ make sure the patterns you keep missing are the ones you see again.
   on the most overdue pattern. The dashboard shows every pattern's box, what is due,
   and your streak. Boxes and due dates are derived on every read from an append-only
   log of verdicts, so changing the schedule or the verdict rule re-scores history.
+- Roadmaps: work through NeetCode 150 topic by topic along NeetCode's tree, or Grind
+  75 week by week. A topic or week opens once half of every one before it is solved.
+  You never see the listed problem: each step is an original problem in its shape,
+  and solving it checks the listed one off. Progress is derived from your sessions,
+  so a "like Two Sum" interview counts too.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company

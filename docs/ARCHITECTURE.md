@@ -48,6 +48,7 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 | `src/runner/`     | `Runner` and `LanguageAdapter` interfaces, the process and Docker runners, comparators, and the candidate-safe view of a result.                                                       |
 | `src/store/`      | On-disk formats: config, problems, sessions, review events, trends. Atomic JSON writes, strict id validation.                                                                          |
 | `src/review.ts`   | Leitner scheduling over pattern and problem keys, derived from the review log on every read.                                                                                           |
+| `src/roadmap.ts`  | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                       |
 | `assets/runtime/` | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                        |
 | `pi/`             | The Pi extension: slash commands, the bridge, the status line.                                                                                                                         |
 

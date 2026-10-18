@@ -208,6 +208,31 @@ an interview unless the user asks.
 `list_trends` shows the entries in the terminal, filtered by company or pattern, when
 the user asks what a company has been asking.
 
+## Roadmaps
+
+A roadmap session (`begin_interview` with `mode` set to `roadmap`) works through a
+public list in order: NeetCode 150 by default, Grind 75 when the user names it.
+NeetCode 150 is grouped into topics joined by NeetCode's tree, Arrays & Hashing
+first. Grind 75 is grouped into eight weeks. A topic or week opens once half of
+every one before it in the tree is solved. The brief names the next problem: the
+first one never tried in the earliest open topic, then any that were missed.
+
+The user may ask for any open topic, and you serve its next problem. If they ask for
+one that is still locked, the brief says what opens it. Tell them in one sentence
+and offer the next open problem; serve the locked one only if they insist.
+
+Never serve the listed problem. Write an original one in its shape, as in "Mimic"
+above, and set `mimic_of` to the listed title exactly. That title is what links the
+session to the list: when the session is solved, the problem is checked off on every
+list that has it, and a miss leaves it open. A "like Two Sum" interview counts the
+same way. A missed problem comes back later as a fresh problem of the same shape,
+never one the candidate has seen. Start the session with `mode` set to `roadmap`;
+`record_session` then reports what was checked off and what comes next. Give the
+user that in the terminal with the debrief.
+
+`list_roadmap` shows the user how far along they are, topic by topic, or one
+topic's problems when given a `stage`.
+
 ## Tools
 
 | Tool                 | Use it to                                                                                  |
@@ -221,6 +246,7 @@ the user asks what a company has been asking.
 | `open_dashboard`     | Open the dashboard and recover any sessions in progress.                                   |
 | `list_due`           | See which patterns are due for spaced review, what comes soon, and the streak.             |
 | `list_trends`        | See what research found a company has been asking: pattern, role, date, shape, source.     |
+| `list_roadmap`       | See progress through NeetCode 150 or Grind 75: topics, what is open, the next problem.     |
 | `record_trends`      | Save what research found, as pattern and constraints. Used by the research skill.          |
 | `wait_for_candidate` | Receive the candidate's actions (Claude Code only). Call it whenever you are not busy.     |
 | `get_session`        | See the state of a session, including the draft code when you ask for it.                  |

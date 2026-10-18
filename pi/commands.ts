@@ -1,11 +1,11 @@
 /**
- * commands.ts: /interview, /review, /research, and /dashboard for Pi.
+ * commands.ts: /interview, /review, /roadmap, /research, and /dashboard for Pi.
  *
  * Each command sends one short user message that names the ChudCode tool to call
  * first. The method itself comes back from `begin_interview`, with the host section
  * for Pi, so these prompts stay small. Claude Code gets the same entry points as
- * skills; the interview and review skills describe listening with a wait tool, which
- * Pi does not have, so those two are written out here instead. Research is the same
+ * skills; the interview, review, and roadmap skills describe listening with a wait
+ * tool, which Pi does not have, so those three are written out here instead. Research is the same
  * on both hosts and reuses its skill.
  */
 
@@ -58,6 +58,23 @@ export const COMMANDS = {
         "Call `begin_interview` with `mode` set to `review` (and the pattern, if named) and follow the method it returns. If nothing is due, say so and offer a regular interview. " +
           "Serve a validated problem on that pattern the candidate has not seen, writing one if needed, then call `start_session` with `mode` set to `review`.",
         SESSION_STEPS,
+      ].join("\n\n"),
+  },
+  roadmap: {
+    description:
+      "Take the next problem on NeetCode 150 or Grind 75. Usage: /roadmap [grind75] [topic or week]",
+    prompt: (args: string) =>
+      [
+        "Run the next ChudCode roadmap session.",
+        args
+          ? `The user asked for: ${args}`
+          : "The user named no list or topic, so use NeetCode 150.",
+        "Call `begin_interview` with `mode` set to `roadmap`, `roadmap` set to `grind75` if the user named Grind 75 and `neetcode150` otherwise, and `stage` if they named a topic or week (`list_roadmap` lists the stage ids). Follow the method it returns. " +
+          "Write an original problem in the shape of the listed one it names, with the source's mimic_of set to that title exactly, and validate it; never serve the listed problem itself. Then call `start_session` with `mode` set to `roadmap`.",
+        SESSION_STEPS.replace(
+          "and when the pattern comes back.",
+          "when the pattern comes back, and where they stand on the roadmap.",
+        ),
       ].join("\n\n"),
   },
   research: {

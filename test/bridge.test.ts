@@ -218,7 +218,13 @@ describe("commands", () => {
       },
       () => (pokes += 1),
     );
-    expect([...registered.keys()]).toEqual(["interview", "review", "research", "dashboard"]);
+    expect([...registered.keys()]).toEqual([
+      "interview",
+      "review",
+      "roadmap",
+      "research",
+      "dashboard",
+    ]);
 
     await registered.get("interview")!("  sliding window medium ", { isIdle: () => true });
     await registered.get("research")!("Stripe new grad", { isIdle: () => false });

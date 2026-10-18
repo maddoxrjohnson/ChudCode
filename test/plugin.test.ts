@@ -58,7 +58,7 @@ describe("Pi package", () => {
 describe("skills", () => {
   const known = new McpSession(new CandidateInbox()).toolNames();
 
-  it.each(["interview", "review", "dashboard", "research"])(
+  it.each(["interview", "review", "roadmap", "dashboard", "research"])(
     "%s has frontmatter and names only tools the server lists",
     (skill) => {
       const body = fs.readFileSync(path.join(packageRoot(), "skills", skill, "SKILL.md"), "utf8");

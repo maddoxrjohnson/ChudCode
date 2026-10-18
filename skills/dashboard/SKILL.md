@@ -11,6 +11,8 @@ description: Open the ChudCode dashboard in the browser, or report the user's pr
   The tool also recovers any session that was in progress.
 - To report progress in the terminal, call `list_due`: the patterns due for review,
   what comes due soon, and the streak. If something is due, offer a review session.
+- To report progress through NeetCode 150 or Grind 75, call `list_roadmap`, with
+  `roadmap` set to `grind75` for Grind 75. Offer the next problem it names.
 - To list problems in the terminal, call `list_problems`. Pass `pattern` or
   `difficulty` to filter.
 - To see one session in detail, call `get_session` with its id.
