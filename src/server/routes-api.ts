@@ -17,19 +17,21 @@
  *   POST /api/sessions/<id>/done
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
+ *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
  */
 
 import type * as http from "node:http";
 
 import * as flow from "../flow.ts";
 import { loadProgress } from "../progress.ts";
-import { loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
+import { nextUp, requestNext } from "../next-up.ts";
+import { isRoadmapId, loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
 import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
 import { listSessions, sessionExists, writeDraft } from "../store/sessions.ts";
 import { hasAgentToken } from "./agent-auth.ts";
-import { agentInbox, agentListening } from "./hooks.ts";
+import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
@@ -62,6 +64,17 @@ export async function handleApi(
       progress: loadProgress(),
       roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
     });
+  }
+
+  if (resource === "roadmaps" && action === "next" && req.method === "POST") {
+    if (!isRoadmapId(id)) throw new HttpError(404, "No such roadmap");
+    const body = asRecord(await readJsonBody(req, 1024));
+    const from = body["from"];
+    if (from !== undefined && (typeof from !== "string" || !sessionExists(from)))
+      throw new HttpError(400, "from must be a session id");
+    const next = nextUp(id);
+    if (!next) throw new HttpError(409, "Every problem on this roadmap is solved");
+    return sendJson(res, { request: requestNext(id, from), next, connected: agentConnected() });
   }
 
   if (resource === "problems" && id !== undefined && action === undefined && req.method === "GET") {

@@ -268,6 +268,29 @@ export function roadmapTitle(named: string): string | undefined {
   );
 }
 
+/** The list a roadmap session on this title belongs to when none was named: NeetCode 150 first. */
+export function roadmapFor(title: string): RoadmapId | undefined {
+  const entry = seedEntries().find((e) => e.title === title);
+  return ROADMAP_IDS.find((id) => entry?.lists.includes(id));
+}
+
+/**
+ * A validated problem written in the shape of this title that has never been served:
+ * the interviewer writes one ahead of time so the next roadmap step opens at once.
+ */
+export function preparedProblem(
+  title: string,
+  problems: readonly ProblemMeta[],
+): ProblemMeta | undefined {
+  return problems.find(
+    (p) =>
+      p.validatedAt !== undefined &&
+      p.timesServed === 0 &&
+      p.source.mimicOf !== undefined &&
+      roadmapTitle(p.source.mimicOf) === title,
+  );
+}
+
 /** A roadmap's standing right now, from the sessions and problems on disk. */
 export function loadRoadmapProgress(id: RoadmapId): RoadmapProgress {
   return buildRoadmapProgress(

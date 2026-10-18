@@ -10,7 +10,8 @@ import {
 } from "../flow.ts";
 import { openUrl } from "../open-browser.ts";
 import { loadProgress } from "../progress.ts";
-import { loadRoadmapProgress, ROADMAP_IDS, roadmapTitle } from "../roadmap.ts";
+import { resolveNext } from "../next-up.ts";
+import { loadRoadmapProgress, ROADMAP_IDS, roadmapFor, roadmapTitle } from "../roadmap.ts";
 import {
   interviewBrief,
   patternListText,
@@ -184,6 +185,10 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         {
           slug: schema.str("The problem's slug, from list_problems."),
           mode: schema.oneOf(MODES, "interview (default), review, mimic, or roadmap."),
+          roadmap: schema.oneOf(
+            ROADMAP_IDS,
+            "Roadmap mode: the list this session works through. Defaults to the list the problem's mimic_of title is on, NeetCode 150 first.",
+          ),
           timer_minutes: schema.int(
             "Length of the interview clock. Defaults to the configured value (35).",
             1,
@@ -193,7 +198,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
             "Start the clock immediately instead of waiting for the candidate to press Start.",
           ),
         },
-        ["mode", "timer_minutes", "start_now"],
+        ["mode", "roadmap", "timer_minutes", "start_now"],
       ),
       async execute(args) {
         const slug = requireString(args, "slug", 64);
@@ -209,6 +214,13 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         const mode: SessionMode = optionalEnum(args, "mode", MODES) ?? "interview";
         const timerMinutes = optionalInt(args, "timer_minutes", 1, 240) ?? config.timerMinutes;
 
+        const mimicOf = bundle.meta.source.mimicOf;
+        const listed = mimicOf === undefined ? undefined : roadmapTitle(mimicOf);
+        const roadmap =
+          mode === "roadmap"
+            ? (optionalEnum(args, "roadmap", ROADMAP_IDS) ?? (listed && roadmapFor(listed)))
+            : undefined;
+
         const base = await server.start();
         const session = createSession({
           problem: slug,
@@ -216,18 +228,19 @@ export function sessionTools(host: ToolHost): ToolDef[] {
           patterns: bundle.meta.patterns,
           difficulty: bundle.meta.difficulty as Difficulty,
           mode,
+          ...(roadmap ? { roadmap } : {}),
           timerMs: timerMinutes * 60_000,
         });
         updateMeta(slug, { timesServed: bundle.meta.timesServed + 1, lastServedAt: Date.now() });
         host.created(session.id);
+        resolveNext(session);
         notifyDashboard(session.id);
         if (optionalBool(args, "start_now")) startClock(session.id, Date.now(), "interviewer");
 
         const url = server.urlForSession(session.id) ?? base;
         if (shouldAutoOpen(config)) openUrl(url);
-        const mimicOf = bundle.meta.source.mimicOf;
         const unlisted =
-          mode === "roadmap" && (mimicOf === undefined || roadmapTitle(mimicOf) === undefined)
+          mode === "roadmap" && listed === undefined
             ? `Note: this problem's \`mimic_of\` names no roadmap problem, so solving it checks nothing off. ${mimicOf === undefined ? "It has none." : `It says "${mimicOf}".`}`
             : "";
         return ok(

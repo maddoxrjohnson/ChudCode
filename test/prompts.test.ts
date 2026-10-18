@@ -6,13 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildProgress } from "../src/progress.ts";
 import { DAY_MS, scheduleItems } from "../src/review.ts";
-import { patterns } from "../src/store/problems.ts";
+import { patterns, type ProblemMeta } from "../src/store/problems.ts";
 import {
   BRIEF_TREND_LIMIT,
   constraintsSection,
   dueListText,
   interviewBrief,
   messagePrompt,
+  nextRequestedPrompt,
   nothingYetText,
   resultText,
   roadmapDirectiveText,
@@ -287,6 +288,23 @@ describe("dueListText", () => {
 });
 
 describe("roadmap text", () => {
+  it("tells the interviewer a Next press is waiting, with the prepared problem if there is one", () => {
+    const progress = buildRoadmapProgress(roadmap("neetcode150"), []);
+    const prepared = { slug: "dup-finder" } as ProblemMeta;
+    const ready = nextRequestedPrompt(progress, prepared, 0);
+    expect(ready).toContain("pressed **Next problem** for NeetCode 150");
+    expect(ready).toContain("start it before anything else");
+    expect(ready).toContain(
+      'You already wrote and validated `dup-finder` in the shape of "Contains Duplicate".',
+    );
+    expect(ready).toContain('`roadmap: "neetcode150"`');
+    expect(ready).not.toContain("## Roadmap");
+    const fresh = nextRequestedPrompt(progress, undefined, 0);
+    expect(fresh).toContain("## Roadmap: NeetCode 150");
+    expect(fresh).toContain("Serve **Contains Duplicate**");
+    expect(fresh).toContain("`wait_for_candidate`");
+  });
+
   const map = roadmap("neetcode150");
   const arrays = map.stages[0]?.items.map((i) => i.title) ?? [];
   const attempt = (title: string, correct: boolean, at = 1): RoadmapAttempt => ({

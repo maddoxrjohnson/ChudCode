@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  ACTIVE_WINDOW_MS,
   CandidateInbox,
   connectInbox,
   DEFAULT_WAIT_SECONDS,
@@ -15,6 +16,7 @@ import {
   waitSeconds,
   type JsonRpcResponse,
 } from "../src/mcp.ts";
+import { clearNext } from "../src/next-up.ts";
 import { setHooks } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
 import { readProblem, updateMeta } from "../src/store/problems.ts";
@@ -39,6 +41,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   inbox.reset();
+  clearNext();
   await server.close();
   setHooks({});
   fixture.cleanup();
@@ -113,6 +116,21 @@ describe("CandidateInbox", () => {
     expect(await pending).toEqual(["hello"]);
     expect(box.listening).toBe(false);
     expect(await box.wait(2, 20)).toEqual([]);
+  });
+
+  it("counts as connected while waiting or just after a tool call, until it is released", async () => {
+    const box = new CandidateInbox();
+    expect(box.connected()).toBe(false);
+    box.touch(1_000);
+    expect(box.connected(2_000)).toBe(true);
+    expect(box.connected(1_000 + ACTIVE_WINDOW_MS)).toBe(false);
+    box.release();
+    expect(box.connected(2_000)).toBe(false);
+    const pending = box.wait(1, 2_000);
+    expect(box.connected()).toBe(true);
+    box.push("x");
+    await pending;
+    box.reset();
   });
 
   it("resolves a cancelled wait with null and never loses the prompt", async () => {
@@ -471,6 +489,46 @@ describe("an interview round trip", () => {
     expect(stage).toContain("- solved: Contains Duplicate (easy)");
     expect(stage).toContain("- new: Valid Anagram (easy)");
     expect((await call("list_roadmap", { stage: "nope" })).isError).toBe(true);
+  }, 15_000);
+
+  it("takes a Next problem press from the page to the interviewer and the page to the new session", async () => {
+    updateMeta("window-sum", { source: { kind: "mimic", mimicOf: "Contains Duplicate" } });
+    await call("open_dashboard");
+    const dashboard = await openStream(server.getBaseUrl()!, "/api/events?scope=dashboard");
+    try {
+      expect((await browser("/api/roadmaps/nope/next")).status).toBe(404);
+      const pressed = await browser("/api/roadmaps/neetcode150/next");
+      expect(pressed.status).toBe(200);
+      const body = (await pressed.json()) as {
+        request: { roadmap: string };
+        next: { title: string; prepared: string | null };
+        connected: boolean;
+      };
+      expect(body.request.roadmap).toBe("neetcode150");
+      expect(body.next).toMatchObject({ title: "Contains Duplicate", prepared: "window-sum" });
+      expect(body.connected).toBe(true);
+      await dashboard.next((f) => f.type === "next");
+      // A second press changes nothing and does not queue a second prompt.
+      await browser("/api/roadmaps/neetcode150/next");
+
+      const told = text(await call("wait_for_candidate", { timeout_seconds: 2 }));
+      expect(told).toContain("pressed **Next problem** for NeetCode 150");
+      expect(told).toContain("You already wrote and validated `window-sum`");
+      expect(told).not.toContain("events arrived");
+
+      const id = await startSession({ mode: "roadmap" });
+      expect(readSession(id).roadmap).toBe("neetcode150");
+      const sent = await dashboard.next((f) => f.type === "next_session");
+      expect(sent.data).toEqual({ sessionId: id, url: `/s/${id}` });
+
+      // Answered: a fresh press for the same step has nothing prepared any more.
+      const again = (await (await browser("/api/roadmaps/neetcode150/next")).json()) as {
+        next: { prepared: string | null };
+      };
+      expect(again.next.prepared).toBeNull();
+    } finally {
+      dashboard.close();
+    }
   }, 15_000);
 
   it("marks a solved session correct and schedules its pattern further out", async () => {

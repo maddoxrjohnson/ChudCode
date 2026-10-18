@@ -17,12 +17,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { pendingNext } from "./next-up.ts";
 import { AgentOutbox } from "./outbox.ts";
-import { readProblem } from "./store/problems.ts";
+import { loadRoadmapProgress, preparedProblem } from "./roadmap.ts";
+import { listProblems, readProblem } from "./store/problems.ts";
 import {
   candidateDonePrompt,
   hintUsedPrompt,
   messagePrompt,
+  nextRequestedPrompt,
   notePrompt,
   nothingYetText,
   recoveredSessionPrompt,
@@ -31,10 +34,11 @@ import {
   submissionPrompt,
   timerExpiredPrompt,
 } from "./prompts.ts";
-import { setHooks, type CandidateEvent } from "./server/hooks.ts";
+import { agentConnected, setHooks, type CandidateEvent, type NextRequest } from "./server/hooks.ts";
 import * as server from "./server/server.ts";
 import {
   AGENT_CHANNEL,
+  DASHBOARD_CHANNEL,
   push,
   sessionChannel,
   setSubscriberListener,
@@ -76,6 +80,12 @@ const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05
  */
 export const DEFAULT_WAIT_SECONDS = 60;
 export const MAX_WAIT_SECONDS = 60;
+
+/**
+ * How long after its last tool call an interviewer still counts as connected. Writing
+ * and validating a problem leaves a few minutes between waits.
+ */
+export const ACTIVE_WINDOW_MS = 5 * 60_000;
 
 /** Appended to the interviewing brief for this host. */
 export const HOST_BRIEF = `## ChudCode tools in this session
@@ -130,6 +140,9 @@ export class CandidateInbox {
   private readonly waiters = new Map<string | number, Waiter>();
   private readonly activity = new Map<string, Activity>();
   private onListening: ((listening: boolean) => void) | null = null;
+  private lastActiveAt = 0;
+  private released = false;
+  private expiry: NodeJS.Timeout | null = null;
 
   get size(): number {
     return this.queue.length;
@@ -137,6 +150,29 @@ export class CandidateInbox {
 
   get listening(): boolean {
     return this.waiters.size > 0;
+  }
+
+  /** Waiting now, or called a tool recently and has not been told to end its turn. */
+  connected(now = Date.now()): boolean {
+    return this.listening || (!this.released && now - this.lastActiveAt < ACTIVE_WINDOW_MS);
+  }
+
+  /** The interviewer called a tool. */
+  touch(now = Date.now()): void {
+    const was = this.connected(now);
+    this.lastActiveAt = now;
+    this.released = false;
+    if (this.expiry) clearTimeout(this.expiry);
+    this.expiry = setTimeout(() => this.notifyListening(), ACTIVE_WINDOW_MS + 1_000);
+    this.expiry.unref();
+    if (!was) this.notifyListening();
+  }
+
+  /** The interviewer was told to end its turn: it will not answer the page again. */
+  release(): void {
+    if (this.released) return;
+    this.released = true;
+    this.notifyListening();
   }
 
   /** Called whenever the server starts or stops waiting. */
@@ -218,6 +254,10 @@ export class CandidateInbox {
     this.queue.length = 0;
     this.seen.clear();
     this.activity.clear();
+    if (this.expiry) clearTimeout(this.expiry);
+    this.expiry = null;
+    this.lastActiveAt = 0;
+    this.released = false;
   }
 
   private take(): string[] {
@@ -243,10 +283,15 @@ export function activeSessions(): Session[] {
   return listSessions(10).filter((s) => s.phase !== "done");
 }
 
+/**
+ * Tell every open page whether the interviewer is listening (the session badge) and
+ * whether it is connected at all (the Next problem button). Finished sessions are
+ * included, since the debrief carries the button.
+ */
 function broadcastPresence(listening: boolean): void {
-  for (const session of activeSessions()) {
-    push(sessionChannel(session.id), "presence", { listening });
-  }
+  const payload = { listening, connected: agentConnected() };
+  for (const session of listSessions(10)) push(sessionChannel(session.id), "presence", payload);
+  push(DASHBOARD_CHANNEL, "presence", payload);
 }
 
 /** Route candidate events into the inbox and tell the page when the interviewer listens. */
@@ -254,7 +299,9 @@ export function connectInbox(inbox: CandidateInbox): void {
   inbox.setListeningListener(broadcastPresence);
   setHooks({
     isListening: () => inbox.listening,
+    isConnected: () => inbox.connected(),
     onCandidateEvent: (event) => routeEvent(inbox, event),
+    onNextRequested: (request) => routeNext(inbox, request),
   });
 }
 
@@ -269,6 +316,7 @@ export function connectOutbox(outbox: AgentOutbox): void {
   setHooks({
     isListening: () => subscriberCount(AGENT_CHANNEL) > 0,
     onCandidateEvent: (event) => routeEvent(outbox, event),
+    onNextRequested: (request) => routeNext(outbox, request),
     agentInbox: (since) => outbox.since(since),
   });
 }
@@ -346,6 +394,19 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
     default:
       return;
   }
+}
+
+/** A press of Next problem, dropped once a session answers it. */
+function routeNext(inbox: PromptSink, request: NextRequest): void {
+  const progress = loadRoadmapProgress(request.roadmap);
+  const prepared = progress.next
+    ? preparedProblem(progress.next.item.title, listProblems())
+    : undefined;
+  inbox.push(
+    nextRequestedPrompt(progress, prepared, request.at),
+    `next:${request.roadmap}:${request.at}`,
+    () => pendingNext()?.at === request.at,
+  );
 }
 
 /**
@@ -490,6 +551,7 @@ export class McpSession {
     name: unknown,
     args: Record<string, unknown>,
   ): Promise<JsonRpcResponse | null> {
+    this.inbox?.touch();
     if (name === WAIT_TOOL.name && this.inbox) return this.waitForCandidate(this.inbox, id, args);
     const tool = typeof name === "string" ? this.tools.get(name) : undefined;
     if (!tool) return error(id, -32602, `Unknown tool: ${String(name)}`);

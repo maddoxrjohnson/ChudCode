@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
 
+import type { RoadmapId } from "../roadmap.ts";
 import type { RunResult, RunStatus } from "../runner/types.ts";
 import { appendJsonl, readJson, readJsonl, readText, writeJson, writeText } from "./json.ts";
 import type { Difficulty } from "./problems.ts";
@@ -47,6 +48,8 @@ export interface Session {
   patterns: string[];
   difficulty: Difficulty;
   mode: SessionMode;
+  /** Roadmap mode: the list this session works through. */
+  roadmap?: RoadmapId;
   language: "python";
   timerMs: number;
   createdAt: number;
@@ -88,6 +91,7 @@ export interface NewSession {
   patterns: string[];
   difficulty: Difficulty;
   mode: SessionMode;
+  roadmap?: RoadmapId;
   timerMs: number;
 }
 
@@ -110,6 +114,7 @@ export function createSession(input: NewSession, now = Date.now()): Session {
     patterns: [...input.patterns],
     difficulty: input.difficulty,
     mode: input.mode,
+    ...(input.roadmap ? { roadmap: input.roadmap } : {}),
     language: "python",
     timerMs: input.timerMs,
     createdAt: now,

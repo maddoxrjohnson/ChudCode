@@ -40,6 +40,7 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mcp/launch.mjs`  | Entry point both hosts run. Checks Node can run TypeScript, installs runtime deps on first launch, warns if Python is missing.                                                         |
 | `src/mcp.ts`      | Hand-written JSON-RPC dispatch, the tool table, the listening inbox, and routing of candidate events to prompts.                                                                       |
+| `src/next-up.ts`  | The Next problem button: one pending press, handed to the host and answered by the next roadmap session `start_session` creates.                                                       |
 | `src/outbox.ts`   | The pushing host's numbered prompt log, replayable with `GET /api/inbox?since`.                                                                                                        |
 | `src/tools/`      | One file per tool group. Tools validate arguments and call `flow.ts` or a store.                                                                                                       |
 | `src/flow.ts`     | Every operation that moves a session along: start, note, message, run, submit, hint, timeout, done, record. Writes disk, appends the event log, pushes SSE, emits the candidate event. |

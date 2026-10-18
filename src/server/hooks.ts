@@ -5,6 +5,7 @@
  * With no hook registered (tests, the solo dev server) events are simply dropped.
  */
 
+import type { RoadmapId } from "../roadmap.ts";
 import type { RunResult, RunStatus } from "../runner/types.ts";
 
 export type CandidateEvent = { sessionId: string; at: number } & (
@@ -18,6 +19,14 @@ export type CandidateEvent = { sessionId: string; at: number } & (
   | { kind: "timer_expired" }
   | { kind: "candidate_done" }
 );
+
+/** The candidate pressed Next problem: serve the next step on this roadmap. */
+export interface NextRequest {
+  roadmap: RoadmapId;
+  /** The session page the press came from, if it was not the dashboard. */
+  from?: string;
+  at: number;
+}
 
 /** One prompt the host bridge has been sent, as `GET /api/inbox` returns it. */
 export interface InboxEntry {
@@ -38,10 +47,17 @@ export interface InboxPage {
 
 export interface ServerHooks {
   onCandidateEvent?(event: CandidateEvent): void;
+  /** The candidate asked for the next roadmap problem from the page. */
+  onNextRequested?(request: NextRequest): void;
   /** Prompts after `since` for the host bridge. Only push-delivery hosts register it. */
   agentInbox?(since: number): InboxPage;
   /** Whether an agent is currently waiting for candidate events. */
   isListening?(): boolean;
+  /**
+   * Whether an agent is around to answer the page: waiting now, or busy with other
+   * tools a moment ago (writing a problem, say). False once it has been told to stop.
+   */
+  isConnected?(): boolean;
 }
 
 let hooks: ServerHooks = {};
@@ -54,10 +70,18 @@ export function emitCandidateEvent(event: CandidateEvent): void {
   hooks.onCandidateEvent?.(event);
 }
 
+export function emitNextRequest(request: NextRequest): void {
+  hooks.onNextRequested?.(request);
+}
+
 export function agentInbox(since: number): InboxPage | null {
   return hooks.agentInbox?.(since) ?? null;
 }
 
 export function agentListening(): boolean {
   return hooks.isListening?.() ?? false;
+}
+
+export function agentConnected(): boolean {
+  return hooks.isConnected?.() ?? agentListening();
 }

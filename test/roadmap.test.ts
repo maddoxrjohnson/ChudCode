@@ -10,12 +10,14 @@ import {
   buildRoadmapProgress,
   loadRoadmapProgress,
   nextItem,
+  preparedProblem,
   roadmap,
+  roadmapFor,
   roadmapAttempts,
   unlockThreshold,
   type RoadmapAttempt,
 } from "../src/roadmap.ts";
-import { updateMeta, type ProblemMeta } from "../src/store/problems.ts";
+import { listProblems, updateMeta, type ProblemMeta } from "../src/store/problems.ts";
 import { createSession, updateSession, type Session } from "../src/store/sessions.ts";
 import { makeFixture, seedExample, type Fixture } from "./helpers.ts";
 
@@ -179,5 +181,22 @@ describe("loadRoadmapProgress", () => {
     expect(grind.solved).toBe(1);
     expect(grind.stages[0]?.items[0]).toMatchObject({ title: "Two Sum", state: "solved" });
     expect(grind.next?.item.title).toBe("Valid Parentheses");
+  });
+
+  it("finds a problem written ahead of time for a step, until it has been served", () => {
+    seedExample();
+    expect(preparedProblem("Contains Duplicate", listProblems())).toBeUndefined();
+    updateMeta("window-sum", { source: { kind: "mimic", mimicOf: "contains duplicate" } });
+    expect(preparedProblem("Contains Duplicate", listProblems())?.slug).toBe("window-sum");
+    updateMeta("window-sum", { timesServed: 1 });
+    expect(preparedProblem("Contains Duplicate", listProblems())).toBeUndefined();
+  });
+});
+
+describe("roadmapFor", () => {
+  it("puts a title on NeetCode 150 when it is there, and on Grind 75 otherwise", () => {
+    expect(roadmapFor("Two Sum")).toBe("neetcode150");
+    expect(roadmapFor("Ransom Note")).toBe("grind75");
+    expect(roadmapFor("Not A Real Problem")).toBeUndefined();
   });
 });

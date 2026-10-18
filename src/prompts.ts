@@ -371,7 +371,7 @@ export function roadmapDirectiveText(progress: RoadmapProgress, stageId?: string
     "",
     `Serve ${itemWords(item)}, the next problem in ${stage.name}.${again}`,
     "",
-    `Never serve the listed problem itself. Write an original one in its shape with \`write_problem\`: the same pattern, difficulty, input sizes, and the twist that makes the pattern necessary, with its own story and examples. Set \`source.kind\` to \`mimic\` and \`mimic_of\` to "${item.title}" exactly; that is what checks it off when the session is solved. A validated problem on disk with that \`mimic_of\` that has been served 0 times is also fine; never one the candidate has seen. Call \`start_session\` with \`mode: "roadmap"\`.`,
+    `Never serve the listed problem itself. Write an original one in its shape with \`write_problem\`: the same pattern, difficulty, input sizes, and the twist that makes the pattern necessary, with its own story and examples. Set \`source.kind\` to \`mimic\` and \`mimic_of\` to "${item.title}" exactly; that is what checks it off when the session is solved. A validated problem on disk with that \`mimic_of\` that has been served 0 times is also fine; never one the candidate has seen. Call \`start_session\` with \`mode: "roadmap"\` and \`roadmap: "${progress.id}"\`.`,
   );
   return lines.join("\n");
 }
@@ -410,6 +410,29 @@ export function roadmapListText(progress: RoadmapProgress, stageId?: string): st
     "Pass `stage` to see one topic's problems.",
   );
   return lines.join("\n");
+}
+
+/** What the interviewer gets when the candidate presses Next problem on the page. */
+export function nextRequestedPrompt(
+  progress: RoadmapProgress,
+  prepared: ProblemMeta | undefined,
+  now = Date.now(),
+): string {
+  const parts = [
+    `The candidate pressed **Next problem** for ${progress.name} (${new Date(now).toISOString()}). The page is waiting and opens the new session as soon as \`start_session\` returns, so start it before anything else.`,
+  ];
+  if (prepared && progress.next) {
+    parts.push(
+      `You already wrote and validated \`${prepared.slug}\` in the shape of "${progress.next.item.title}". Call \`start_session\` with slug \`${prepared.slug}\`, \`mode: "roadmap"\`, and \`roadmap: "${progress.id}"\`.`,
+    );
+  } else {
+    parts.push(roadmapDirectiveText(progress));
+  }
+  parts.push(
+    `Once the session is up, greet the candidate in one sentence with \`say_to_candidate\`. ${thenWait()}`,
+    deliveryNote(),
+  );
+  return parts.join("\n\n");
 }
 
 /** What `record_session` adds for a roadmap session: what was checked off and what is next. */
