@@ -32,7 +32,8 @@ Then, in Claude Code, say "give me a mock interview on sliding windows" or run
 `/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
 `/chudcode:review` serves a fresh problem on the pattern you are most overdue to see
 again. `/chudcode:roadmap` takes you through NeetCode 150 in order, or Grind 75 if you
-name it: each step is an original problem in the shape of the next one on the list.
+name it: each step is an original problem in the shape of the next one on the list,
+and after each debrief a Next problem button takes you straight to the one after.
 `/chudcode:research <company>` finds what that company has been asking lately,
 so an interview for it has the right shape. `/chudcode:dashboard` opens the page with
 your review schedule, streak, and past sessions.
@@ -97,7 +98,9 @@ make sure the patterns you keep missing are the ones you see again.
   75 week by week. A topic or week opens once half of every one before it is solved.
   You never see the listed problem: each step is an original problem in its shape,
   and solving it checks the listed one off. Progress is derived from your sessions,
-  so a "like Two Sum" interview counts too.
+  so a "like Two Sum" interview counts too. After a roadmap debrief the interviewer
+  writes the next step ahead of time and stays for a while; the Next problem button
+  on the debrief or the dashboard opens it without a trip back to the terminal.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -107,15 +110,15 @@ make sure the patterns you keep missing are the ones you see again.
 ## What it looks like
 
 After a passing submission and the follow-ups, the interviewer scores the session.
-The debrief lands on the page: five rubric scores, strengths, things to work on, and
-when the pattern comes back.
+The debrief lands on the page: five rubric scores, strengths, things to work on,
+when the pattern comes back, and, on a roadmap, the button for the next problem.
 
-![The page after the debrief: 12 of 12 cases passed, the rubric card with scores, strengths, and things to work on](docs/screenshots/session-debrief.png)
+![The page after the debrief: 12 of 12 cases passed, the rubric card with scores, strengths, and things to work on, and a Next problem button for Contains Duplicate on NeetCode 150](docs/screenshots/session-debrief.png)
 
 The dashboard shows every pattern's place in the review schedule, what is due, the
 streak, progress through both roadmaps, and past sessions.
 
-![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, and recent sessions](docs/screenshots/dashboard.png)
+![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, a Next problem button under each roadmap, and recent sessions](docs/screenshots/dashboard.png)
 
 The screenshots come from `npm run e2e:browser -- <dir>`, which drives the real page.
 How the pieces fit is in `docs/ARCHITECTURE.md`.

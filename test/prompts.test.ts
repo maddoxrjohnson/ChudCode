@@ -372,6 +372,17 @@ describe("nothingYetText", () => {
     expect(nothingYetText(60, [], "")).toContain("No session is in progress");
   });
 
+  it("matches the advice to the phase, and never suggests scoring before Start", () => {
+    const base = session();
+    const at = (phase: Session["phase"]) => [{ ...base, phase }];
+    expect(nothingYetText(60, at("briefing"), "")).toContain(
+      "The candidate has not pressed Start yet.",
+    );
+    expect(nothingYetText(60, at("briefing"), "")).not.toContain("record_session");
+    expect(nothingYetText(60, at("coding"), "")).toContain("The candidate is working.");
+    expect(nothingYetText(60, at("review"), "")).toContain("in follow-ups");
+  });
+
   it("keeps the interviewer listening while a roadmap debrief is open", () => {
     const window = { roadmap: "grind75" as const, name: "Grind 75", leftMs: 61_000 };
     const out = nothingYetText(60, [], "", 0, window);

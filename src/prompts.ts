@@ -749,11 +749,12 @@ export function nothingYetText(
     );
   } else {
     for (const session of active) lines.push(sessionLine(session, now));
-    const coding = active.some((s) => s.phase === "coding");
     lines.push(
-      coding
+      active.some((s) => s.phase === "coding")
         ? "The candidate is working. Call `wait_for_candidate` again. If several silent minutes have passed with no runs, one short check-in with `say_to_candidate` is fine."
-        : "The session is in follow-ups. If you asked a question, call `wait_for_candidate` again; otherwise ask one with `say_to_candidate` or call `record_session`.",
+        : active.some((s) => s.phase === "review")
+          ? "The session is in follow-ups. If you asked a question, call `wait_for_candidate` again; otherwise ask one with `say_to_candidate` or call `record_session`."
+          : "The candidate has not pressed Start yet. Call `wait_for_candidate` again; the clock starts when they do.",
     );
   }
   if (digest) lines.push(digest);
