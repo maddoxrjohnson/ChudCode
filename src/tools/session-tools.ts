@@ -21,6 +21,7 @@ import {
   thenWait,
 } from "../prompts.ts";
 import * as server from "../server/server.ts";
+import { AGENT_CHANNEL, push } from "../server/sse.ts";
 import { plural } from "../format.ts";
 import { readConfig, shouldAutoOpen } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
@@ -239,6 +240,12 @@ export function sessionTools(host: ToolHost): ToolDef[] {
 
         const url = server.urlForSession(session.id) ?? base;
         if (shouldAutoOpen(config)) openUrl(url);
+        // Pi's extension shows the link under the editor, whatever the model says.
+        push(AGENT_CHANNEL, "session", {
+          sessionId: session.id,
+          title: bundle.meta.title,
+          url,
+        });
         const unlisted =
           mode === "roadmap" && listed === undefined
             ? `Note: this problem's \`mimic_of\` names no roadmap problem, so solving it checks nothing off. ${mimicOf === undefined ? "It has none." : `It says "${mimicOf}".`}`
@@ -249,7 +256,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
             ...(unlisted ? [unlisted] : []),
             `The candidate sees the statement, ${bundle.tests.filter((c) => c.visible).length} examples, a ${timerMinutes}-minute clock, and ${bundle.hints.length} hints they can take. ${bundle.tests.length - bundle.tests.filter((c) => c.visible).length} hidden cases run on Submit.`,
             `Target complexity: ${bundle.meta.complexityTarget.time} time, ${bundle.meta.complexityTarget.space} space.`,
-            `Give the user the URL and say one sentence on the page with say_to_candidate. ${thenWait()}`,
+            `Your reply to the user in the terminal must include this link: ${url} — the page is where they work, and without it they cannot reach the session. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
             "",
             "The statement as the candidate sees it, so you can answer clarifying questions from it:",
             "",

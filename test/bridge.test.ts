@@ -196,10 +196,39 @@ describe("helpers", () => {
     ]);
   });
 
-  it("shows the status line only while connected", () => {
+  it("puts the link of every session start_session opens on the status line", async () => {
+    await bootServer();
+    bridge.start();
+    await until(connected, "the bridge to connect");
+    const mcp = new McpSession(agentOutbox());
+    const started = (await mcp.handle({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "start_session", arguments: { slug: "window-sum" } },
+    })) as { result: { content: Array<{ text: string }> } };
+    const text = started.result.content.map((c) => c.text).join("\n");
+    expect(text).toMatch(/must include this link: http:\/\/127\.0\.0\.1:\d+\/s\//);
+    await until(() => statuses.some((s) => s.connected && s.session), "the session link");
+    const last = statuses.at(-1);
+    expect(last?.connected && last.session?.title).toBe("Largest Window Sum");
+    expect(last?.connected && last.session?.url).toMatch(/\/s\/\d{8}-\d{4}-window-sum-/);
+  });
+
+  it("shows the status line only while connected, with the latest session's link", () => {
     expect(statusLines({ connected: false })).toBeUndefined();
     expect(statusLines({ connected: true, port: 4100 })).toEqual([
       "chudcode interviewer connected on port 4100",
+    ]);
+    expect(
+      statusLines({
+        connected: true,
+        port: 4100,
+        session: { sessionId: "s", title: "Two Pass", url: "http://127.0.0.1:4100/s/s" },
+      }),
+    ).toEqual([
+      "chudcode interviewer connected on port 4100",
+      "chudcode session Two Pass: http://127.0.0.1:4100/s/s",
     ]);
   });
 });

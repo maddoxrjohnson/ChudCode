@@ -21,6 +21,7 @@ export default defineConfig([
       "test/**/*.ts",
       "scripts/**/*.{ts,mjs}",
       "pi/**/*.ts",
+      "hooks/**/*.ts",
       "mcp/**/*.mjs",
       "eslint.config.js",
     ],

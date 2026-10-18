@@ -29,7 +29,8 @@ claude plugin install chudcode@chudcode
 ```
 
 Then, in Claude Code, say "give me a mock interview on sliding windows" or run
-`/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser.
+`/chudcode:interview`. Your agent plays the interviewer; the page opens in your browser,
+and the plugin prints the session's link in your terminal every time one starts.
 `/chudcode:review` serves a fresh problem on the pattern you are most overdue to see
 again. `/chudcode:roadmap` takes you through NeetCode 150 in order, or Grind 75 if you
 name it: each step is an original problem in the shape of the next one on the list,
@@ -70,7 +71,7 @@ Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your cl
 `CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
 are `/interview`, `/review`, `/roadmap`, `/research <company>`, and `/dashboard`. While the
 interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
-below the editor.
+below the editor, and the link of the session it opened last.
 
 ## Why
 

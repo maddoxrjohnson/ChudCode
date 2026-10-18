@@ -36,22 +36,23 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 
 ## Modules
 
-| Path              | Job                                                                                                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mcp/launch.mjs`  | Entry point both hosts run. Checks Node can run TypeScript, installs runtime deps on first launch, warns if Python is missing.                                                         |
-| `src/mcp.ts`      | Hand-written JSON-RPC dispatch, the tool table, the listening inbox, and routing of candidate events to prompts.                                                                       |
-| `src/next-up.ts`  | The Next problem button: one pending press, handed to the host and answered by the next roadmap session `start_session` creates.                                                       |
-| `src/outbox.ts`   | The pushing host's numbered prompt log, replayable with `GET /api/inbox?since`.                                                                                                        |
-| `src/tools/`      | One file per tool group. Tools validate arguments and call `flow.ts` or a store.                                                                                                       |
-| `src/flow.ts`     | Every operation that moves a session along: start, note, message, run, submit, hint, timeout, done, record. Writes disk, appends the event log, pushes SSE, emits the candidate event. |
-| `src/prompts.ts`  | Everything the agent reads: the brief, event prompts, result text. One place to tune the interviewer.                                                                                  |
-| `src/server/`     | Loopback HTTP: pages, the JSON API, SSE channels, the agent token.                                                                                                                     |
-| `src/runner/`     | `Runner` and `LanguageAdapter` interfaces, the process and Docker runners, comparators, and the candidate-safe view of a result.                                                       |
-| `src/store/`      | On-disk formats: config, problems, sessions, review events, trends. Atomic JSON writes, strict id validation.                                                                          |
-| `src/review.ts`   | Leitner scheduling over pattern and problem keys, derived from the review log on every read.                                                                                           |
-| `src/roadmap.ts`  | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                       |
-| `assets/runtime/` | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                        |
-| `pi/`             | The Pi extension: slash commands, the bridge, the status line.                                                                                                                         |
+| Path                    | Job                                                                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp/launch.mjs`        | Entry point both hosts run. Checks Node can run TypeScript, installs runtime deps on first launch, warns if Python is missing.                                                         |
+| `src/mcp.ts`            | Hand-written JSON-RPC dispatch, the tool table, the listening inbox, and routing of candidate events to prompts.                                                                       |
+| `src/next-up.ts`        | The Next problem button: one pending press, handed to the host and answered by the next roadmap session `start_session` creates.                                                       |
+| `hooks/session-link.ts` | Claude Code hook on `start_session`: prints the session's link in the terminal, so it never depends on the model's reply. Pi's extension shows the same link under the editor.         |
+| `src/outbox.ts`         | The pushing host's numbered prompt log, replayable with `GET /api/inbox?since`.                                                                                                        |
+| `src/tools/`            | One file per tool group. Tools validate arguments and call `flow.ts` or a store.                                                                                                       |
+| `src/flow.ts`           | Every operation that moves a session along: start, note, message, run, submit, hint, timeout, done, record. Writes disk, appends the event log, pushes SSE, emits the candidate event. |
+| `src/prompts.ts`        | Everything the agent reads: the brief, event prompts, result text. One place to tune the interviewer.                                                                                  |
+| `src/server/`           | Loopback HTTP: pages, the JSON API, SSE channels, the agent token.                                                                                                                     |
+| `src/runner/`           | `Runner` and `LanguageAdapter` interfaces, the process and Docker runners, comparators, and the candidate-safe view of a result.                                                       |
+| `src/store/`            | On-disk formats: config, problems, sessions, review events, trends. Atomic JSON writes, strict id validation.                                                                          |
+| `src/review.ts`         | Leitner scheduling over pattern and problem keys, derived from the review log on every read.                                                                                           |
+| `src/roadmap.ts`        | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                       |
+| `assets/runtime/`       | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                        |
+| `pi/`                   | The Pi extension: slash commands, the bridge, the status line.                                                                                                                         |
 
 ## One interview, end to end
 

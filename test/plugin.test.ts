@@ -9,6 +9,7 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { hookOutput, sessionLink } from "../hooks/session-link.ts";
 import { CandidateInbox, MAX_WAIT_SECONDS, McpSession } from "../src/mcp.ts";
 import { packageRoot } from "../src/store/paths.ts";
 
@@ -36,6 +37,38 @@ describe("Claude Code plugin", () => {
   it("names the author and no one else", () => {
     expect(manifest["author"]).toEqual({ name: "Maddox Johnson" });
     expect(manifest["contributors"]).toBeUndefined();
+  });
+
+  it("prints every session's link from a hook on start_session", () => {
+    const hooks = readJson("hooks/hooks.json")["hooks"].PostToolUse;
+    const tool = `mcp__plugin_${manifest["name"]}_chudcode__start_session`;
+    expect(hooks).toEqual([
+      expect.objectContaining({
+        matcher: tool,
+        hooks: [
+          expect.objectContaining({
+            command: expect.stringContaining("${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts"),
+          }),
+        ],
+      }),
+    ]);
+    expect(new McpSession(new CandidateInbox()).toolNames()).toContain("start_session");
+
+    const url = "http://127.0.0.1:4100/s/20261018-1652-two-pass-f2cc";
+    const input = JSON.stringify({
+      tool_name: tool,
+      tool_response: [
+        {
+          type: "text",
+          text: `Session 20261018-1652-two-pass-f2cc is ready: ${url}\nThe candidate sees…`,
+        },
+      ],
+    });
+    const link = sessionLink(input);
+    expect(link).toEqual({ sessionId: "20261018-1652-two-pass-f2cc", url });
+    expect(hookOutput(link!).systemMessage).toBe(`ChudCode session ready: ${url}`);
+    expect(sessionLink(JSON.stringify({ tool_response: "No problem named x." }))).toBeNull();
+    expect(sessionLink("not json")).toBeNull();
   });
 
   it("is listed by the marketplace at the repository root", () => {

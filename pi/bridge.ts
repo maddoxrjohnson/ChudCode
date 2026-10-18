@@ -12,6 +12,9 @@
  * `GET /api/inbox?since=<last>` for what it missed. A new stream id means a new server
  * process, and everything it has queued is new.
  *
+ * A `session` event names a session `start_session` just opened. The bridge passes its
+ * link to the status line, so the candidate always has it, whatever the agent says.
+ *
  * The wake-up shape follows pi-teach's src/bridge.ts (Josh Noll, MIT); see
  * docs/ATTRIBUTION.md. Its reply-from-final-text fallback is not needed here: an
  * interviewer only reaches the page through `say_to_candidate`.
@@ -32,7 +35,15 @@ export interface ServerInfo {
   agentToken: string;
 }
 
-export type BridgeStatus = { connected: false } | { connected: true; port: number };
+/** The session `start_session` opened last, shown under the editor with its link. */
+export interface OpenSession {
+  sessionId: string;
+  title: string;
+  url: string;
+}
+
+export type BridgeStatus =
+  { connected: false } | { connected: true; port: number; session?: OpenSession };
 
 export interface BridgeOptions {
   /** Where to find the server. Defaults to reading server.json. */
@@ -130,6 +141,11 @@ export class InterviewBridge {
     const catchUp = () => this.catchUp(base, headers);
     await catchUp();
     for await (const frame of sseFrames(res.body)) {
+      if (frame.type === "session") {
+        const session = asOpenSession(frame.data);
+        if (session) this.onStatus({ connected: true, port: info.port, session });
+        continue;
+      }
       if (frame.type !== "candidate") continue;
       const entry = frame.data as InboxEntry;
       if (entry.stream === this.stream && entry.seq === this.lastSeq + 1) this.deliver(entry);
@@ -174,6 +190,13 @@ export function readServerFile(file = serverFile()): ServerInfo | null {
   } catch {
     return null;
   }
+}
+
+function asOpenSession(value: unknown): OpenSession | null {
+  const v = value as Partial<OpenSession> | null;
+  if (!v || typeof v.sessionId !== "string" || typeof v.title !== "string") return null;
+  if (typeof v.url !== "string" || !/^http:\/\/127\.0\.0\.1:\d+\//.test(v.url)) return null;
+  return { sessionId: v.sessionId, title: v.title, url: v.url };
 }
 
 export interface SseFrame {

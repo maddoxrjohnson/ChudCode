@@ -1,0 +1,17 @@
+{
+  "description": "Show the link of every ChudCode session in the terminal, whatever the model says.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__plugin_chudcode_chudcode__start_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@
  * status.ts: the line under Pi's editor that says whether the interviewer is wired up.
  *
  * Shown while the bridge is subscribed, so it is obvious which Pi session the
- * candidate's page is talking to. Plain string lines, the only widget content every
+ * candidate's page is talking to, with a link to the session opened last. Plain string lines, the only widget content every
  * Pi mode honours. Follows pi-teach's src/status-widget.ts (Josh Noll, MIT); see
  * docs/ATTRIBUTION.md.
  */
@@ -26,9 +26,15 @@ export function statusLines(
 ): string[] | undefined {
   if (!status.connected) return undefined;
   const paint = (color: string, text: string) => theme?.fg(color, text) ?? text;
-  return [
+  const lines = [
     `${paint("accent", "chudcode")} ${paint("dim", "interviewer connected on port")} ${paint("accent", String(status.port))}`,
   ];
+  if (status.session) {
+    lines.push(
+      `${paint("accent", "chudcode")} ${paint("dim", "session")} ${status.session.title}: ${paint("accent", status.session.url)}`,
+    );
+  }
+  return lines;
 }
 
 /** Draw the widget; a mode without widgets must not break the bridge. */
