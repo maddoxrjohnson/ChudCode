@@ -17,7 +17,7 @@ import {
 } from "../src/mcp.ts";
 import { setHooks } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
-import { readProblem } from "../src/store/problems.ts";
+import { readProblem, updateMeta } from "../src/store/problems.ts";
 import { DAY_MS } from "../src/review.ts";
 import { appendReviewEvents, readReviewEvents } from "../src/store/review-events.ts";
 import { readSession } from "../src/store/sessions.ts";
@@ -171,6 +171,7 @@ describe("protocol", () => {
       "get_session",
       "list_due",
       "list_problems",
+      "list_roadmap",
       "list_trends",
       "lookup_seed",
       "open_dashboard",
@@ -416,6 +417,61 @@ describe("an interview round trip", () => {
       stream.close();
     }
   }, 30_000);
+
+  it("serves the next roadmap problem and checks it off when it is solved", async () => {
+    const brief = text(await call("begin_interview", { mode: "roadmap" }));
+    expect(brief).toContain("the next problem on the NeetCode 150 roadmap");
+    expect(brief).toContain("## Roadmap: NeetCode 150");
+    expect(brief).toContain("Serve **Contains Duplicate** (easy; arrays-hashing)");
+    expect(brief).toContain('`mimic_of` to "Contains Duplicate" exactly');
+    const grind = text(await call("begin_interview", { mode: "roadmap", roadmap: "grind75" }));
+    expect(grind).toContain(
+      "Serve **Two Sum** (easy; arrays-hashing), the next problem in Week 1.",
+    );
+    const badStage = await call("begin_interview", { mode: "roadmap", stage: "week-1" });
+    expect(badStage.isError).toBe(true);
+    expect(text(badStage)).toContain("Stages: arrays-hashing, two-pointers");
+
+    const unlisted = text(await call("start_session", { slug: "window-sum", mode: "roadmap" }));
+    expect(unlisted).toContain("names no roadmap problem, so solving it checks nothing off");
+
+    updateMeta("window-sum", { source: { kind: "mimic", mimicOf: "Contains Duplicate" } });
+    const id = await startSession({ start_now: true, mode: "roadmap" });
+    expect(readSession(id).mode).toBe("roadmap");
+    await browser(`/api/sessions/${id}/submit`, { code: CORRECT });
+    expect(text(await call("wait_for_candidate", { timeout_seconds: 2 }))).toContain(
+      "Every case passed",
+    );
+    const recorded = text(
+      await call("record_session", {
+        session_id: id,
+        rubric: { correctness: 4, communication: 3, complexity: 3, code_quality: 3, time: 4 },
+        complexity_ok: true,
+        notes_md: "Clean.",
+        strengths: ["a", "b"],
+        improvements: ["c", "d"],
+      }),
+    );
+    expect(recorded).toContain(
+      "NeetCode 150: Contains Duplicate is checked off; 1 of 150 solved. Next: Valid Anagram (Arrays & Hashing).",
+    );
+    // Contains Duplicate is on Grind 75 too, so it counts there as well.
+    expect(recorded).toMatch(
+      /Grind 75: Contains Duplicate is checked off; 1 of 75 solved\. Next: Two Sum \(Week 1\)\./,
+    );
+    expect(recorded).toContain("and where they stand on the roadmap");
+
+    const listed = await call("list_roadmap");
+    expect(text(listed)).toContain("1 of 150 solved.");
+    expect(text(listed)).toContain("- `arrays-hashing` open · Arrays & Hashing 1/9");
+    expect(text(listed)).toContain(
+      "- `two-pointers` locked · Two Pointers 0/5 (locked: needs 5/9 of Arrays & Hashing)",
+    );
+    const stage = text(await call("list_roadmap", { stage: "arrays-hashing" }));
+    expect(stage).toContain("- solved: Contains Duplicate (easy)");
+    expect(stage).toContain("- new: Valid Anagram (easy)");
+    expect((await call("list_roadmap", { stage: "nope" })).isError).toBe(true);
+  }, 15_000);
 
   it("marks a solved session correct and schedules its pattern further out", async () => {
     const id = await startSession({ start_now: true });

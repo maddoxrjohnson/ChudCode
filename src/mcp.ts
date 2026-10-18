@@ -53,6 +53,7 @@ import {
 import { interviewTools } from "./tools/interview-tools.ts";
 import { problemTools } from "./tools/problem-tools.ts";
 import { reviewTools } from "./tools/review-tools.ts";
+import { roadmapTools } from "./tools/roadmap-tools.ts";
 import { sessionTools } from "./tools/session-tools.ts";
 import { trendTools } from "./tools/trend-tools.ts";
 
@@ -432,6 +433,7 @@ export class McpSession {
         ...interviewTools(),
         ...problemTools(),
         ...reviewTools(),
+        ...roadmapTools(),
         ...trendTools(),
       ].map((tool) => [tool.name, tool]),
     );

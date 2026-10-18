@@ -243,7 +243,7 @@ export function roadmapAttempts(
   for (const session of sessions) {
     const named = mimicOf.get(session.problem);
     if (!named) continue;
-    const title = seedTitle(named);
+    const title = roadmapTitle(named);
     if (!title) continue;
     let correct: boolean;
     if (session.verdict) correct = session.verdict.correct;
@@ -261,7 +261,7 @@ export function roadmapAttempts(
 }
 
 /** The seed title a `mimic_of` value names: an exact title first, then a close match. */
-function seedTitle(named: string): string | undefined {
+export function roadmapTitle(named: string): string | undefined {
   const key = titleKey(named);
   return (
     seedEntries().find((e) => titleKey(e.title) === key)?.title ?? matchSeedTitle(named)?.title

@@ -19,7 +19,7 @@ import { appendJsonl, readJson, readJsonl, readText, writeJson, writeText } from
 import type { Difficulty } from "./problems.ts";
 import { isDir, isValidSessionId, sessionDir, sessionsDir } from "./paths.ts";
 
-export type SessionMode = "interview" | "review" | "mimic" | "solo";
+export type SessionMode = "interview" | "review" | "mimic" | "roadmap" | "solo";
 export type Phase = "briefing" | "coding" | "review" | "done";
 
 export interface Rubric {

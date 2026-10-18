@@ -10,6 +10,7 @@ import {
 } from "../flow.ts";
 import { openUrl } from "../open-browser.ts";
 import { loadProgress } from "../progress.ts";
+import { loadRoadmapProgress, ROADMAP_IDS, roadmapTitle } from "../roadmap.ts";
 import {
   interviewBrief,
   patternListText,
@@ -54,7 +55,7 @@ export interface ToolHost {
   recover(): void;
 }
 
-const MODES = ["interview", "review", "mimic"] as const;
+const MODES = ["interview", "review", "mimic", "roadmap"] as const;
 
 export function sessionTools(host: ToolHost): ToolDef[] {
   return [
@@ -68,14 +69,21 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         {
           mode: schema.oneOf(
             MODES,
-            "interview (default), review (a due pattern), or mimic (the user named a real problem).",
+            "interview (default), review (a due pattern), mimic (the user named a real problem), or roadmap (the next problem on NeetCode 150 or Grind 75).",
+          ),
+          roadmap: schema.oneOf(
+            ROADMAP_IDS,
+            "Roadmap mode: which list. Default neetcode150; grind75 when the user names Grind 75.",
+          ),
+          stage: schema.str(
+            "Roadmap mode: a topic or week the user asked for, as a stage id from list_roadmap.",
           ),
           pattern: schema.str("A pattern id the user asked for, e.g. sliding-window."),
           difficulty: schema.oneOf(DIFFICULTIES, "Requested difficulty."),
           company: schema.str("A company the user is preparing for, if they named one."),
           title: schema.str("A real problem title the user named, if any."),
         },
-        ["mode", "pattern", "difficulty", "company", "title"],
+        ["mode", "roadmap", "stage", "pattern", "difficulty", "company", "title"],
       ),
       async execute(args) {
         const mode = optionalEnum(args, "mode", MODES) ?? "interview";
@@ -85,6 +93,19 @@ export function sessionTools(host: ToolHost): ToolDef[] {
           return fail(`Unknown pattern id: ${pattern}. Valid ids:\n${patternListText()}`);
         }
         const request: Parameters<typeof interviewBrief>[0] = { mode };
+        if (mode === "roadmap") {
+          const progress = loadRoadmapProgress(
+            optionalEnum(args, "roadmap", ROADMAP_IDS) ?? "neetcode150",
+          );
+          const stage = optionalString(args, "stage", 64);
+          if (stage !== undefined && !progress.stages.some((s) => s.id === stage)) {
+            return fail(
+              `No stage ${stage} on ${progress.name}. Stages: ${progress.stages.map((s) => s.id).join(", ")}.`,
+            );
+          }
+          request.roadmap = progress;
+          if (stage !== undefined) request.stage = stage;
+        }
         if (pattern !== undefined) request.pattern = pattern;
         const difficulty = optionalEnum(args, "difficulty", DIFFICULTIES);
         if (difficulty !== undefined) request.difficulty = difficulty;
@@ -162,7 +183,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       inputSchema: schema.obj(
         {
           slug: schema.str("The problem's slug, from list_problems."),
-          mode: schema.oneOf(MODES, "interview (default), review, or mimic."),
+          mode: schema.oneOf(MODES, "interview (default), review, mimic, or roadmap."),
           timer_minutes: schema.int(
             "Length of the interview clock. Defaults to the configured value (35).",
             1,
@@ -204,9 +225,15 @@ export function sessionTools(host: ToolHost): ToolDef[] {
 
         const url = server.urlForSession(session.id) ?? base;
         if (shouldAutoOpen(config)) openUrl(url);
+        const mimicOf = bundle.meta.source.mimicOf;
+        const unlisted =
+          mode === "roadmap" && (mimicOf === undefined || roadmapTitle(mimicOf) === undefined)
+            ? `Note: this problem's \`mimic_of\` names no roadmap problem, so solving it checks nothing off. ${mimicOf === undefined ? "It has none." : `It says "${mimicOf}".`}`
+            : "";
         return ok(
           [
             `Session ${session.id} is ready: ${url}`,
+            ...(unlisted ? [unlisted] : []),
             `The candidate sees the statement, ${bundle.tests.filter((c) => c.visible).length} examples, a ${timerMinutes}-minute clock, and ${bundle.hints.length} hints they can take. ${bundle.tests.length - bundle.tests.filter((c) => c.visible).length} hidden cases run on Submit.`,
             `Target complexity: ${bundle.meta.complexityTarget.time} time, ${bundle.meta.complexityTarget.space} space.`,
             `Give the user the URL and say one sentence on the page with say_to_candidate. ${thenWait()}`,

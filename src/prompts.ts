@@ -15,6 +15,7 @@ import { clipText, formatClock, formatInput, formatValue, plural } from "./forma
 import { remaining, type SessionState } from "./flow.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 import { dueText, relativeDay, type ReviewItem } from "./review.ts";
+import type { ItemStanding, RoadmapProgress, StageStanding } from "./roadmap.ts";
 import type { RunResult, TestCase } from "./runner/types.ts";
 import { describeLists, lookupSeed, matchSeedTitle, type SeedEntry } from "./seed.ts";
 import { docsDir } from "./store/paths.ts";
@@ -108,7 +109,10 @@ function deliveryNote(): string {
 // ── The brief ─────────────────────────────────────────────────────────────────
 
 export interface BriefRequest {
-  mode: "interview" | "review" | "mimic";
+  mode: "interview" | "review" | "mimic" | "roadmap";
+  /** Roadmap mode: the roadmap's standing, and the stage the user asked for. */
+  roadmap?: RoadmapProgress;
+  stage?: string;
   pattern?: string;
   difficulty?: string;
   company?: string;
@@ -133,6 +137,16 @@ export function interviewBrief(request: BriefRequest, hostBrief: string, now = D
       `The user wants a review session: a fresh problem on a pattern that is due.${asked}`,
     );
     parts.push(reviewDirectiveText(progress, request.pattern));
+  } else if (request.mode === "roadmap" && request.roadmap) {
+    parts.push(
+      `The user wants the next problem on the ${request.roadmap.name} roadmap.${asks.length ? asked : ""}`,
+    );
+    parts.push(roadmapDirectiveText(request.roadmap, request.stage));
+    if (progress.due.length > 0) {
+      parts.push(
+        `${plural(progress.due.length, "pattern is", "patterns are")} also due for spaced review (listed below). Mention it in one sentence, then serve the roadmap problem unless the user would rather review.`,
+      );
+    }
   } else {
     parts.push(`The user wants a mock coding interview.${asked}`);
     if (progress.due.length > 0) {
@@ -294,6 +308,125 @@ function reviewDirectiveText(progress: Progress, requestedPattern?: string): str
     "A review needs a problem the candidate has not seen: the point is the pattern, not the problem. Use a validated problem on disk tagged with the pattern that has been served 0 times if one exists; otherwise write an original one with `write_problem`, `source.kind` set to `review`, then `validate_problem` until it passes.",
     `Match the difficulty to history: the same as last time after a miss, one step harder after a solve. Call \`start_session\` with \`mode: "review"\`.`,
   ].join(" ");
+}
+
+// ── Roadmaps ──────────────────────────────────────────────────────────────────
+
+/** `Arrays & Hashing 5/9`, or `Trees 0/15 (locked: needs 4/7 of Binary Search, 6/11 of Linked List)`. */
+export function stageLine(stage: StageStanding, all: readonly StageStanding[]): string {
+  const count = `${stage.name} ${stage.solved}/${stage.total}`;
+  if (stage.unlocked) return count;
+  const needs = stage.requires
+    .map((id) => all.find((s) => s.id === id) as StageStanding)
+    .filter((s) => s.solved < s.unlockAt)
+    .map((s) => `${s.unlockAt}/${s.total} of ${s.name}`);
+  return `${count} (locked: needs ${needs.join(", ")})`;
+}
+
+function itemWords(item: ItemStanding): string {
+  return `**${item.title}** (${item.difficulty}; ${item.patterns.join(", ")})`;
+}
+
+/** The roadmap section of the brief: where the candidate stands and what to serve. */
+export function roadmapDirectiveText(progress: RoadmapProgress, stageId?: string): string {
+  const open = progress.stages.filter((s) => s.unlocked);
+  const lines = [
+    `## Roadmap: ${progress.name}`,
+    "",
+    `${progress.solved} of ${progress.total} solved. Open topics: ${open.map((s) => stageLine(s, progress.stages)).join(", ")}.`,
+  ];
+  const asked = stageId ? progress.stages.find((s) => s.id === stageId) : undefined;
+  let target = progress.next;
+  if (asked && !asked.unlocked) {
+    lines.push(
+      "",
+      `The user asked for **${asked.name}**, which is still locked: ${stageLine(asked, progress.stages)}. Say so in one sentence and offer the next open problem instead; serve ${asked.name} anyway only if the user insists.`,
+    );
+    const first = asked.items.find((i) => i.state !== "solved");
+    if (first) lines.push(`If they insist, serve ${itemWords(first)}.`);
+  } else if (asked) {
+    const inStage = nextInStage(asked);
+    if (!inStage) {
+      lines.push(
+        "",
+        `Every problem in **${asked.name}** is solved. Say so and offer the next open problem.`,
+      );
+    } else {
+      target = { stage: asked, item: inStage };
+    }
+  }
+  if (!target) {
+    lines.push(
+      "",
+      `Every problem on ${progress.name} is solved. Congratulate the candidate in one sentence, then offer a review session or the other roadmap.`,
+    );
+    return lines.join("\n");
+  }
+  const { stage, item } = target;
+  const again =
+    item.state === "missed"
+      ? ` The candidate missed this one before (${plural(item.attempts, "attempt")}); a fresh problem of the same shape is the point.`
+      : "";
+  lines.push(
+    "",
+    `Serve ${itemWords(item)}, the next problem in ${stage.name}.${again}`,
+    "",
+    `Never serve the listed problem itself. Write an original one in its shape with \`write_problem\`: the same pattern, difficulty, input sizes, and the twist that makes the pattern necessary, with its own story and examples. Set \`source.kind\` to \`mimic\` and \`mimic_of\` to "${item.title}" exactly; that is what checks it off when the session is solved. A validated problem on disk with that \`mimic_of\` that has been served 0 times is also fine; never one the candidate has seen. Call \`start_session\` with \`mode: "roadmap"\`.`,
+  );
+  return lines.join("\n");
+}
+
+function nextInStage(stage: StageStanding): ItemStanding | undefined {
+  return (
+    stage.items.find((i) => i.state === "new") ?? stage.items.find((i) => i.state === "missed")
+  );
+}
+
+/** What `list_roadmap` returns: every stage's count and lock, or one stage's problems. */
+export function roadmapListText(progress: RoadmapProgress, stageId?: string): string {
+  const lines = [`## ${progress.name}`, "", `${progress.solved} of ${progress.total} solved.`];
+  if (progress.next) {
+    lines.push(`Next: ${itemWords(progress.next.item)} in ${progress.next.stage.name}.`);
+  }
+  const stage = stageId ? progress.stages.find((s) => s.id === stageId) : undefined;
+  if (stage) {
+    lines.push(
+      "",
+      `### ${stageLine(stage, progress.stages)}`,
+      "",
+      ...stage.items.map((item) => {
+        const tries = item.state === "missed" ? ` ×${item.attempts}` : "";
+        return `- ${item.state}${tries}: ${item.title} (${item.difficulty})`;
+      }),
+    );
+    return lines.join("\n");
+  }
+  lines.push(
+    "",
+    ...progress.stages.map(
+      (s) => `- \`${s.id}\` ${s.unlocked ? "open" : "locked"} · ${stageLine(s, progress.stages)}`,
+    ),
+    "",
+    "Pass `stage` to see one topic's problems.",
+  );
+  return lines.join("\n");
+}
+
+/** What `record_session` adds for a roadmap session: what was checked off and what is next. */
+export function roadmapOutcomeLines(
+  title: string,
+  correct: boolean,
+  roadmaps: readonly RoadmapProgress[],
+): string[] {
+  return roadmaps
+    .filter((p) => p.stages.some((s) => s.items.some((i) => i.title === title)))
+    .map((p) => {
+      const done = correct ? `${title} is checked off` : `${title} stays open`;
+      const next = p.next
+        ? ` Next: ${p.next.item.title} (${p.next.stage.name}).`
+        : " Every problem is solved.";
+      return `${p.name}: ${done}; ${p.solved} of ${p.total} solved.${next}`;
+    });
 }
 
 // ── Trends ────────────────────────────────────────────────────────────────────

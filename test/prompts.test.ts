@@ -15,10 +15,14 @@ import {
   messagePrompt,
   nothingYetText,
   resultText,
+  roadmapDirectiveText,
+  roadmapListText,
+  roadmapOutcomeLines,
   sessionLine,
   submissionPrompt,
   trendsText,
 } from "../src/prompts.ts";
+import { buildRoadmapProgress, roadmap, type RoadmapAttempt } from "../src/roadmap.ts";
 import type { RunResult } from "../src/runner/types.ts";
 import { createSession, type Session } from "../src/store/sessions.ts";
 import { addTrends } from "../src/store/trends.ts";
@@ -279,6 +283,67 @@ describe("dueListText", () => {
       "- stack: box 0, 1 day overdue; missed 2 days ago, 1 attempt",
       "- trees: box 1, due today; solved 3 days ago (medium), 1 attempt",
     ]);
+  });
+});
+
+describe("roadmap text", () => {
+  const map = roadmap("neetcode150");
+  const arrays = map.stages[0]?.items.map((i) => i.title) ?? [];
+  const attempt = (title: string, correct: boolean, at = 1): RoadmapAttempt => ({
+    title,
+    correct,
+    at,
+    session: `s-${at}`,
+  });
+
+  it("names a locked stage's requirements and steers back to the next open problem", () => {
+    const progress = buildRoadmapProgress(map, [attempt("Contains Duplicate", true)]);
+    const out = roadmapDirectiveText(progress, "trees");
+    expect(out).toContain("1 of 150 solved. Open topics: Arrays & Hashing 1/9.");
+    expect(out).toContain(
+      "**Trees**, which is still locked: Trees 0/15 (locked: needs 4/7 of Binary Search, 6/11 of Linked List)",
+    );
+    expect(out).toContain("If they insist, serve **Invert Binary Tree** (easy; trees).");
+    expect(out).toContain(
+      "Serve **Valid Anagram** (easy; arrays-hashing), the next problem in Arrays & Hashing.",
+    );
+  });
+
+  it("serves a missed problem again as a fresh one, and says when a stage or the list is done", () => {
+    const missedAll = arrays.map((t, i) => attempt(t, i < 5 || i === 8, i));
+    const progress = buildRoadmapProgress(map, missedAll);
+    const out = roadmapDirectiveText(progress, "arrays-hashing");
+    expect(out).toContain("The candidate missed this one before (1 attempt)");
+    expect(out).toContain(`Serve **${arrays[5]}**`);
+
+    const allArrays = buildRoadmapProgress(
+      map,
+      arrays.map((t) => attempt(t, true)),
+    );
+    expect(roadmapDirectiveText(allArrays, "arrays-hashing")).toContain(
+      "Every problem in **Arrays & Hashing** is solved.",
+    );
+    const everything = buildRoadmapProgress(
+      map,
+      map.stages.flatMap((st) => st.items.map((i) => attempt(i.title, true))),
+    );
+    expect(roadmapDirectiveText(everything)).toContain("Every problem on NeetCode 150 is solved.");
+    expect(roadmapListText(everything)).not.toContain("Next:");
+  });
+
+  it("lists one stage's problems with their state and reports outcomes per list", () => {
+    const progress = buildRoadmapProgress(map, [
+      attempt("Valid Anagram", false, 1),
+      attempt("Valid Anagram", false, 2),
+    ]);
+    const stage = roadmapListText(progress, "arrays-hashing");
+    expect(stage).toContain("### Arrays & Hashing 0/9");
+    expect(stage).toContain("- missed ×2: Valid Anagram (easy)");
+    expect(stage).toContain("- new: Contains Duplicate (easy)");
+    expect(roadmapOutcomeLines("Valid Anagram", false, [progress])).toEqual([
+      "NeetCode 150: Valid Anagram stays open; 0 of 150 solved. Next: Contains Duplicate (Arrays & Hashing).",
+    ]);
+    expect(roadmapOutcomeLines("Not Listed", true, [progress])).toEqual([]);
   });
 });
 

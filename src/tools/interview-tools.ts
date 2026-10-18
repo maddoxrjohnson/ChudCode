@@ -3,7 +3,8 @@
  */
 
 import { interviewerRun, postMessage, recordSession, revealHint } from "../flow.ts";
-import { resultText, sessionLine, thenWait } from "../prompts.ts";
+import { resultText, roadmapOutcomeLines, sessionLine, thenWait } from "../prompts.ts";
+import { loadRoadmapProgress, ROADMAP_IDS, roadmapTitle } from "../roadmap.ts";
 import type { RunScope } from "../runs.ts";
 import { isValidSessionId } from "../store/paths.ts";
 import { readProblem } from "../store/problems.ts";
@@ -178,6 +179,15 @@ export function interviewTools(): ToolDef[] {
           improvements: stringList(args, "improvements", 5),
         });
         const v = outcome.session.verdict;
+        const mimicOf =
+          outcome.session.mode === "roadmap"
+            ? readProblem(outcome.session.problem).meta.source.mimicOf
+            : undefined;
+        const title = mimicOf === undefined ? undefined : roadmapTitle(mimicOf);
+        const roadmapLines =
+          title === undefined
+            ? []
+            : roadmapOutcomeLines(title, v?.correct ?? false, ROADMAP_IDS.map(loadRoadmapProgress));
         const why = v
           ? [
               v.allPassed ? "all cases passed" : "not all cases passed",
@@ -189,8 +199,9 @@ export function interviewTools(): ToolDef[] {
           [
             `Recorded. Verdict: ${v?.correct ? "solved" : "not solved"} (${why}).`,
             ...outcome.nextDue,
+            ...roadmapLines,
             sessionLine(outcome.session),
-            "Summarise for the user in the terminal: verdict, two strengths, two improvements, next review.",
+            `Summarise for the user in the terminal: verdict, two strengths, two improvements, next review${roadmapLines.length ? ", and where they stand on the roadmap" : ""}.`,
           ].join("\n"),
           { correct: v?.correct ?? false },
         );
