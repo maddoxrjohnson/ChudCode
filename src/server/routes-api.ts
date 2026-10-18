@@ -23,6 +23,7 @@ import type * as http from "node:http";
 
 import * as flow from "../flow.ts";
 import { loadProgress } from "../progress.ts";
+import { loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
 import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
@@ -59,6 +60,7 @@ export async function handleApi(
       sessions: listSessions(20),
       problems: listProblems(),
       progress: loadProgress(),
+      roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
     });
   }
 

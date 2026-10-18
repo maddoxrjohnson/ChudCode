@@ -7,7 +7,8 @@ description: Open the ChudCode dashboard in the browser, or report the user's pr
 
 - To open the dashboard in a browser, call `open_dashboard` from the `chudcode` MCP
   server and give the user the URL it returns. The page shows every pattern's place
-  in the review schedule, what is due, their streak, recent sessions, and problems.
+  in the review schedule, what is due, their streak, their progress through NeetCode
+  150 and Grind 75, recent sessions, and problems.
   The tool also recovers any session that was in progress.
 - To report progress in the terminal, call `list_due`: the patterns due for review,
   what comes due soon, and the streak. If something is due, offer a review session.

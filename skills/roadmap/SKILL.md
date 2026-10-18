@@ -27,4 +27,5 @@ description: Work through NeetCode 150 or Grind 75 in order, one interview at a 
 
 When the user only asks how far along they are, call `list_roadmap` and answer from
 it: the solved count, which topics or weeks are open, and the next problem. Pass
-`stage` to list one topic's problems.
+`stage` to list one topic's problems. The dashboard from `open_dashboard` shows both
+roadmaps, topic by topic.

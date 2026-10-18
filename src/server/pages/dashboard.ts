@@ -1,6 +1,7 @@
 /**
  * dashboard.ts: the landing page. Where every pattern sits in the review boxes, what
- * is due, the practice streak, recent sessions, and the problems on disk.
+ * is due, the practice streak, progress through the roadmaps, recent sessions, and
+ * the problems on disk.
  *
  * Everything is rendered on the server from `Progress`, so the page reads without
  * JavaScript; its module only reloads it when a session changes.
@@ -10,6 +11,7 @@ import { plural } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
 import type { PatternStanding, Progress } from "../../progress.ts";
 import { dueText, MASTERED_BOX, relativeDay, type ReviewItem } from "../../review.ts";
+import type { ItemStanding, RoadmapProgress, StageStanding } from "../../roadmap.ts";
 import type { ProblemMeta } from "../../store/problems.ts";
 import type { Session } from "../../store/sessions.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
@@ -18,6 +20,7 @@ export interface DashboardData {
   sessions: Session[];
   problems: ProblemMeta[];
   progress: Progress;
+  roadmaps: RoadmapProgress[];
 }
 
 export function dashboardPage(data: DashboardData): string {
@@ -35,6 +38,11 @@ export function dashboardPage(data: DashboardData): string {
   <section id="patterns">
     <h2>Patterns</h2>
     ${gridHtml(progress)}
+  </section>
+  <section id="roadmaps">
+    <h2>Roadmaps</h2>
+    ${data.roadmaps.map((r, i) => roadmapHtml(r, i === 0)).join("\n")}
+    <p class="muted small">Ask your agent for the next roadmap problem. You get an original problem in the shape of the listed one, and solving it checks the listed one off. A topic opens once half of every topic before it is solved.</p>
   </section>
   <section id="sessions">
     <h2>Recent sessions</h2>
@@ -139,6 +147,53 @@ function rowHtml(p: PatternStanding, boxes: number, now: number): string {
   ${cells.join("")}
   <td>${last}</td>
 </tr>`;
+}
+
+function roadmapHtml(roadmap: RoadmapProgress, open: boolean): string {
+  const next = roadmap.next
+    ? `next: ${roadmap.next.item.title} (${roadmap.next.stage.name})`
+    : "every problem solved";
+  const stages = roadmap.stages.map((s) => stageHtml(s, roadmap.stages)).join("\n");
+  return `<details class="roadmap" id="roadmap-${escapeHtml(roadmap.id)}"${open ? " open" : ""}>
+<summary><strong>${escapeHtml(roadmap.name)}</strong> <span class="badge">${roadmap.solved}/${roadmap.total} solved</span> <span class="muted">${escapeHtml(next)}</span></summary>
+<ul class="stage-list">
+${stages}
+</ul>
+</details>`;
+}
+
+function stageHtml(stage: StageStanding, all: readonly StageStanding[]): string {
+  const state = !stage.unlocked ? "locked" : stage.solved === stage.total ? "done" : "open";
+  const note = stage.unlocked ? "" : `opens at ${lockWords(stage, all)}`;
+  const items = stage.items.map(itemHtml).join("\n");
+  return `<li class="stage ${state}" data-stage="${escapeHtml(stage.id)}">
+<details>
+<summary><span class="stage-name">${escapeHtml(stage.name)}</span> <progress max="${stage.total}" value="${stage.solved}"></progress> <span class="stage-count">${stage.solved}/${stage.total}</span>${note ? ` <span class="muted small">${escapeHtml(note)}</span>` : ""}</summary>
+<ul class="item-list">
+${items}
+</ul>
+</details>
+</li>`;
+}
+
+/** "5/9 Arrays & Hashing", or "4/7 Binary Search and 6/11 Linked List". */
+function lockWords(stage: StageStanding, all: readonly StageStanding[]): string {
+  return stage.requires
+    .map((id) => all.find((s) => s.id === id) as StageStanding)
+    .filter((s) => s.solved < s.unlockAt)
+    .map((s) => `${s.unlockAt}/${s.total} ${s.name}`)
+    .join(" and ");
+}
+
+const ITEM_MARKS: Record<ItemStanding["state"], string> = { solved: "✓", missed: "✗", new: "○" };
+
+function itemHtml(item: ItemStanding): string {
+  const title = item.lastSession
+    ? `<a href="/s/${escapeHtml(item.lastSession)}">${escapeHtml(item.title)}</a>`
+    : escapeHtml(item.title);
+  const tries =
+    item.state === "missed" ? ` <span class="muted small">missed ×${item.attempts}</span>` : "";
+  return `<li class="item ${item.state}"><span class="mark" aria-label="${item.state}">${ITEM_MARKS[item.state]}</span> ${title} ${difficultyBadge(item.difficulty)}${tries}</li>`;
 }
 
 function sessionsHtml(sessions: Session[]): string {

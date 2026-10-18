@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildProgress } from "../src/progress.ts";
 import { DAY_MS, scheduleItems, type ReviewEvent } from "../src/review.ts";
+import { buildRoadmapProgress, roadmap } from "../src/roadmap.ts";
 import { dashboardPage, intervalLabel } from "../src/server/pages/dashboard.ts";
 import { notFoundPage, page } from "../src/server/pages/layout.ts";
 import { patterns, type ProblemMeta } from "../src/store/problems.ts";
@@ -86,6 +87,14 @@ describe("dashboardPage", () => {
     ],
     problems: [problem, unvalidated],
     progress,
+    roadmaps: [
+      buildRoadmapProgress(roadmap("neetcode150"), [
+        { title: "Contains Duplicate", correct: true, at: T0, session: SOLVED },
+        { title: "Two Sum", correct: false, at: T0, session: MISSED },
+        { title: "Two Sum", correct: false, at: T0 + 1, session: MISSED },
+      ]),
+      buildRoadmapProgress(roadmap("grind75"), []),
+    ],
   });
 
   it("shows the streak, what is due, and mastery in the stats row", () => {
@@ -136,6 +145,34 @@ describe("dashboardPage", () => {
     expect(row("tries")).not.toContain("●");
   });
 
+  it("shows each roadmap's topics, what is open, and every problem's state", () => {
+    const neet = html.slice(
+      html.indexOf('id="roadmap-neetcode150"'),
+      html.indexOf('id="roadmap-grind75"'),
+    );
+    expect(neet).toMatch(/^id="roadmap-neetcode150" open>/);
+    expect(neet).toContain('<span class="badge">1/150 solved</span>');
+    expect(neet).toContain("next: Valid Anagram (Arrays &amp; Hashing)");
+    expect(neet).toContain('<li class="stage open" data-stage="arrays-hashing">');
+    expect(neet).toContain(
+      '<progress max="9" value="1"></progress> <span class="stage-count">1/9</span>',
+    );
+    expect(neet).toContain('<li class="stage locked" data-stage="trees">');
+    expect(neet).toContain("opens at 4/7 Binary Search and 6/11 Linked List");
+    expect(neet).toContain(
+      `<li class="item solved"><span class="mark" aria-label="solved">✓</span> <a href="/s/${SOLVED}">Contains Duplicate</a>`,
+    );
+    expect(neet).toContain(`<a href="/s/${MISSED}">Two Sum</a>`);
+    expect(neet).toContain("missed ×2");
+    expect(neet).toContain(
+      '<li class="item new"><span class="mark" aria-label="new">○</span> Valid Anagram',
+    );
+    const grind = html.slice(html.indexOf('id="roadmap-grind75"'));
+    expect(grind).toMatch(/^id="roadmap-grind75">/);
+    expect(grind).toContain('<li class="stage locked" data-stage="week-2">');
+    expect(grind).toContain("opens at 6/12 Week 1");
+  });
+
   it("lists sessions and problems with their outcomes, escaped", () => {
     expect(html).toContain('<span class="badge ok">solved</span>');
     expect(html).toContain('<span class="muted">abandoned</span>');
@@ -150,6 +187,7 @@ describe("dashboardPage", () => {
     const empty = dashboardPage({
       sessions: [],
       problems: [],
+      roadmaps: [],
       progress: buildProgress({ items: [], taxonomy: patterns(), sessionTimes: [], now: T0 }),
     });
     expect(empty).toContain("Finish an interview and its patterns start their review schedule.");
@@ -159,6 +197,7 @@ describe("dashboardPage", () => {
     const quiet = dashboardPage({
       sessions: [],
       problems: [],
+      roadmaps: [],
       progress: buildProgress({
         items: scheduleItems([event("pattern:trees", -1, true, SOLVED)]),
         taxonomy: patterns(),

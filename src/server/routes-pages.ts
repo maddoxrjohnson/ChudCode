@@ -6,6 +6,7 @@ import type * as http from "node:http";
 
 import { sessionState } from "../flow.ts";
 import { loadProgress } from "../progress.ts";
+import { loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
 import { readConfig } from "../store/config.ts";
 import { assetsDir, isValidSessionId, isValidSlug, safeJoin } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
@@ -32,6 +33,7 @@ export function handlePage(
         sessions: listSessions(20),
         problems: listProblems(),
         progress: loadProgress(),
+        roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
       }),
     );
   }

@@ -894,3 +894,107 @@ textarea:focus,
   text-decoration: none;
   border-bottom: 1px dotted var(--muted);
 }
+
+/* ── Roadmaps ────────────────────────────────────────────────────────────── */
+
+.roadmap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.roadmap > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stage-list,
+.item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.stage-list {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.stage summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.2rem 0;
+}
+
+.stage-name {
+  min-width: 13rem;
+}
+
+/* Flex summaries lose the native marker, so draw one. */
+.roadmap > summary::before,
+.stage summary::before {
+  content: "▸";
+  color: var(--muted);
+  display: inline-block;
+  width: 0.8rem;
+  transition: transform 0.1s;
+}
+
+.roadmap[open] > summary::before,
+.stage details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.roadmap > summary::-webkit-details-marker,
+.stage summary::-webkit-details-marker {
+  display: none;
+}
+
+.stage progress {
+  width: 8rem;
+  height: 0.5rem;
+  accent-color: var(--ok);
+}
+
+.stage-count {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.stage.locked .stage-name,
+.stage.locked .stage-count {
+  color: var(--muted);
+}
+
+.stage.done .stage-name {
+  color: var(--ok);
+}
+
+.item-list {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.25rem 0 0.5rem 1.25rem;
+}
+
+.item .mark {
+  display: inline-block;
+  width: 1.1rem;
+  color: var(--muted);
+}
+
+.item.solved .mark {
+  color: var(--ok);
+}
+
+.item.missed .mark {
+  color: var(--danger);
+}

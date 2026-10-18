@@ -113,9 +113,9 @@ when the pattern comes back.
 ![The page after the debrief: 12 of 12 cases passed, the rubric card with scores, strengths, and things to work on](docs/screenshots/session-debrief.png)
 
 The dashboard shows every pattern's place in the review schedule, what is due, the
-streak, and past sessions.
+streak, progress through both roadmaps, and past sessions.
 
-![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, and recent sessions](docs/screenshots/dashboard.png)
+![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, and recent sessions](docs/screenshots/dashboard.png)
 
 The screenshots come from `npm run e2e:browser -- <dir>`, which drives the real page.
 How the pieces fit is in `docs/ARCHITECTURE.md`.

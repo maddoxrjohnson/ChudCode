@@ -19,6 +19,7 @@ import { chromium, type Page } from "playwright";
 import { postMessage, recordSession, startSession } from "../src/flow.ts";
 import { setHooks, type CandidateEvent } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
+import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { createSession, readDraft, readSession } from "../src/store/sessions.ts";
 import { makeFixture, seedExample } from "../test/helpers.ts";
@@ -91,6 +92,10 @@ function interviewer(event: CandidateEvent): void {
 
 const fixture = makeFixture();
 seedExample();
+// Written as a mimic of a listed problem, so the scored session shows on the roadmaps.
+updateMeta("window-sum", {
+  source: { kind: "mimic", mimicOf: "Best Time to Buy and Sell Stock" },
+});
 setHooks({
   isListening: () => true,
   // Reply after the request that raised the event has been answered, as an agent would.
@@ -248,6 +253,17 @@ try {
     "the session is listed as solved",
     (await page.locator("#sessions .badge.ok").count()) === 1,
   );
+  const stage = page.locator('#roadmap-neetcode150 li[data-stage="sliding-window"]');
+  check(
+    "the roadmap checks off the problem the session mimicked",
+    // Closed <details> render nothing, so read text content, not rendered text.
+    (await stage.locator(".stage-count").textContent()) === "1/6" &&
+      ((await stage.locator("li.item.solved").textContent()) ?? "").includes(
+        "Best Time to Buy and Sell Stock",
+      ),
+  );
+  const grindBadge = await page.locator("#roadmap-grind75 > summary .badge").innerText();
+  check("it counts on Grind 75 too", grindBadge === "1/75 solved", grindBadge);
   await screenshot(page, "dashboard");
 
   // Live reload: another session starting makes the open dashboard refresh itself.
