@@ -9,18 +9,22 @@
 
 import { plural } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
+import type { NextUp } from "../../next-up.ts";
 import type { PatternStanding, Progress } from "../../progress.ts";
 import { dueText, MASTERED_BOX, relativeDay, type ReviewItem } from "../../review.ts";
 import type { ItemStanding, RoadmapProgress, StageStanding } from "../../roadmap.ts";
 import type { ProblemMeta } from "../../store/problems.ts";
 import type { Session } from "../../store/sessions.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
+import { nextUpHtml, type NextButtonView } from "./next-up.ts";
 
 export interface DashboardData {
   sessions: Session[];
   problems: ProblemMeta[];
   progress: Progress;
   roadmaps: RoadmapProgress[];
+  /** The Next problem button for each roadmap; left out, the rows are not shown. */
+  next?: { ups: NextUp[]; view: NextButtonView };
 }
 
 export function dashboardPage(data: DashboardData): string {
@@ -41,8 +45,8 @@ export function dashboardPage(data: DashboardData): string {
   </section>
   <section id="roadmaps">
     <h2>Roadmaps</h2>
-    ${data.roadmaps.map((r, i) => roadmapHtml(r, i === 0)).join("\n")}
-    <p class="muted small">Ask your agent for the next roadmap problem. You get an original problem in the shape of the listed one, and solving it checks the listed one off. A topic opens once half of every topic before it is solved.</p>
+    ${data.roadmaps.map((r, i) => roadmapHtml(r, i === 0, data.next)).join("\n")}
+    <p class="muted small">Press Next problem, or ask your agent for the next roadmap problem. You get an original problem in the shape of the listed one, and solving it checks the listed one off. A topic opens once half of every topic before it is solved.</p>
   </section>
   <section id="sessions">
     <h2>Recent sessions</h2>
@@ -149,17 +153,28 @@ function rowHtml(p: PatternStanding, boxes: number, now: number): string {
 </tr>`;
 }
 
-function roadmapHtml(roadmap: RoadmapProgress, open: boolean): string {
-  const next = roadmap.next
-    ? `next: ${roadmap.next.item.title} (${roadmap.next.stage.name})`
-    : "every problem solved";
+function roadmapHtml(
+  roadmap: RoadmapProgress,
+  open: boolean,
+  buttons: DashboardData["next"],
+): string {
+  const up = buttons?.ups.find((u) => u.roadmap === roadmap.id);
+  // With a button row the row names the next problem, so the summary does not.
+  const next = !roadmap.next
+    ? "every problem solved"
+    : up
+      ? ""
+      : `next: ${roadmap.next.item.title} (${roadmap.next.stage.name})`;
   const stages = roadmap.stages.map((s) => stageHtml(s, roadmap.stages)).join("\n");
-  return `<details class="roadmap" id="roadmap-${escapeHtml(roadmap.id)}"${open ? " open" : ""}>
-<summary><strong>${escapeHtml(roadmap.name)}</strong> <span class="badge">${roadmap.solved}/${roadmap.total} solved</span> <span class="muted">${escapeHtml(next)}</span></summary>
+  return `<div class="roadmap-card">
+<details class="roadmap" id="roadmap-${escapeHtml(roadmap.id)}"${open ? " open" : ""}>
+<summary><strong>${escapeHtml(roadmap.name)}</strong> <span class="badge">${roadmap.solved}/${roadmap.total} solved</span>${next ? ` <span class="muted">${escapeHtml(next)}</span>` : ""}</summary>
 <ul class="stage-list">
 ${stages}
 </ul>
-</details>`;
+</details>
+${up && buttons ? nextUpHtml(up, buttons.view) : ""}
+</div>`;
 }
 
 function stageHtml(stage: StageStanding, all: readonly StageStanding[]): string {

@@ -1,8 +1,9 @@
 /** The session page: wires the editor, timer, phase, tests, chat, and hints together. */
 
-import { postJson, putJson } from "../shared/api.mjs";
+import { getJson, postJson, putJson } from "../shared/api.mjs";
 import { readConfig } from "../shared/dom.mjs";
 import { connectEvents } from "../shared/events.mjs";
+import { createNextUp } from "../shared/next-up.mjs";
 import { initTheme } from "../shared/theme.mjs";
 import { createChat } from "./chat.mjs";
 import { mountEditor } from "./editor.mjs";
@@ -155,6 +156,24 @@ customForm?.addEventListener("submit", (event) => {
   });
 });
 
+// ── Next roadmap problem ─────────────────────────────────────────────────────
+
+// Only roadmap sessions carry the button, and it appears once the debrief lands.
+const next = config.roadmap ? createNextUp({ from: sessionId }) : null;
+
+async function showNextUp() {
+  const host = document.getElementById("next-section");
+  if (!host || !next) return;
+  try {
+    const { html } = await getJson(api("next-up"));
+    host.innerHTML = html;
+    next.bind(host);
+    host.scrollIntoView({ block: "nearest" });
+  } catch {
+    /* the debrief still reads without it */
+  }
+}
+
 // ── Live updates ─────────────────────────────────────────────────────────────
 
 const presence = document.getElementById("presence");
@@ -174,14 +193,24 @@ connectEvents(
       timer.update(payload);
       phase.apply(payload.phase);
     },
-    presence: (payload) => setPresence(payload.listening),
-    rubric: (payload) => renderRubric(payload),
+    presence: (payload) => {
+      setPresence(payload.listening);
+      next?.presence(payload.connected ?? payload.listening);
+    },
+    rubric: (payload) => {
+      renderRubric(payload);
+      void showNextUp();
+    },
+    next: (payload) => next?.pending(payload.pending),
+    next_session: (payload) => next?.open(payload),
     run: (payload) => {
       if (payload.partial) tests.partial(payload.partial);
       else if (payload.result && payload.kind === "interviewer")
         tests.final(payload.result, payload.kind);
     },
-    reload: () => window.location.reload(),
+    reload: () => {
+      if (!next?.navigating) window.location.reload();
+    },
   },
   { onError: () => setPresence(false) },
 );

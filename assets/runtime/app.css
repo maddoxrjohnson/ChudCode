@@ -897,12 +897,60 @@ textarea:focus,
 
 /* ── Roadmaps ────────────────────────────────────────────────────────────── */
 
-.roadmap {
+.roadmap-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.75rem;
+}
+
+/* ── Next problem ────────────────────────────────────────────────────────── */
+
+.next-up {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.next-what {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.next-status {
+  flex-basis: 100%;
+}
+
+.next-up[data-state="waiting"] .next-status::before {
+  content: "";
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: next-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes next-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.next-section:empty {
+  display: none;
+}
+
+.next-section .next-up {
+  border-top: none;
+  margin-top: 0.75rem;
+  padding-top: 0;
 }
 
 .roadmap > summary {
@@ -997,4 +1045,10 @@ textarea:focus,
 
 .item.missed .mark {
   color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .next-up[data-state="waiting"] .next-status::before {
+    animation: none;
+  }
 }

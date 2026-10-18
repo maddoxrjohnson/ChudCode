@@ -5,15 +5,18 @@
 import type * as http from "node:http";
 
 import { sessionState } from "../flow.ts";
+import { nextUp, pendingNext, sessionRoadmap } from "../next-up.ts";
+import { currentDelivery } from "../prompts.ts";
 import { loadProgress } from "../progress.ts";
 import { loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
 import { readConfig } from "../store/config.ts";
 import { assetsDir, isValidSessionId, isValidSlug, safeJoin } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
-import { listSessions, sessionExists } from "../store/sessions.ts";
-import { agentListening } from "./hooks.ts";
+import { listSessions, readSession, sessionExists } from "../store/sessions.ts";
+import { agentConnected, agentListening } from "./hooks.ts";
 import { HttpError, sendFile, sendHtml } from "./http.ts";
 import { dashboardPage } from "./pages/dashboard.ts";
+import { nextUpHtml, type NextButtonView } from "./pages/next-up.ts";
 import { problemPage } from "./pages/problem.ts";
 import { sessionPage } from "./pages/session.ts";
 
@@ -34,6 +37,7 @@ export function handlePage(
         problems: listProblems(),
         progress: loadProgress(),
         roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
+        next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
       }),
     );
   }
@@ -54,9 +58,14 @@ export function handlePage(
     const [id] = rest;
     if (!isValidSessionId(id) || !sessionExists(id)) throw new HttpError(404, "No such session");
     const config = readConfig();
+    const roadmap = sessionRoadmap(readSession(id));
     return sendHtml(
       res,
-      sessionPage(sessionState(id, agentListening()), { autocomplete: config.editor.autocomplete }),
+      sessionPage(sessionState(id, agentListening()), {
+        autocomplete: config.editor.autocomplete,
+        connected: agentConnected(),
+        ...(roadmap ? { roadmap, nextHtml: sessionNextHtml(id) } : {}),
+      }),
     );
   }
 
@@ -67,4 +76,22 @@ export function handlePage(
   }
 
   throw new HttpError(404, "No such page");
+}
+
+/** Whether a press of Next problem will be answered, and what to type if not. */
+export function nextButtonView(): NextButtonView {
+  return {
+    connected: agentConnected(),
+    pending: pendingNext(),
+    command: currentDelivery() === "push" ? "/roadmap" : "/chudcode:roadmap",
+  };
+}
+
+/** The button row under a scored roadmap session's debrief, or "" before then. */
+export function sessionNextHtml(id: string): string {
+  const session = readSession(id);
+  const roadmap = sessionRoadmap(session);
+  if (session.phase !== "done" || !session.rubric || !roadmap) return "";
+  const up = nextUp(roadmap);
+  return up ? nextUpHtml(up, nextButtonView()) : "";
 }

@@ -7,8 +7,9 @@
  * Run `npx playwright install chromium` once first. State lives in a throwaway
  * directory. This covers what the unit tests cannot: the editor, autosave, the Run
  * and Submit buttons, custom input, the hint ladder, the chat in both directions,
- * the debrief card arriving over SSE, and the dashboard reflecting the scored
- * session and reloading when another one starts.
+ * the debrief card arriving over SSE, the dashboard reflecting the scored session and
+ * reloading when another one starts, and the Next problem button following the
+ * interviewer to the session it opens.
  */
 
 import * as fs from "node:fs";
@@ -16,8 +17,9 @@ import * as path from "node:path";
 
 import { chromium, type Page } from "playwright";
 
-import { postMessage, recordSession, startSession } from "../src/flow.ts";
-import { setHooks, type CandidateEvent } from "../src/server/hooks.ts";
+import { notifyDashboard, postMessage, recordSession, startSession } from "../src/flow.ts";
+import { resolveNext } from "../src/next-up.ts";
+import { setHooks, type CandidateEvent, type NextRequest } from "../src/server/hooks.ts";
 import * as server from "../src/server/server.ts";
 import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
@@ -88,6 +90,21 @@ function interviewer(event: CandidateEvent): void {
   }
 }
 
+/** A press of Next problem: the interviewer opens a session for the next step. */
+function nextProblem(request: NextRequest): void {
+  const next = createSession({
+    problem: "window-sum",
+    problemTitle: "Largest Window Sum",
+    patterns: ["sliding-window"],
+    difficulty: "easy",
+    mode: "roadmap",
+    roadmap: request.roadmap,
+    timerMs: 5 * 60_000,
+  });
+  resolveNext(next);
+  notifyDashboard(next.id);
+}
+
 // ── The run ───────────────────────────────────────────────────────────────────
 
 const fixture = makeFixture();
@@ -100,6 +117,8 @@ setHooks({
   isListening: () => true,
   // Reply after the request that raised the event has been answered, as an agent would.
   onCandidateEvent: (event) => void setTimeout(() => interviewer(event), 50),
+  // An agent takes a moment to answer, so the page shows that it is waiting.
+  onNextRequested: (request) => void setTimeout(() => nextProblem(request), 300),
 });
 
 const session = createSession({
@@ -107,7 +126,8 @@ const session = createSession({
   problemTitle: "Largest Window Sum",
   patterns: ["sliding-window"],
   difficulty: "easy",
-  mode: "interview",
+  mode: "roadmap",
+  roadmap: "neetcode150",
   timerMs: 5 * 60_000,
 });
 
@@ -217,6 +237,14 @@ try {
     debrief,
   );
   await page.locator("#phase").filter({ hasText: "Finished" }).waitFor();
+  const nextRow = page.locator("#next-section .next-up");
+  await nextRow.waitFor();
+  check(
+    "the debrief offers the next roadmap problem",
+    (await nextRow.innerText()).includes("Next on NeetCode 150:") &&
+      (await nextRow.locator(".next-button").isEnabled()),
+    await nextRow.innerText(),
+  );
   check(
     "finishing disables the buttons",
     (await page.locator("#run-button").isDisabled()) &&
@@ -274,6 +302,26 @@ try {
   check(
     "the dashboard reloads when a session starts",
     (await page.locator("#sessions tbody tr").count()) === 2,
+  );
+
+  // Next problem: a press waits for the interviewer, then follows it to the new session.
+  const neetNext = page.locator('.next-up[data-roadmap="neetcode150"]');
+  check(
+    "the dashboard names the next NeetCode 150 problem",
+    ((await neetNext.textContent()) ?? "").includes("Contains Duplicate"),
+    await neetNext.textContent(),
+  );
+  await neetNext.locator(".next-button").click();
+  await page.locator('.next-up[data-roadmap="neetcode150"][data-state="waiting"]').waitFor();
+  check("a press shows that it is waiting", true);
+  await page.waitForURL(/\/s\/\d{8}-\d{4}-window-sum-[0-9a-f]{4}$/);
+  await page.locator(".cm-editor").waitFor();
+  check(
+    "the press lands on the session the interviewer opened",
+    (await page.locator("#phase").innerText()) === "Briefing" &&
+      !page.url().endsWith(session.id) &&
+      !page.url().endsWith(second.id),
+    page.url(),
   );
 
   // Server state.

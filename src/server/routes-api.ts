@@ -15,6 +15,7 @@
  *   POST /api/sessions/<id>/hint
  *   POST /api/sessions/<id>/timeout
  *   POST /api/sessions/<id>/done
+ *   GET  /api/sessions/<id>/next-up         { html }  the Next problem row under the debrief
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
  *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
@@ -33,6 +34,7 @@ import { listSessions, sessionExists, writeDraft } from "../store/sessions.ts";
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
+import { nextButtonView, sessionNextHtml } from "./routes-pages.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
 export const MAX_CODE_BYTES = 200 * 1024;
@@ -63,6 +65,7 @@ export async function handleApi(
       problems: listProblems(),
       progress: loadProgress(),
       roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
+      next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
     });
   }
 
@@ -121,6 +124,8 @@ async function handleSessionAction(
     writeDraft(id, expectString(body["code"], "code", MAX_CODE_BYTES));
     return sendJson(res, { ok: true });
   }
+
+  if (action === "next-up" && method === "GET") return sendJson(res, { html: sessionNextHtml(id) });
 
   if (method !== "POST") throw new HttpError(405, "Method not allowed");
 

@@ -9,6 +9,7 @@ import { DAY_MS, scheduleItems, type ReviewEvent } from "../src/review.ts";
 import { buildRoadmapProgress, roadmap } from "../src/roadmap.ts";
 import { dashboardPage, intervalLabel } from "../src/server/pages/dashboard.ts";
 import { notFoundPage, page } from "../src/server/pages/layout.ts";
+import { nextUpHtml } from "../src/server/pages/next-up.ts";
 import { patterns, type ProblemMeta } from "../src/store/problems.ts";
 import type { Session } from "../src/store/sessions.ts";
 
@@ -171,6 +172,76 @@ describe("dashboardPage", () => {
     expect(grind).toMatch(/^id="roadmap-grind75">/);
     expect(grind).toContain('<li class="stage locked" data-stage="week-2">');
     expect(grind).toContain("opens at 6/12 Week 1");
+  });
+
+  it("puts a Next problem row under each roadmap when the button is on", () => {
+    const up = (roadmap: "neetcode150" | "grind75", title: string, prepared: string | null) => ({
+      roadmap,
+      name: roadmap === "grind75" ? "Grind 75" : "NeetCode 150",
+      title,
+      difficulty: "easy" as const,
+      stage: roadmap === "grind75" ? "Week 1" : "Arrays & Hashing",
+      solved: 0,
+      total: roadmap === "grind75" ? 75 : 150,
+      prepared,
+    });
+    const withButtons = dashboardPage({
+      sessions: [],
+      problems: [],
+      progress,
+      roadmaps: [
+        buildRoadmapProgress(roadmap("neetcode150"), []),
+        buildRoadmapProgress(roadmap("grind75"), []),
+      ],
+      next: {
+        ups: [
+          up("neetcode150", "Contains Duplicate", "dup-finder"),
+          up("grind75", "Two Sum", null),
+        ],
+        view: { connected: true, pending: null, command: "/chudcode:roadmap" },
+      },
+    });
+    const neet = withButtons.slice(
+      withButtons.indexOf('id="roadmap-neetcode150"'),
+      withButtons.indexOf('id="roadmap-grind75"'),
+    );
+    // The row names the next problem, so the summary no longer does.
+    expect(neet).not.toContain("next: Contains Duplicate");
+    expect(neet).toContain(
+      '<div class="next-up" data-roadmap="neetcode150" data-state="ready" data-prepared="1"',
+    );
+    expect(neet).toContain("Next on NeetCode 150:</span> <strong>Contains Duplicate</strong>");
+    expect(neet).toContain(
+      '<button type="button" class="button primary next-button">Next problem</button>',
+    );
+    expect(neet).toContain("Written and validated: it opens at once.");
+    const grind = withButtons.slice(withButtons.indexOf('id="roadmap-grind75"'));
+    expect(grind).toContain("The interviewer writes it when you press, in about a minute.");
+  });
+
+  it("shows the Next problem row as waiting or away, with the command to type", () => {
+    const next = {
+      roadmap: "grind75" as const,
+      name: "Grind 75",
+      title: "Two Sum",
+      difficulty: "easy" as const,
+      stage: "Week 1",
+      solved: 0,
+      total: 75,
+      prepared: null,
+    };
+    const waiting = nextUpHtml(next, {
+      connected: true,
+      pending: { roadmap: "grind75", at: 1 },
+      command: "/chudcode:roadmap",
+    });
+    expect(waiting).toContain('data-state="waiting"');
+    expect(waiting).toContain('next-button" disabled>');
+    expect(waiting).toContain("Waiting for the interviewer to open it…");
+    const away = nextUpHtml(next, { connected: false, pending: null, command: "/roadmap" });
+    expect(away).toContain('data-state="away"');
+    expect(away).toContain('data-command="/roadmap grind75"');
+    expect(away).toContain("The interviewer is away. Type /roadmap grind75 in your terminal");
   });
 
   it("lists sessions and problems with their outcomes, escaped", () => {

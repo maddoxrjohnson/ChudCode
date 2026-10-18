@@ -494,6 +494,19 @@ describe("an interview round trip", () => {
     expect(window).toMatchObject({ roadmap: "neetcode150", name: "NeetCode 150" });
     expect(nextWindow(undefined, Date.now() + NEXT_WINDOW_MS)).toBeNull();
 
+    // The debrief and the dashboard carry the button for the next step.
+    const row = (await (
+      await fetch(`${server.getBaseUrl()}/api/sessions/${id}/next-up`)
+    ).json()) as {
+      html: string;
+    };
+    expect(row.html).toContain('data-roadmap="neetcode150" data-state="ready"');
+    expect(row.html).toContain("<strong>Valid Anagram</strong>");
+    const page = await (await fetch(`${server.getBaseUrl()}/s/${id}`)).text();
+    expect(page).toContain('<section class="next-section" id="next-section"><div class="next-up"');
+    const dashboard = await (await fetch(`${server.getBaseUrl()}/`)).text();
+    expect(dashboard).toContain('<div class="next-up" data-roadmap="grind75"');
+
     const listed = await call("list_roadmap");
     expect(text(listed)).toContain("1 of 150 solved.");
     expect(text(listed)).toContain("- `arrays-hashing` open · Arrays & Hashing 1/9");

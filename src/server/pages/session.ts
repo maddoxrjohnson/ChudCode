@@ -14,6 +14,12 @@ import { examplesHtml, statementHtml } from "./problem.ts";
 
 export interface SessionPageOptions {
   autocomplete: boolean;
+  /** Roadmap sessions: the list it works through, for the Next problem button. */
+  roadmap?: string;
+  /** The button row, once the session is scored. */
+  nextHtml?: string;
+  /** Whether an interviewer is around to answer the button. */
+  connected?: boolean;
 }
 
 const PHASE_LABELS: Record<SessionState["session"]["phase"], string> = {
@@ -112,6 +118,7 @@ export function sessionPage(state: SessionState, options: SessionPageOptions): s
     </section>
 
     <section class="rubric" id="rubric">${rubric}</section>
+    <section class="next-section" id="next-section">${options.nextHtml ?? ""}</section>
 
     <div class="side-footer">
       <button type="button" class="button" id="done-button" ${session.phase === "review" || session.phase === "done" ? "disabled" : ""}>I'm done</button>
@@ -136,6 +143,8 @@ export function sessionPage(state: SessionState, options: SessionPageOptions): s
       hintsTotal: problem.hintsTotal,
       paramOrder: order,
       listening: state.listening,
+      connected: options.connected ?? state.listening,
+      roadmap: options.roadmap ?? null,
     },
     module: "runtime/session/main.mjs",
   });
