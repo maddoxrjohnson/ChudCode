@@ -801,6 +801,55 @@
               "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
               "core": false,
               "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "default-five-minute-lifetime",
+              "claim": "By default, the prompt cache has a 5-minute lifetime, and the cache is refreshed for no additional cost each time the cached content is used.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "one-hour-ttl-request",
+              "claim": "The extended 1-hour cache is requested by including ttl with the value 1h in the cache_control definition, alongside type ephemeral.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "read-multiplier-and-exceptions",
+              "claim": "Cache read tokens are priced at 0.1 times the base input token price, with per-model exceptions of 0.025x on Claude Fable 5.1 and Claude Mythos 5.1 and 0.05x on Claude Opus 5.5 and Claude Sonnet 5.5.",
+              "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "lookback-window-20-blocks",
+              "claim": "The lookback window for automatic prefix checking is 20 blocks: the system checks at most 20 positions per breakpoint, counting the breakpoint itself as the first.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "mixed-ttl-longer-first",
+              "claim": "When one request mixes TTLs, cache entries with a longer TTL must appear before shorter ones, so a 1-hour cache entry must come before any 5-minute cache entry.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "base-input-prices",
+              "claim": "The pricing page lists base input prices per million tokens of $4 for Claude Opus 5.5, $2 for Claude Sonnet 5.5, $3 for Claude Sonnet 4.5, and $1 for Claude Haiku 4.5.",
+              "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "min-cacheable-by-model",
+              "claim": "The prompt-caching page lists a minimum cacheable prompt of 512 tokens for Claude Opus 5.5 and Claude Sonnet 5.5, 1,024 tokens for Claude Sonnet 4.5, and 4,096 tokens for Claude Haiku 4.5.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-19"
             }
           ],
           "exercises": ["design-review", "cache-plan"],

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "verifiedAt": "2026-10-19",
+  "note": "A simplified model of Anthropic prompt caching for planning exercises. Each parameter names the curriculum facts it rests on.",
+  "ttlMinutes": {
+    "5m": 5,
+    "1h": 60
+  },
+  "writeMultiplier": {
+    "5m": 1.25,
+    "1h": 2
+  },
+  "maxBreakpoints": 4,
+  "facts": {
+    "ttlMinutes": ["default-five-minute-lifetime", "one-hour-ttl-request"],
+    "writeMultiplier": ["cache-write-multipliers"],
+    "readMultiplier": ["cache-read-multiplier", "read-multiplier-and-exceptions"],
+    "maxBreakpoints": ["cache-breakpoints"],
+    "minCacheable": ["cache-min-length", "min-cacheable-by-model"],
+    "inputPerMTok": ["base-input-prices"],
+    "order": ["cache-invalidation-order", "mixed-ttl-longer-first"]
+  },
+  "models": {
+    "claude-opus-5-5": {
+      "inputPerMTok": 4,
+      "readMultiplier": 0.05,
+      "minCacheable": 512
+    },
+    "claude-sonnet-5-5": {
+      "inputPerMTok": 2,
+      "readMultiplier": 0.05,
+      "minCacheable": 512
+    },
+    "claude-sonnet-4-5": {
+      "inputPerMTok": 3,
+      "readMultiplier": 0.1,
+      "minCacheable": 1024
+    },
+    "claude-haiku-4-5": {
+      "inputPerMTok": 1,
+      "readMultiplier": 0.1,
+      "minCacheable": 4096
+    }
+  }
+}
