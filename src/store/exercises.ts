@@ -6,6 +6,8 @@
  *     brief.md        the scenario and the task, as the learner sees it
  *     teaching.md     the lesson itself, citing curriculum facts as [fact:<id>]
  *     private.json    what the interviewer grades against; never served to the page
+ *                     (for a mutation drill, also the module, its rewrites, the mutants,
+ *                     and the oracle tests)
  *
  * The interviewer writes a fresh exercise per lesson and validates it before serving,
  * as with problems. `private.json` holds the model answer and the follow-ups, so the
@@ -15,6 +17,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import type { CachePlan, CacheScenario } from "../drill/cache-sim.ts";
+import type { FlawSpec } from "../drill/flaw-review.ts";
+import type { MutationSpec } from "../drill/mutation.ts";
+import type { RefactorSpec } from "../drill/refactor.ts";
 import { readJson, readText, writeJson, writeText } from "./json.ts";
 import { type ExerciseKind } from "./lessons.ts";
 import { exerciseDir, exercisesDir, isDir, isValidSlug } from "./paths.ts";
@@ -30,21 +36,29 @@ export interface ExerciseMeta {
   lastServedAt?: number;
 }
 
-/** What a design review is graded against. */
-export interface DesignReviewPrivate {
+/** What the interviewer grades against. */
+export interface ExercisePrivate {
   /** A strong answer in outline, for the interviewer to compare against. */
   modelOutline: string;
   /** Questions to ask after the first answer, strongest first. */
   followUps: string[];
   /** Mistakes a weak answer makes, for the debrief. */
   pitfalls: string[];
+  /** A mutation drill's module, rewrites, mutants, and oracle. */
+  mutation?: MutationSpec;
+  /** A flaw review's diff (shown), its planted flaws and decoys (not). */
+  flawReview?: FlawSpec;
+  /** A cache plan's scenario (shown) and the best plan the author knows (not). */
+  cachePlan?: { scenario: CacheScenario; reference: CachePlan };
+  /** A refactor drill's legacy module, clean refactor, mutants, and oracle. */
+  refactor?: RefactorSpec;
 }
 
 export interface ExerciseBundle {
   meta: ExerciseMeta;
   brief: string;
   teaching: string;
-  private: DesignReviewPrivate;
+  private: ExercisePrivate;
 }
 
 /** The part of an exercise the page may show. */
@@ -55,6 +69,10 @@ export interface PublicExercise {
   title: string;
   brief: string;
   teaching: string;
+  /** A flaw review's diff. */
+  diff?: string;
+  /** A cache plan's scenario. */
+  scenario?: CacheScenario;
 }
 
 export function exerciseExists(slug: string): boolean {
@@ -66,7 +84,7 @@ export function readExercise(slug: string): ExerciseBundle {
   const meta = readJson<ExerciseMeta>(path.join(dir, "meta.json"));
   const brief = readText(path.join(dir, "brief.md"));
   const teaching = readText(path.join(dir, "teaching.md"));
-  const hidden = readJson<DesignReviewPrivate>(path.join(dir, "private.json"));
+  const hidden = readJson<ExercisePrivate>(path.join(dir, "private.json"));
   if (!meta || brief === null || teaching === null || !hidden)
     throw new Error(`No exercise named ${slug}`);
   if (meta.slug !== slug) throw new Error(`Exercise directory ${slug} holds meta for ${meta.slug}`);
@@ -129,5 +147,8 @@ export function publicExercise(bundle: ExerciseBundle): PublicExercise {
     title: bundle.meta.title,
     brief: bundle.brief,
     teaching: bundle.teaching,
+    // Only the parts of a drill the learner works from; the answers stay private.
+    ...(bundle.private.flawReview ? { diff: bundle.private.flawReview.diff } : {}),
+    ...(bundle.private.cachePlan ? { scenario: bundle.private.cachePlan.scenario } : {}),
   };
 }

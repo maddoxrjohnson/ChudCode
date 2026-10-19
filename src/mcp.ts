@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { nextWindow, pendingNext } from "./next-up.ts";
+import { lessonWindow, nextLesson, pendingNextLesson } from "./next-lesson.ts";
 import { AgentOutbox } from "./outbox.ts";
 import { loadRoadmapProgress, preparedProblem } from "./roadmap.ts";
 import { listProblems, readProblem } from "./store/problems.ts";
@@ -34,7 +35,13 @@ import {
   submissionPrompt,
   timerExpiredPrompt,
 } from "./prompts.ts";
-import { agentConnected, setHooks, type CandidateEvent, type NextRequest } from "./server/hooks.ts";
+import {
+  agentConnected,
+  setHooks,
+  type CandidateEvent,
+  type NextLessonRequest,
+  type NextRequest,
+} from "./server/hooks.ts";
 import * as server from "./server/server.ts";
 import {
   AGENT_CHANNEL,
@@ -47,14 +54,28 @@ import {
 import { packageRoot } from "./store/paths.ts";
 import { listSessions, readEvents, readSession, type Session } from "./store/sessions.ts";
 import { readExercise } from "./store/exercises.ts";
+import { readJson } from "./store/json.ts";
+import type { MutationReport } from "./drill/mutation.ts";
+import type { RefactorReport } from "./drill/refactor.ts";
+import type { CachePlan } from "./drill/cache-sim.ts";
+import type { FlawGrade, ReviewMark } from "./drill/flaw-review.ts";
+import type { ExercisePrivate } from "./store/exercises.ts";
 import {
   lessonExists,
   listLessons,
   readAnswer,
+  gradeFile,
   readLesson,
   type LessonSession,
 } from "./store/lessons.ts";
 import {
+  cachePlannedPrompt,
+  drillGradedPrompt,
+  refactorGradedPrompt,
+  transcriptSubmittedPrompt,
+  lessonWindowText,
+  nextLessonPrompt,
+  flawReviewedPrompt,
   labSubmittedPrompt,
   lessonAnswerPrompt,
   lessonDonePrompt,
@@ -326,6 +347,7 @@ export function connectInbox(inbox: CandidateInbox): void {
     isConnected: () => inbox.connected(),
     onCandidateEvent: (event) => routeEvent(inbox, event),
     onNextRequested: (request) => routeNext(inbox, request),
+    onNextLessonRequested: (request) => routeNextLesson(inbox, request),
   });
 }
 
@@ -341,6 +363,7 @@ export function connectOutbox(outbox: AgentOutbox): void {
     isListening: () => subscriberCount(AGENT_CHANNEL) > 0,
     onCandidateEvent: (event) => routeEvent(outbox, event),
     onNextRequested: (request) => routeNext(outbox, request),
+    onNextLessonRequested: (request) => routeNextLesson(outbox, request),
     agentInbox: (since) => outbox.since(since),
   });
 }
@@ -421,6 +444,31 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
   }
 }
 
+function flawPrompt(
+  session: LessonSession,
+  number: number,
+  hidden: ExercisePrivate,
+  at: number,
+): string {
+  const stored = readJson<{ marks: ReviewMark[]; grade: FlawGrade }>(gradeFile(session.id, number));
+  if (!stored)
+    return `Review ${number} of lesson \`${session.id}\` arrived but its grade is missing. Call \`get_session\`.`;
+  return flawReviewedPrompt(session, number, stored.marks, stored.grade, hidden, at);
+}
+
+function planPrompt(
+  session: LessonSession,
+  number: number,
+  hidden: ExercisePrivate,
+  at: number,
+): string {
+  const stored = readJson<{ plan: CachePlan }>(gradeFile(session.id, number));
+  const grade = session.cachePlan?.latest;
+  if (!stored || !grade || !hidden.cachePlan)
+    return `Plan ${number} of lesson \`${session.id}\` arrived but its result is missing. Call \`get_session\`.`;
+  return cachePlannedPrompt(session, stored.plan, grade, hidden.cachePlan.reference, hidden, at);
+}
+
 function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
   const id = event.sessionId;
   const session = readLesson(id);
@@ -437,10 +485,27 @@ function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
     case "answer": {
       const answer = readAnswer(id, event.number) ?? "";
       const hidden = readExercise(session.exercise).private;
-      const prompt =
-        session.exerciseKind === "lab"
-          ? labSubmittedPrompt(session, event.number, answer, hidden, event.at)
-          : lessonAnswerPrompt(session, event.number, answer, hidden, event.at);
+      const report =
+        session.exerciseKind === "mutation"
+          ? readJson<MutationReport>(gradeFile(id, event.number))
+          : null;
+      const refactor =
+        session.exerciseKind === "refactor"
+          ? readJson<RefactorReport>(gradeFile(id, event.number))
+          : null;
+      const prompt = refactor
+        ? refactorGradedPrompt(session, event.number, refactor, hidden, event.at)
+        : report
+          ? drillGradedPrompt(session, event.number, report, hidden, event.at)
+          : session.exerciseKind === "flaw-review"
+            ? flawPrompt(session, event.number, hidden, event.at)
+            : session.exerciseKind === "cache-plan"
+              ? planPrompt(session, event.number, hidden, event.at)
+              : session.exerciseKind === "transcript"
+                ? transcriptSubmittedPrompt(session, event.number, answer, hidden, event.at)
+                : session.exerciseKind === "lab"
+                  ? labSubmittedPrompt(session, event.number, answer, hidden, event.at)
+                  : lessonAnswerPrompt(session, event.number, answer, hidden, event.at);
       return inbox.push(prompt, `answer:${id}:${event.number}`, notDone);
     }
     case "timer_expired":
@@ -450,6 +515,15 @@ function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
     default:
       return;
   }
+}
+
+/** A press of Next lesson, dropped once a lesson starts. */
+function routeNextLesson(inbox: PromptSink, request: NextLessonRequest): void {
+  inbox.push(
+    nextLessonPrompt(nextLesson(), request.at),
+    `next-lesson:${request.at}`,
+    () => pendingNextLesson() !== null,
+  );
 }
 
 /** A press of Next problem, dropped once a session answers it. */
@@ -670,8 +744,11 @@ export class McpSession {
           toolResult(ok(lessonNothingYetText(seconds, lessons, digest, Date.now()))),
         );
       const window = active.length === 0 ? nextWindow() : null;
+      const afterLesson = active.length === 0 && !window ? lessonWindow() : null;
+      if (afterLesson)
+        return result(id, toolResult(ok(lessonWindowText(seconds, afterLesson.leftMs, digest))));
       // With nothing in progress and no debrief to answer, the text says to end the turn.
-      if (active.length === 0 && !window && !pendingNext()) inbox.release();
+      if (active.length === 0 && !window && !pendingNext() && !pendingNextLesson()) inbox.release();
       return result(
         id,
         toolResult(ok(nothingYetText(seconds, active, digest, Date.now(), window))),

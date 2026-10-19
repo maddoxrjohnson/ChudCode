@@ -10,7 +10,8 @@
  * the debrief card arriving over SSE, the dashboard reflecting the scored session and
  * reloading when another one starts, the Next problem button following the
  * interviewer to the session it opens, an agentic-coding lesson from its sourced
- * teaching to the debrief, and a lab that reads a project the learner consents to.
+ * teaching to the debrief, a lab that reads a project the learner consents to, and
+ * a mutation drill graded twice, a flaw review marked line by line, and a cache plan.
  */
 
 import * as fs from "node:fs";
@@ -29,9 +30,13 @@ import { createSession, readDraft, readSession } from "../src/store/sessions.ts"
 import { loadCurriculumProgress } from "../src/curriculum.ts";
 import { inspectLab, postLessonMessage, recordLesson } from "../src/lesson-flow.ts";
 import { updateExerciseMeta, writeExercise } from "../src/store/exercises.ts";
-import { createLesson, lessonExists, readLesson } from "../src/store/lessons.ts";
+import { createLesson, lessonExists, readLesson, updateLesson } from "../src/store/lessons.ts";
+import { createWorkspace } from "../src/drill/workspace.ts";
 import { makeFixture, seedExample } from "../test/helpers.ts";
 import { exerciseArgs, labArgs } from "../test/lesson-fixtures.ts";
+import { drillArgs, ORACLE, SPEC, WEAK_TESTS } from "../test/mutation-fixtures.ts";
+import { cacheArgs, REFERENCE, SCENARIO } from "../test/cache-fixtures.ts";
+import { FLAW_SPEC, flawArgs } from "../test/flaw-fixtures.ts";
 
 process.env["CHUDCODE_AUTO_OPEN"] = "0";
 
@@ -102,6 +107,25 @@ let followedUp = false;
 function lessonInterviewer(event: CandidateEvent): void {
   const id = event.sessionId;
   if (readLesson(id).exerciseKind === "lab") return labInterviewer(event);
+  if (readLesson(id).exerciseKind === "mutation") return drillInterviewer(event);
+  const kind = readLesson(id).exerciseKind;
+  if (kind === "flaw-review" || kind === "cache-plan") {
+    // Score the first submission: the page work is what this checks.
+    if (event.kind === "answer")
+      recordLesson(id, {
+        scores: {
+          decomposition: null,
+          verification: 3,
+          contextCost: 3,
+          safety: 3,
+          delegation: null,
+        },
+        notesMd: "Graded on the first submission.",
+        strengths: ["Went straight for the risky lines."],
+        improvements: ["Say what an attacker controls."],
+      });
+    return;
+  }
   switch (event.kind) {
     case "started":
       postLessonMessage(id, "interviewer", "Take your time. Ask me anything about the scenario.");
@@ -170,6 +194,32 @@ function labInterviewer(event: CandidateEvent): void {
     default:
       return;
   }
+}
+
+/** A drill: ask about the first grade, score after the second. */
+function drillInterviewer(event: CandidateEvent): void {
+  if (event.kind !== "answer") return;
+  const id = event.sessionId;
+  if (event.number === 1) {
+    postLessonMessage(
+      id,
+      "interviewer",
+      "What happens when a request costs **exactly** what is left?",
+    );
+    return;
+  }
+  recordLesson(id, {
+    scores: {
+      decomposition: null,
+      verification: 3,
+      contextCost: null,
+      safety: null,
+      delegation: null,
+    },
+    notesMd: "The second suite pins the boundaries.",
+    strengths: ["Exact-cost boundary"],
+    improvements: ["Start from the edges next time."],
+  });
 }
 
 /** A press of Next problem: the interviewer opens a session for the next step. */
@@ -466,9 +516,15 @@ try {
   const lessonVerdict = await page.locator("#rubric .badge").textContent({ timeout: 5000 });
   check("the lesson debrief says Passed", lessonVerdict === "Passed", lessonVerdict);
   check(
+    "the debrief has no stray text",
+    !(await page.locator("#rubric").innerText()).includes("null"),
+  );
+  check(
     "unscored dimensions show as n/a",
     (await page.locator("#rubric .scores li", { hasText: "n/a" }).count()) === 2,
   );
+  await page.locator("#rubric .next-up", { hasText: "Next lesson" }).waitFor({ timeout: 5000 });
+  check("the debrief offers the next lesson", true);
   await screenshot(page, "lesson-debrief");
   await page.goto(base);
   const lessonsBadge = await page.locator("#agentic .badge").first().textContent();
@@ -553,6 +609,192 @@ try {
   await screenshot(page, "lab-debrief");
   fs.rmSync(project, { recursive: true, force: true });
 
+  // A mutation drill: the agent's tests in the workspace, graded against hidden variants.
+  const drill = drillArgs();
+  writeExercise({
+    meta: {
+      slug: drill["slug"] as string,
+      kind: "mutation",
+      lesson: "verify-with-checks",
+      title: drill["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: drill["teaching_md"] as string,
+    brief: drill["brief_md"] as string,
+    private: {
+      modelOutline: drill["model_outline"] as string,
+      followUps: drill["follow_ups"] as string[],
+      pitfalls: drill["pitfalls"] as string[],
+      mutation: SPEC,
+    },
+  });
+  updateExerciseMeta("test-the-token-bucket", { validatedAt: Date.now() });
+  const drillSession = createLesson({
+    lesson: "verify-with-checks",
+    lessonTitle: "Give the agent a check it can run",
+    module: "test-strength",
+    exercise: "test-the-token-bucket",
+    exerciseKind: "mutation",
+    focus: ["verification"],
+    timerMs: 45 * 60_000,
+  });
+  const workspace = await createWorkspace(drillSession.id, drill["brief_md"] as string, SPEC);
+  updateLesson(drillSession.id, (s) => {
+    s.drill = { workspace, module: SPEC.module, grades: 0 };
+  });
+  await page.goto(`${base}/s/${drillSession.id}`);
+  check(
+    "the drill page shows the workspace",
+    (await page.locator("#workspace-path").textContent()) === `cd ${workspace}`,
+  );
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  fs.writeFileSync(path.join(workspace, "tests", "test_bucket.py"), WEAK_TESTS);
+  await page.locator("#grade-button").click();
+  await page.locator("#grade-result", { hasText: "2 of 5" }).waitFor({ timeout: 30_000 });
+  check(
+    "a grade shows counts but not which bugs survived",
+    !(await page.locator("#grade-result").innerText()).includes("capacity"),
+  );
+  await page.locator(".message.from-interviewer", { hasText: "exactly" }).waitFor();
+  check("the interviewer asks about the weak grade", true);
+  await page.mouse.move(0, 0);
+  await screenshot(page, "drill");
+  fs.writeFileSync(path.join(workspace, "tests", "test_bucket.py"), ORACLE);
+  await page.locator("#grade-button").click();
+  await page.locator("#grade-result", { hasText: "Past the gate" }).waitFor({ timeout: 30_000 });
+  const drillVerdict = await page
+    .locator("#rubric .badge")
+    .first()
+    .textContent({ timeout: 10_000 });
+  check("the drill passes on the stronger suite", drillVerdict === "Passed", drillVerdict);
+  check(
+    "the debrief reports the planted bugs",
+    (await page.locator("#rubric", { hasText: "Your tests caught every one." }).count()) === 1,
+  );
+  check(
+    "no stray text in the debrief",
+    !(await page.locator("#rubric").innerText()).includes("null"),
+  );
+  await screenshot(page, "drill-debrief");
+
+  // A flaw review: mark lines of the diff, then submit.
+  const flaws = flawArgs();
+  writeExercise({
+    meta: {
+      slug: flaws["slug"] as string,
+      kind: "flaw-review",
+      lesson: "review-agent-diffs",
+      title: flaws["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: flaws["teaching_md"] as string,
+    brief: flaws["brief_md"] as string,
+    private: {
+      modelOutline: flaws["model_outline"] as string,
+      followUps: flaws["follow_ups"] as string[],
+      pitfalls: flaws["pitfalls"] as string[],
+      flawReview: FLAW_SPEC,
+    },
+  });
+  updateExerciseMeta("review-the-invoices-diff", { validatedAt: Date.now() });
+  const reviewSession = createLesson({
+    lesson: "review-agent-diffs",
+    lessonTitle: "Catch what the agent got wrong",
+    module: "review-accuracy-security",
+    exercise: "review-the-invoices-diff",
+    exerciseKind: "flaw-review",
+    focus: ["safety", "verification"],
+    timerMs: 45 * 60_000,
+  });
+  await page.goto(`${base}/s/${reviewSession.id}`);
+  check("the flaw review shows the diff", (await page.locator(".diff tr[data-line]").count()) > 30);
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  for (const [line, category] of [
+    [6, "secret"],
+    [25, "injection"],
+    [19, "missing-authz"],
+    [32, "hallucinated-api"],
+  ] as const) {
+    await page.locator(`.diff tr[data-line="${line}"]`).click();
+    await page.locator("#mark-category").selectOption(category);
+    await page.locator("#mark-reason").fill(`line ${line} is wrong`);
+    await page.locator("#mark-form button[type=submit]").click();
+  }
+  check("marks are listed and shown on the diff", (await page.locator("#marks li").count()) === 4);
+  check("marked lines are highlighted", (await page.locator(".diff tr.marked").count()) === 4);
+  await page.mouse.move(0, 0);
+  await screenshot(page, "flaw-review");
+  await page.locator("#review-button").click();
+  await page.locator("#review-result", { hasText: "4 of 5" }).waitFor({ timeout: 10_000 });
+  const reviewVerdict = await page
+    .locator("#rubric .badge")
+    .first()
+    .textContent({ timeout: 10_000 });
+  check(
+    "the review passes on the criticals and most flaws",
+    reviewVerdict === "Passed",
+    reviewVerdict,
+  );
+  check(
+    "the debrief lists every planted flaw, the missed one marked",
+    (await page.locator("#rubric .checklist-results li").count()) === 5 &&
+      (await page.locator("#rubric .badge", { hasText: "missed" }).count()) === 1,
+  );
+  await screenshot(page, "flaw-review-debrief");
+
+  // A cache plan: paste the agent's plan, check it, and see the best plan in the debrief.
+  const cache = cacheArgs();
+  writeExercise({
+    meta: {
+      slug: cache["slug"] as string,
+      kind: "cache-plan",
+      lesson: "prompt-caching",
+      title: cache["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: cache["teaching_md"] as string,
+    brief: cache["brief_md"] as string,
+    private: {
+      modelOutline: cache["model_outline"] as string,
+      followUps: cache["follow_ups"] as string[],
+      pitfalls: cache["pitfalls"] as string[],
+      cachePlan: { scenario: SCENARIO, reference: REFERENCE },
+    },
+  });
+  updateExerciseMeta("cache-the-support-bot", { validatedAt: Date.now() });
+  const planSession = createLesson({
+    lesson: "prompt-caching",
+    lessonTitle: "How prompt caching prices a session",
+    module: "cost-context",
+    exercise: "cache-the-support-bot",
+    exerciseKind: "cache-plan",
+    focus: ["contextCost"],
+    timerMs: 45 * 60_000,
+  });
+  await page.goto(`${base}/s/${planSession.id}`);
+  check(
+    "the cache plan shows the workload",
+    (await page.locator(".segments tbody tr").count()) === 4,
+  );
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  await page.locator("#answer-text").fill(JSON.stringify(REFERENCE, null, 2));
+  await page.locator("#plan-button").click();
+  await page.locator("#plan-result", { hasText: "Past the gate" }).waitFor({ timeout: 10_000 });
+  await page.mouse.move(0, 0);
+  await screenshot(page, "cache-plan");
+  const planVerdict = await page.locator("#rubric .badge").first().textContent({ timeout: 10_000 });
+  check("the plan passes at the reference's cost", planVerdict === "Passed", planVerdict);
+  check(
+    "the debrief shows the best plan known",
+    (await page.locator("#rubric", { hasText: "The best plan known" }).count()) === 1,
+  );
+
   // Server state.
   check("the verdict is recorded", readSession(session.id).verdict?.correct === true);
   check(
@@ -561,7 +803,7 @@ try {
       .map((e) => e.key)
       .sort()
       .join() ===
-      "lesson:context-files,lesson:plan-before-code,pattern:sliding-window,problem:window-sum",
+      "lesson:context-files,lesson:plan-before-code,lesson:prompt-caching,lesson:review-agent-diffs,lesson:verify-with-checks,pattern:sliding-window,problem:window-sum",
   );
   check("no browser errors", errors.length === 0, errors.join("; "));
 

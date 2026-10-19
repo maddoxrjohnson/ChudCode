@@ -1,6 +1,15 @@
 {
   "version": 1,
-  "factHosts": ["code.claude.com", "docs.claude.com", "platform.claude.com", "www.anthropic.com"],
+  "factHosts": [
+    "code.claude.com",
+    "docs.claude.com",
+    "platform.claude.com",
+    "www.anthropic.com",
+    "martinfowler.com",
+    "www.martinfowler.com",
+    "modelcontextprotocol.io",
+    "learn.chatgpt.com"
+  ],
   "modules": [
     {
       "id": "planning",
@@ -201,8 +210,26 @@
               "verifiedAt": "2026-10-18"
             }
           ],
-          "exercises": ["design-review"],
-          "rubricFocus": ["contextCost"]
+          "exercises": ["design-review", "transcript"],
+          "rubricFocus": ["contextCost"],
+          "checklist": [
+            {
+              "id": "clears",
+              "text": "Unrelated tasks start fresh, with /clear or a new session, instead of piling up"
+            },
+            {
+              "id": "compacts",
+              "text": "Compaction happens deliberately, with a focus, not only when the window fills"
+            },
+            {
+              "id": "delegates",
+              "text": "Broad exploration goes to a subagent instead of the main conversation"
+            },
+            {
+              "id": "prompts",
+              "text": "Prompts say what done looks like and how to check it"
+            }
+          ]
         }
       ]
     },
@@ -296,7 +323,50 @@
             "Find injection holes, leaked secrets, and missing authorisation",
             "Decide what to check by hand and what to hand to a review subagent"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "review-own-changes-before-approval",
+              "claim": "The security page says the user is responsible for reviewing proposed code and commands for safety before approving them.",
+              "source": "https://code.claude.com/docs/en/security",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "code-review-may-miss-issues",
+              "claim": "The Code Review page warns that its AI review may miss bugs, security vulnerabilities, or other issues, and that a review with no findings does not mean the code is error-free or secure.",
+              "source": "https://code.claude.com/docs/en/code-review",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "avoid-piping-untrusted-content",
+              "claim": "Under its untrusted-content guidance, the security page recommends avoiding piping untrusted content directly to Claude and verifying proposed changes to critical files.",
+              "source": "https://code.claude.com/docs/en/security",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "fresh-context-reviewer",
+              "claim": "The best-practices page says a fresh context improves code review because Claude will not be biased toward code it just wrote, and it describes a Writer/Reviewer pattern that uses a second session to review.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "code-review-local-scope",
+              "claim": "The local code-review page says /code-review checks your branch's changes for correctness bugs in a background subagent with its own context window, and works on any plan. Without --fix it asks Claude only for a report; with --fix it also asks Claude to apply the findings, and any edit goes through your permission mode.",
+              "source": "https://code.claude.com/docs/en/code-review-local",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "security-review-command",
+              "claim": "The commands reference says /security-review analyzes the changes on your current branch for security vulnerabilities, reviewing the diff against origin's default branch for risks such as injection, auth issues, and data exposure.",
+              "source": "https://code.claude.com/docs/en/commands",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["flaw-review", "design-review"],
           "rubricFocus": ["safety", "verification"]
         },
@@ -886,7 +956,7 @@
               "verifiedAt": "2026-10-18"
             }
           ],
-          "exercises": ["design-review", "lab"],
+          "exercises": ["design-review", "lab", "transcript"],
           "rubricFocus": ["contextCost", "delegation"],
           "checklist": [
             {
@@ -920,7 +990,43 @@
             "Pin behaviour with characterisation tests before the agent touches the code",
             "Keep each refactor step small enough to review and revert"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "refactor-small-testable-increments",
+              "claim": "The Refactor code recipe on the Common workflows page includes the tip 'Do refactoring in small, testable increments', and its example asks Claude to keep the same behavior and then run the tests.",
+              "source": "https://code.claude.com/docs/en/common-workflows",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "refactor-needs-a-check",
+              "claim": "The best practices page says to give Claude a check it can run, such as tests, a build, or a screenshot to compare, because Claude stops when the work looks done and 'looks done' is otherwise the only signal available.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "fowler-definition-of-refactoring",
+              "claim": "Fowler defines refactoring as a change made to the internal structure of software to make it easier to understand and cheaper to modify without changing its observable behavior.",
+              "source": "https://www.martinfowler.com/bliki/DefinitionOfRefactoring.html",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "fowler-small-behaviour-preserving-steps",
+              "claim": "Fowler's Refactoring page says the heart of refactoring is a series of small behavior preserving transformations, and that the system is kept fully working after each refactoring.",
+              "source": "https://martinfowler.com/bliki/Refactoring.html",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "preparatory-refactor-first",
+              "claim": "Fowler credits Kent Beck with the phrase 'make the change easy, then make the easy change' and writes 'So first I refactor the code into the structure that makes it easy to add the feature.'",
+              "source": "https://martinfowler.com/articles/preparatory-refactoring-example.html",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["design-review", "refactor"],
           "rubricFocus": ["verification", "decomposition"]
         }
@@ -940,9 +1046,77 @@
             "Weigh what it catches against the cost of a cold context and another vendor seeing the code",
             "Bridge another tool in through MCP, a multi-provider harness, or a gateway"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "mcp-serve-exposes-claude-code-tools-only",
+              "claim": "Running claude mcp serve starts Claude Code as a stdio MCP server. The page warns that this server only exposes Claude Code's tools, so the MCP client must implement user confirmation for individual tool calls.",
+              "source": "https://code.claude.com/docs/en/mcp",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "gateway-no-non-claude-models",
+              "claim": "Any gateway that exposes a supported API format works, but Anthropic doesn't endorse, maintain, or audit third-party gateway products, and doesn't support routing Claude Code to non-Claude models through any gateway.",
+              "source": "https://code.claude.com/docs/en/llm-gateway",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "bedrock-enabled-by-env-var",
+              "claim": "Amazon Bedrock is enabled by setting the environment variable CLAUDE_CODE_USE_BEDROCK to 1, and the page notes that AWS_REGION is optional when your AWS profile already sets a region.",
+              "source": "https://code.claude.com/docs/en/amazon-bedrock",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "mcp-credentials-not-sent-to-named-server",
+              "claim": "For a remote MCP server, Claude Code reads credential variables from the environment as empty in the server's url and headers, which keeps a project's .mcp.json or a plugin from sending your Claude Code or cloud provider credentials to a server it names.",
+              "source": "https://code.claude.com/docs/en/mcp",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "mcp-open-standard-definition",
+              "claim": "MCP (Model Context Protocol) is an open-source standard for connecting AI applications to external systems, such as data sources, tools, and workflows.",
+              "source": "https://modelcontextprotocol.io/",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "codex-connects-to-mcp-servers",
+              "claim": "Codex stores MCP configuration in config.toml, with each server configured in a [mcp_servers.<server-name>] table, and the codex mcp add command can register a server that runs as a local stdio process.",
+              "source": "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["design-review", "lab"],
-          "rubricFocus": ["verification", "delegation", "safety"]
+          "rubricFocus": ["verification", "delegation", "safety"],
+          "checklist": [
+            {
+              "id": "when",
+              "text": "It says when a second model is worth its cost: which changes, not every change"
+            },
+            {
+              "id": "scope",
+              "text": "The second model sees only what it needs, and what leaves the machine is a choice"
+            },
+            {
+              "id": "contract",
+              "text": "The reviewer's output has a shape the first agent or a person can act on"
+            },
+            {
+              "id": "wiring",
+              "text": "The bridge (an MCP server, a gateway, or a script) is configured explicitly, with its credentials kept out of the repository"
+            }
+          ],
+          "labFiles": [
+            ".mcp.json",
+            ".claude/settings.json",
+            "CLAUDE.md",
+            ".claude/agents/**/*.md",
+            ".claude/commands/*.md"
+          ]
         }
       ]
     }

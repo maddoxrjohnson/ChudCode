@@ -19,10 +19,15 @@
  *
  * A lesson session uses the same paths: GET for its state, PUT draft { text }, and
  * POST start, message, answer { text }, timeout, done. A lab adds
- * POST lab-preview { path } (what it would read) and lab { path, note, consent }.
+ * POST lab-preview { path } (what it would read) and lab { path, note, consent }; a
+ * drill adds POST grade, which runs the tests in its workspace; a flaw review adds
+ * POST review { marks }, and a cache plan POST plan { plan }. A transcript review adds
+ * POST transcripts (list the learner's recent sessions) and transcript { id, note,
+ * consent }.
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
  *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
+ *   POST /api/curriculum/next               { from?: lesson id }   the Next lesson button
  */
 
 import type * as http from "node:http";
@@ -30,17 +35,24 @@ import type * as http from "node:http";
 import * as flow from "../flow.ts";
 import { loadProgress } from "../progress.ts";
 import { nextUp, requestNext } from "../next-up.ts";
+import { nextLesson, requestNextLesson } from "../next-lesson.ts";
 import { isRoadmapId, loadRoadmapProgress, ROADMAP_IDS } from "../roadmap.ts";
 import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
 import { listSessions, sessionExists, writeDraft } from "../store/sessions.ts";
-import { lessonExists } from "../store/lessons.ts";
+import { lessonExists, readLesson } from "../store/lessons.ts";
 import {
   lessonDone,
   lessonState,
   lessonTimerExpired,
   MAX_ANSWER_CHARS,
+  gradeDrill,
+  gradeRefactorDrill,
+  listLessonTranscripts,
+  submitTranscript,
+  submitCachePlan,
+  submitFlawReview,
   postLessonMessage,
   previewLab,
   saveLessonDraft,
@@ -48,10 +60,12 @@ import {
   submitAnswer,
   submitLab,
 } from "../lesson-flow.ts";
+import { pythonAdapter } from "../runner/adapters/python/adapter.ts";
+import { suiteRunner } from "../runs.ts";
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
-import { agenticData, nextButtonView, sessionNextHtml } from "./routes-pages.ts";
+import { agenticData, lessonNextHtml, nextButtonView, sessionNextHtml } from "./routes-pages.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
 export const MAX_CODE_BYTES = 200 * 1024;
@@ -96,6 +110,20 @@ export async function handleApi(
     const next = nextUp(id);
     if (!next) throw new HttpError(409, "Every problem on this roadmap is solved");
     return sendJson(res, { request: requestNext(id, from), next, connected: agentConnected() });
+  }
+
+  if (resource === "curriculum" && id === "next" && req.method === "POST") {
+    const body = asRecord(await readJsonBody(req, 1024));
+    const from = body["from"];
+    if (from !== undefined && (typeof from !== "string" || !lessonExists(from)))
+      throw new HttpError(400, "from must be a lesson session id");
+    const next = nextLesson();
+    if (!next) throw new HttpError(409, "Every teachable lesson is passed");
+    return sendJson(res, {
+      request: requestNextLesson(from),
+      next,
+      connected: agentConnected(),
+    });
   }
 
   if (resource === "problems" && id !== undefined && action === undefined && req.method === "GET") {
@@ -214,6 +242,8 @@ async function handleLessonAction(
   action: string,
 ): Promise<void> {
   const method = req.method ?? "GET";
+  if (action === "next-up" && method === "GET")
+    return sendJson(res, { html: readLesson(id).rubric ? lessonNextHtml() : "" });
   if (action === "draft" && method === "PUT") {
     const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 1024));
     saveLessonDraft(id, expectString(body["text"], "text", MAX_ANSWER_CHARS));
@@ -253,6 +283,31 @@ async function handleLessonAction(
       return sendJson(res, {
         number: submitLab(id, expectString(body["path"], "path", 4096), note),
       });
+    }
+    case "transcripts":
+      return sendJson(res, { transcripts: listLessonTranscripts(id) });
+    case "transcript": {
+      const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 1024));
+      if (body["consent"] !== true)
+        throw new HttpError(400, "Tick the box to let ChudCode read this session");
+      const note =
+        body["note"] === undefined ? "" : expectString(body["note"], "note", MAX_ANSWER_CHARS);
+      return sendJson(res, {
+        number: submitTranscript(id, expectString(body["id"], "id", 64), note),
+      });
+    }
+    case "review": {
+      const body = asRecord(await readJsonBody(req, 64 * 1024));
+      return sendJson(res, { grade: submitFlawReview(id, body["marks"]).grade });
+    }
+    case "plan": {
+      const body = asRecord(await readJsonBody(req, 32 * 1024));
+      return sendJson(res, { grade: submitCachePlan(id, body["plan"]) });
+    }
+    case "grade": {
+      const grader = readLesson(id).exerciseKind === "refactor" ? gradeRefactorDrill : gradeDrill;
+      const { grade } = await grader(id, suiteRunner(), pythonAdapter.pythonBin);
+      return sendJson(res, { grade });
     }
     case "timeout":
       return sendJson(res, { session: lessonTimerExpired(id) });

@@ -24,8 +24,17 @@ description: Teach a lesson on coding with agents, such as planning with plan mo
    when it arrives, ask one or two follow-ups, and use `get_session` if you need the
    state. The learner may spend a long time in another terminal with their own
    agent; keep waiting. Do not end your turn during the lesson.
-6. Score it with `record_lesson`, then give the user the verdict, two strengths, two
-   things to work on, and when the lesson comes back for review.
+   - A lab arrives as a project folder the learner consented to on the page: read it
+     with `inspect_lab`. A transcript review arrives as one of their Claude Code
+     sessions: read it with `inspect_transcript`. Neither tool takes a path.
+   - A drill (mutation tests, a flaw review, a cache plan, a refactor) is graded by
+     code when the learner presses its button; you get the full result, the page
+     gets counts. Do not name what they missed before the debrief.
+6. Score it with `record_lesson` (labs and transcript reviews need a result for
+   every checklist item), then give the user the verdict, two strengths, two things
+   to work on, and when the lesson comes back for review. Then do what it says about
+   the Next lesson button: write the next lesson's exercise ahead and keep waiting
+   while the window is open.
 
 If the lesson stops for reasons unrelated to the learner, end it with
 `abandon_session` and reason interrupted. When the user only asks how far along

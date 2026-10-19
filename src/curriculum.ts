@@ -27,6 +27,7 @@ export const CURRICULUM_EXERCISES = [
   "flaw-review",
   "cache-plan",
   "refactor",
+  "transcript",
 ] as const;
 export type CurriculumExercise = (typeof CURRICULUM_EXERCISES)[number];
 
@@ -203,6 +204,9 @@ function lessonErrors(
       errors.push(`${where}.checklist must be a list of { id, text }`);
   }
   // An outline gets its lab checklist when its facts are written.
+  if (Array.isArray(exercises) && exercises.includes("transcript") && facts && facts.length > 0)
+    if (!Array.isArray(checklist) || checklist.length === 0)
+      errors.push(`${where} lists a transcript review, so it needs a checklist`);
   if (Array.isArray(exercises) && exercises.includes("lab") && facts && facts.length > 0) {
     if (!Array.isArray(checklist) || checklist.length === 0)
       errors.push(`${where} lists a lab, so it needs a checklist`);

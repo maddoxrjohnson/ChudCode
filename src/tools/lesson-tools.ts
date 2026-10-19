@@ -4,10 +4,11 @@
 
 import { findLesson, loadCurriculumProgress, type LessonPlace } from "../curriculum.ts";
 import { notifyDashboard } from "../flow.ts";
-import { inspectLab, recordLesson, startLesson } from "../lesson-flow.ts";
+import { inspectLab, inspectTranscript, recordLesson, startLesson } from "../lesson-flow.ts";
 import {
   curriculumText,
   labSnapshotText,
+  transcriptAuditText,
   lessonBrief,
   lessonLine,
   LESSON_DIMENSION_NAMES,
@@ -40,6 +41,7 @@ import {
   LESSON_DIMENSIONS,
   lessonExists,
   listLessons,
+  updateLesson,
   readLesson,
   type ChecklistResult,
   type ExerciseKind,
@@ -48,6 +50,32 @@ import {
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { reviewItems } from "../store/review-events.ts";
 import { validateExercise } from "../validate-exercise.ts";
+import {
+  MUTANTS_MAX,
+  MUTANTS_MIN,
+  validateMutationSpec,
+  type MutationSpec,
+} from "../drill/mutation.ts";
+import { pythonAdapter } from "../runner/adapters/python/adapter.ts";
+import { suiteRunner } from "../runs.ts";
+import { createRefactorWorkspace, createWorkspace } from "../drill/workspace.ts";
+import { nextLesson, resolveNextLesson, type NextLesson } from "../next-lesson.ts";
+import { validateRefactorSpec, type RefactorSpec } from "../drill/refactor.ts";
+import {
+  loadCacheModel,
+  type CachePlan,
+  type CacheScenario,
+  type Level,
+  type Ttl,
+} from "../drill/cache-sim.ts";
+import {
+  DECOYS_MIN,
+  FLAW_CATEGORIES,
+  FLAWS_MAX,
+  FLAWS_MIN,
+  type FlawCategory,
+  type FlawSpec,
+} from "../drill/flaw-review.ts";
 import {
   fail,
   ok,
@@ -70,6 +98,148 @@ function requireLesson(args: Record<string, unknown>): LessonPlace {
   const place = findLesson(id);
   if (!place) throw new ToolArgumentError(`No lesson ${id}. Call list_curriculum.`);
   return place;
+}
+
+function readRefactorArgs(args: Record<string, unknown>): RefactorSpec {
+  requireString(args, "legacy_py", 20_000);
+  const mutation = readMutationArgs({ ...args, module_py: args["legacy_py"], rewrites_py: [] });
+  return {
+    module: mutation.module,
+    legacy: mutation.reference,
+    clean: requireString(args, "clean_py", 20_000),
+    mutants: mutation.mutants,
+    oracleTests: mutation.oracleTests,
+  };
+}
+
+function readMutationArgs(args: Record<string, unknown>): MutationSpec {
+  const raw = args["mutants"];
+  if (!Array.isArray(raw))
+    throw new ToolArgumentError("mutants must be a list for a mutation drill");
+  return {
+    module: requireString(args, "module_name", 41),
+    reference: requireString(args, "module_py", 20_000),
+    rewrites: stringList(args, "rewrites_py", 4).map((r) => {
+      if (r.length > 20_000)
+        throw new ToolArgumentError("each rewrite is capped at 20,000 characters");
+      return r;
+    }),
+    mutants: raw.slice(0, MUTANTS_MAX + 1).map((item, i) => {
+      if (!item || typeof item !== "object")
+        throw new ToolArgumentError(`mutants[${i}] must be an object`);
+      const entry = item as Record<string, unknown>;
+      return {
+        id: requireString(entry, "id", 64),
+        description: requireString(entry, "description", 300),
+        find: requireString(entry, "find", 2_000),
+        replace: typeof entry["replace"] === "string" ? entry["replace"] : "",
+      };
+    }),
+    oracleTests: requireString(args, "oracle_tests_py", 30_000),
+  };
+}
+
+function objectList(
+  args: Record<string, unknown>,
+  key: string,
+  max: number,
+): Array<Record<string, unknown>> {
+  const raw = args[key];
+  if (!Array.isArray(raw)) throw new ToolArgumentError(`${key} must be a list`);
+  if (raw.length > max) throw new ToolArgumentError(`${key} has more than ${max} items`);
+  return raw.map((item, i) => {
+    if (!item || typeof item !== "object" || Array.isArray(item))
+      throw new ToolArgumentError(`${key}[${i}] must be an object`);
+    return item as Record<string, unknown>;
+  });
+}
+
+function intField(entry: Record<string, unknown>, key: string, where: string): number {
+  const value = entry[key];
+  if (!Number.isInteger(value) || (value as number) < 1)
+    throw new ToolArgumentError(`${where}.${key} must be a positive integer`);
+  return value as number;
+}
+
+function readFlawArgs(args: Record<string, unknown>): FlawSpec {
+  return {
+    diff: requireString(args, "diff", 30_000),
+    flaws: objectList(args, "flaws", FLAWS_MAX + 4).map((f, i) => ({
+      id: requireString(f, "id", 64),
+      file: requireString(f, "file", 300),
+      line: intField(f, "line", `flaws[${i}]`),
+      ...(f["end_line"] !== undefined ? { endLine: intField(f, "end_line", `flaws[${i}]`) } : {}),
+      category: requireString(f, "category", 32) as FlawCategory,
+      critical: f["critical"] === true,
+      explanation: requireString(f, "explanation", 1_000),
+    })),
+    decoys: objectList(args, "decoys", 10).map((d, i) => ({
+      file: requireString(d, "file", 300),
+      line: intField(d, "line", `decoys[${i}]`),
+      note: requireString(d, "note", 500),
+    })),
+  };
+}
+
+function readCacheArgs(args: Record<string, unknown>): {
+  scenario: CacheScenario;
+  reference: CachePlan;
+} {
+  const scenario = args["scenario"];
+  const plan = args["reference_plan"];
+  if (!scenario || typeof scenario !== "object")
+    throw new ToolArgumentError("scenario must be an object");
+  if (!plan || typeof plan !== "object")
+    throw new ToolArgumentError("reference_plan must be an object");
+  const s = scenario as Record<string, unknown>;
+  if (typeof s["model"] !== "string")
+    throw new ToolArgumentError("scenario.model must be a string");
+  return {
+    scenario: {
+      model: s["model"],
+      segments: objectList(s, "segments", 12).map((seg, i) => ({
+        id: requireString(seg, "id", 64),
+        level: requireString(seg, "level", 16) as Level,
+        tokens: intField(seg, "tokens", `scenario.segments[${i}]`),
+        label: requireString(seg, "label", 120),
+        ...(Array.isArray(seg["changesAt"]) ? { changesAt: seg["changesAt"] as number[] } : {}),
+      })),
+      requests: objectList(s, "requests", 200).map((req, i) => {
+        if (typeof req["at"] !== "number" || !Number.isFinite(req["at"]))
+          throw new ToolArgumentError(`scenario.requests[${i}].at must be a number of minutes`);
+        return { at: req["at"], newTokens: Number(req["newTokens"] ?? 0) };
+      }),
+    },
+    reference: readPlan(plan as Record<string, unknown>),
+  };
+}
+
+/** A cache plan from JSON that the author or the learner wrote. */
+export function readPlan(p: Record<string, unknown>): CachePlan {
+  const order = p["order"];
+  const breakpoints = p["breakpoints"];
+  if (!Array.isArray(order) || order.some((o) => typeof o !== "string"))
+    throw new ToolArgumentError("order must be a list of segment ids");
+  if (!Array.isArray(breakpoints)) throw new ToolArgumentError("breakpoints must be a list");
+  return {
+    order: order as string[],
+    breakpoints: breakpoints.map((bp, i) => {
+      if (!bp || typeof bp !== "object")
+        throw new ToolArgumentError(`breakpoints[${i}] must be an object`);
+      const b = bp as Record<string, unknown>;
+      return { after: String(b["after"] ?? ""), ttl: String(b["ttl"] ?? "") as Ttl };
+    }),
+  };
+}
+
+/** What record_lesson says to do next: write the next lesson ahead, then stay for a press. */
+function nextLessonText(next: NextLesson | null): string {
+  if (!next)
+    return "The debrief is on the page. Every teachable lesson is passed. Give the user a two-line summary in the terminal, and end your turn.";
+  const write = next.prepared
+    ? `The next lesson, **${next.title}**, already has an exercise written: \`${next.prepared}\`. Nothing to write.`
+    : `Now write the next lesson's exercise ahead of time, so the page's **Next lesson** button opens it at once: **${next.title}** (\`${next.lesson}\`). Call \`begin_lesson\` with that lesson, then \`write_exercise\` and \`validate_exercise\` until it passes. Do not call \`start_lesson\`: a press of the button reaches you and says to.`;
+  return `The debrief is on the page. Give the user a two-line summary in the terminal. ${write} Then call \`wait_for_candidate\`: a press of Next lesson arrives there for the next ten minutes, and the wait says when to end your turn.`;
 }
 
 function readChecklist(raw: unknown): ChecklistResult[] | undefined {
@@ -164,27 +334,112 @@ export function lessonTools(host: ToolHost): ToolDef[] {
       description:
         "Write a lesson exercise: the teaching, the brief the learner works from, and the private material you grade against. Replaces any exercise with the same slug and clears its validation. " +
         "Cite curriculum facts in the teaching as [fact:<id>]. Then call validate_exercise.",
-      inputSchema: schema.obj({
-        slug: schema.str("Lowercase kebab-case, e.g. plan-a-csv-importer."),
-        lesson: schema.str("The lesson id this exercise is for."),
-        kind: schema.oneOf(EXERCISE_KINDS, "The exercise kind."),
-        title: schema.str("A short title for the exercise."),
-        teaching_md: schema.str(
-          "The lesson, in Markdown: the few ideas that matter with concrete examples, citing facts as [fact:<id>]. 600 to 16,000 characters.",
-        ),
-        brief_md: schema.str(
-          "What the learner works from: a '## Scenario' section and a '## Your task' section.",
-        ),
-        model_outline: schema.str("Private: what a strong answer contains, in outline."),
-        follow_ups: schema.list(
-          schema.str("A question"),
-          "Private: follow-up questions, strongest first. At least two.",
-        ),
-        pitfalls: schema.list(
-          schema.str("A mistake"),
-          "Private: mistakes a weak answer makes. At least two.",
-        ),
-      }),
+      inputSchema: schema.obj(
+        {
+          slug: schema.str("Lowercase kebab-case, e.g. plan-a-csv-importer."),
+          lesson: schema.str("The lesson id this exercise is for."),
+          kind: schema.oneOf(EXERCISE_KINDS, "The exercise kind."),
+          title: schema.str("A short title for the exercise."),
+          teaching_md: schema.str(
+            "The lesson, in Markdown: the few ideas that matter with concrete examples, citing facts as [fact:<id>]. 600 to 16,000 characters.",
+          ),
+          brief_md: schema.str(
+            "What the learner works from: a '## Scenario' section and a '## Your task' section.",
+          ),
+          model_outline: schema.str("Private: what a strong answer contains, in outline."),
+          follow_ups: schema.list(
+            schema.str("A question"),
+            "Private: follow-up questions, strongest first. At least two.",
+          ),
+          pitfalls: schema.list(
+            schema.str("A mistake"),
+            "Private: mistakes a weak answer makes. At least two.",
+          ),
+          module_name: schema.str(
+            "Mutation drills: the Python module the learner's tests import, e.g. limiter.",
+          ),
+          module_py: schema.str(
+            "Mutation drills: the correct module. The learner's agent sees it and writes tests for it. Standard library only.",
+          ),
+          rewrites_py: schema.list(
+            schema.str("A whole module"),
+            "Mutation drills, private: at least two equivalent rewrites with the same public behaviour but different internals (other helper names, other control flow, other private attributes).",
+          ),
+          mutants: schema.list(
+            schema.obj({
+              id: schema.str("kebab-case"),
+              description: schema.str("The bug, in one line, for the debrief."),
+              find: schema.str("Text that occurs exactly once in module_py."),
+              replace: schema.str("What it becomes."),
+            }),
+            `Mutation drills, private: ${MUTANTS_MIN} to ${MUTANTS_MAX} plausible bugs, each one edit to module_py: off-by-one bounds, a missing guard, a dropped state update, a wrong default, an edge case.`,
+          ),
+          oracle_tests_py: schema.str(
+            "Mutation drills, private: your own unittest module (import from module_name) that passes on module_py and every rewrite and kills every mutant.",
+          ),
+          diff: schema.str(
+            "Flaw reviews: a unified diff (--- a/x, +++ b/x, @@ hunks) an agent plausibly wrote, 40 to 200 lines. The learner sees it.",
+          ),
+          flaws: schema.list(
+            schema.obj(
+              {
+                id: schema.str("kebab-case"),
+                file: schema.str("The path after +++ b/."),
+                line: schema.int(
+                  "The first new-file line of the flaw; it must be an added line.",
+                  1,
+                ),
+                end_line: schema.int("The last line, if the flaw spans several.", 1),
+                category: schema.oneOf(FLAW_CATEGORIES, "What kind of flaw."),
+                critical: schema.bool("Must be found for the review to pass."),
+                explanation: schema.str("Why it is wrong and the fix, for the debrief."),
+              },
+              ["end_line"],
+            ),
+            `Flaw reviews, private: ${FLAWS_MIN} to ${FLAWS_MAX} planted flaws, at least one critical.`,
+          ),
+          decoys: schema.list(
+            schema.obj({
+              file: schema.str("The path."),
+              line: schema.int("A new-file line that looks wrong and is not.", 1),
+              note: schema.str("Why it is fine."),
+            }),
+            `Flaw reviews, private: at least ${DECOYS_MIN} lines that look suspicious and are correct.`,
+          ),
+          scenario: {
+            type: "object",
+            description:
+              "Cache plans: { model, segments: [{ id, level: tools|system|messages, tokens, label, changesAt?: [request index] }], requests: [{ at: minutes, newTokens }] }. The learner sees it. Model is one of " +
+              Object.keys(loadCacheModel().models).join(", ") +
+              ".",
+          },
+          reference_plan: {
+            type: "object",
+            description:
+              "Cache plans, private: your best plan, { order: [segment ids], breakpoints: [{ after: segment id, ttl: 5m|1h }] }. It must beat the naive plan (listed order, one 5m breakpoint at the end) by 15%.",
+          },
+          legacy_py: schema.str(
+            "Refactor drills: the tangled but working module the learner starts from, with at least one function of 25 lines or more. Standard library only.",
+          ),
+          clean_py: schema.str(
+            "Refactor drills, private: your own refactor of legacy_py with the same public functions and behaviour, and a shorter longest function or shallower nesting.",
+          ),
+        },
+        [
+          "module_name",
+          "module_py",
+          "rewrites_py",
+          "mutants",
+          "oracle_tests_py",
+          "diff",
+          "flaws",
+          "decoys",
+          "scenario",
+          "reference_plan",
+          "legacy_py",
+          "clean_py",
+        ],
+      ),
       async execute(args) {
         const slug = requireString(args, "slug", 64);
         if (!isValidSlug(slug))
@@ -194,6 +449,10 @@ export function lessonTools(host: ToolHost): ToolDef[] {
         if (!(EXERCISE_KINDS as readonly unknown[]).includes(kind))
           throw new ToolArgumentError(`kind must be one of ${EXERCISE_KINDS.join(", ")}`);
         const before = exerciseExists(slug) ? readExercise(slug).meta : undefined;
+        const mutation = kind === "mutation" ? readMutationArgs(args) : undefined;
+        const flawReview = kind === "flaw-review" ? readFlawArgs(args) : undefined;
+        const cachePlan = kind === "cache-plan" ? readCacheArgs(args) : undefined;
+        const refactor = kind === "refactor" ? readRefactorArgs(args) : undefined;
         const bundle: ExerciseBundle = {
           meta: {
             slug,
@@ -209,6 +468,10 @@ export function lessonTools(host: ToolHost): ToolDef[] {
             modelOutline: requireString(args, "model_outline", 10_000),
             followUps: stringList(args, "follow_ups", 8),
             pitfalls: stringList(args, "pitfalls", 10),
+            ...(mutation ? { mutation } : {}),
+            ...(flawReview ? { flawReview } : {}),
+            ...(cachePlan ? { cachePlan } : {}),
+            ...(refactor ? { refactor } : {}),
           },
         };
         writeExercise(bundle);
@@ -232,6 +495,25 @@ export function lessonTools(host: ToolHost): ToolDef[] {
         if (!place)
           return fail(`Exercise ${slug} names lesson ${bundle.meta.lesson}, which does not exist.`);
         const report = validateExercise(bundle, place.lesson);
+        // Only run Python once the shape is right: a drill must prove every mutant killable.
+        if (report.ok && bundle.private.refactor) {
+          const ran = await validateRefactorSpec(
+            bundle.private.refactor,
+            suiteRunner(),
+            pythonAdapter.pythonBin,
+          );
+          report.errors.push(...ran);
+          report.ok = ran.length === 0;
+        }
+        if (report.ok && bundle.private.mutation) {
+          const ran = await validateMutationSpec(
+            bundle.private.mutation,
+            suiteRunner(),
+            pythonAdapter.pythonBin,
+          );
+          report.errors.push(...ran);
+          report.ok = ran.length === 0;
+        }
         if (!report.ok) {
           return fail(
             [
@@ -295,8 +577,21 @@ export function lessonTools(host: ToolHost): ToolDef[] {
           timesServed: bundle.meta.timesServed + 1,
           lastServedAt: Date.now(),
         });
+        const spec = bundle.private.mutation;
+        const legacy = bundle.private.refactor;
+        const workspace = spec
+          ? await createWorkspace(session.id, bundle.brief, spec)
+          : legacy
+            ? await createRefactorWorkspace(session.id, bundle.brief, legacy.module, legacy.legacy)
+            : undefined;
+        const module = spec?.module ?? legacy?.module;
+        if (workspace && module)
+          updateLesson(session.id, (s) => {
+            s.drill = { workspace, module, grades: 0 };
+          });
         host.created(session.id);
         notifyDashboard(session.id);
+        resolveNextLesson(readLesson(session.id));
         if (optionalBool(args, "start_now")) startLesson(session.id, Date.now(), "interviewer");
 
         const url = server.urlForSession(session.id) ?? base;
@@ -306,7 +601,9 @@ export function lessonTools(host: ToolHost): ToolDef[] {
         return ok(
           [
             `Session ${session.id} is ready: ${url}`,
-            `The learner sees the teaching for ${place.lesson.title}, the brief "${bundle.meta.title}", an answer box, and a ${minutes}-minute clock.`,
+            workspace
+              ? `The learner sees the teaching for ${place.lesson.title}, the brief "${bundle.meta.title}", and a ${minutes}-minute clock. Their workspace is ${workspace}: ${module}.py and an empty tests/. They point their own agent at it, then press Grade on the page.`
+              : `The learner sees the teaching for ${place.lesson.title}, the brief "${bundle.meta.title}", an answer box, and a ${minutes}-minute clock.`,
             `Your reply to the user in the terminal must include this link: ${url} — the page is where they work. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
           ].join("\n"),
           { sessionId: session.id, url },
@@ -382,7 +679,7 @@ export function lessonTools(host: ToolHost): ToolDef[] {
             `Recorded. ${lessonLine(outcome.session)}`,
             `${outcome.session.verdict?.correct ? "Passed" : "Not passed"}: ${scored}.`,
             ...(outcome.nextDue ? [outcome.nextDue] : []),
-            "The debrief is on the page. Give the user a two-line summary in the terminal, and end your turn.",
+            nextLessonText(nextLesson()),
           ].join("\n"),
           { verdict: outcome.session.verdict },
         );
@@ -407,6 +704,24 @@ export function lessonTools(host: ToolHost): ToolDef[] {
           files: snapshot.files.map((f) => f.path),
           lints: snapshot.lints.length,
         });
+      },
+    },
+    {
+      name: "inspect_transcript",
+      title: "Inspect Transcript",
+      description:
+        "Summarise the Claude Code session log the learner chose on the page for a transcript review: requests, models and switches, cache reads and writes, gaps long enough to expire a five-minute cache, compactions, an input cost estimate, and their first prompts (redacted). " +
+        "The learner chooses the log and consents on the page; you cannot name one.",
+      inputSchema: schema.obj({ session_id: schema.str("The lesson session id.") }),
+      async execute(args) {
+        const id = requireString(args, "session_id", 120);
+        if (!isValidSessionId(id) || !lessonExists(id))
+          return fail(`No lesson session named ${id}.`);
+        const session = readLesson(id);
+        const place = findLesson(session.lesson);
+        if (!place) return fail(`Lesson ${session.lesson} is no longer in the curriculum.`);
+        const audit = inspectTranscript(id);
+        return ok(transcriptAuditText(audit, place.lesson), { requests: audit.requests });
       },
     },
     {

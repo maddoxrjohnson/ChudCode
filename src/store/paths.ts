@@ -12,6 +12,8 @@
  *     lessons/<id>/      session.json events.jsonl draft.md answers/NN.md
  *     exercises/<slug>/  meta.json brief.md teaching.md private.json
  *     curriculum/fact-checks.jsonl
+ *   ~/chudcode-drills/<id>/  a drill's workspace (README.md, the module, tests/), kept
+ *                            outside the state root; see workspacesDir
  *     review/events.jsonl
  *     trends.json
  *     tmp/<runId>/       ephemeral runner workdirs
@@ -121,6 +123,19 @@ export function exercisesDir(): string {
 export function exerciseDir(slug: string): string {
   assertSlug(slug);
   return path.join(exercisesDir(), slug);
+}
+
+/**
+ * Where drill workspaces go: outside the state root on purpose, so an agent working
+ * in one is not one `cd ..` from the hidden variants. CHUDCODE_WORKSPACES moves it.
+ */
+export function workspacesDir(): string {
+  return process.env["CHUDCODE_WORKSPACES"] ?? path.join(os.homedir(), "chudcode-drills");
+}
+
+export function workspaceDir(id: string): string {
+  if (!isValidSessionId(id)) throw new Error(`Invalid session id: ${JSON.stringify(id)}`);
+  return path.join(workspacesDir(), id);
 }
 
 export function factChecksFile(): string {

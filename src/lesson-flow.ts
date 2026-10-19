@@ -26,23 +26,58 @@ import { publicExercise, readExercise, type PublicExercise } from "./store/exerc
 import {
   appendLessonEvent,
   CHECKLIST_STATUSES,
+  gradeFile,
   labSnapshotFile,
   LESSON_DIMENSIONS,
   lessonReviewEvent,
   readLesson,
   readLessonDraft,
+  readAnswer,
   readLessonEvents,
   recordAnswer,
   updateLesson,
   writeLessonDraft,
   type ChecklistResult,
+  type CacheGrade,
+  type RefactorGrade,
+  type DrillGrade,
+  type ReviewGrade,
   type LessonEvent,
   type LessonRubric,
   type LessonScores,
   type LessonSession,
   type LessonVerdict,
 } from "./store/lessons.ts";
-import { writeJson } from "./store/json.ts";
+import { readJson, writeJson } from "./store/json.ts";
+import { plural } from "./format.ts";
+import { runMutation, type MutationReport, type SuiteRun } from "./drill/mutation.ts";
+import { readWorkspaceModule, readWorkspaceTests, WorkspaceError } from "./drill/workspace.ts";
+import {
+  auditTranscript,
+  listTranscripts,
+  transcriptPath,
+  type TranscriptAudit,
+  type TranscriptEntry,
+} from "./transcript.ts";
+import { gitCommits, gradeRefactor, type RefactorReport } from "./drill/refactor.ts";
+import {
+  COST_SLACK,
+  dollars,
+  gradePlan,
+  parsePlan,
+  planErrors,
+  simulate,
+  type CachePlan,
+} from "./drill/cache-sim.ts";
+import {
+  FLAW_CATEGORIES,
+  gradeReview,
+  MAX_MARKS,
+  parseDiff,
+  type FlawCategory,
+  type FlawGrade,
+  type ReviewMark,
+} from "./drill/flaw-review.ts";
 import { appendReviewEvents, reviewItems } from "./store/review-events.ts";
 
 export const MAX_ANSWER_CHARS = 20_000;
@@ -254,6 +289,439 @@ export async function inspectLab(id: string, now = Date.now()): Promise<LabSnaps
   return snapshot;
 }
 
+// ── Transcripts ───────────────────────────────────────────────────────────────
+
+function transcriptLesson(session: LessonSession): void {
+  if (session.exerciseKind !== "transcript")
+    throw new FlowError(409, "This lesson does not review a transcript");
+}
+
+/** The learner's recent Claude Code sessions, listed only when they ask on the page. */
+export function listLessonTranscripts(id: string): TranscriptEntry[] {
+  transcriptLesson(readLesson(id));
+  return listTranscripts();
+}
+
+/** The learner chose a session log and consented to it being read. */
+export function submitTranscript(
+  id: string,
+  transcriptId: string,
+  note: string,
+  now = Date.now(),
+): number {
+  const session = readLesson(id);
+  transcriptLesson(session);
+  if (session.phase === "briefing") throw new FlowError(409, "Press Start before submitting");
+  if (session.phase === "done") throw new FlowError(409, "This lesson is finished");
+  const entry = listTranscripts().find((t) => t.id === transcriptId);
+  if (!entry || !transcriptPath(transcriptId))
+    throw new FlowError(400, "That session is no longer in the list; list them again");
+  const text = [
+    `Session log from \`${entry.project}\`, last written ${new Date(entry.modifiedAt).toISOString().slice(0, 16).replace("T", " ")}.`,
+    ...(note.trim() ? ["", note.trim().slice(0, MAX_ANSWER_CHARS)] : []),
+  ].join("\n");
+  writeLessonDraft(id, note);
+  const number = recordAnswer(id, text);
+  updateLesson(id, (s) => {
+    s.transcript = {
+      id: transcriptId,
+      project: entry.project,
+      submittedAt: now,
+      answer: number,
+      inspections: 0,
+    };
+  });
+  appendLessonEvent(id, { type: "answer", number, chars: text.length, at: now });
+  push(sessionChannel(id), "answer", { number, at: now, html: renderMarkdown(text) });
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return number;
+}
+
+/** Read the chosen log now, resolving its path again, and keep the summary as evidence. */
+export function inspectTranscript(id: string): TranscriptAudit {
+  const session = readLesson(id);
+  transcriptLesson(session);
+  const chosen = session.transcript;
+  if (!chosen)
+    throw new FlowError(409, "The learner has not chosen a session yet; it comes from the page");
+  const file = transcriptPath(chosen.id);
+  if (!file) throw new FlowError(409, "That session log is gone");
+  const audit = auditTranscript(file, chosen.project);
+  writeJson(labSnapshotFile(id, chosen.answer), audit);
+  updateLesson(id, (s) => {
+    if (s.transcript) s.transcript.inspections += 1;
+  });
+  return audit;
+}
+
+// ── Drills ────────────────────────────────────────────────────────────────────
+
+export const MAX_GRADES = 10;
+
+/** One line for the answers list: what a grade found, without naming any bug. */
+export function gradeSummary(grade: DrillGrade): string {
+  return [
+    `Graded ${plural(grade.tests, "test")}: caught ${grade.killed} of ${grade.mutants} planted bugs. ${grade.passed ? "**Passed the gate.**" : "Not past the gate yet."}`,
+    ...grade.problems.map((p) => `- ${p}`),
+    ...(grade.assertFree > 0 ? [`- ${plural(grade.assertFree, "test")} assert nothing.`] : []),
+  ].join("\n");
+}
+
+/**
+ * Grade the tests in the drill's workspace against the reference, the rewrites, and
+ * every mutant. The full report goes to disk and the interviewer; the page gets counts.
+ */
+export async function gradeDrill(
+  id: string,
+  run: SuiteRun,
+  pythonBin: string,
+  now = Date.now(),
+): Promise<{ grade: DrillGrade; report: MutationReport }> {
+  const session = readLesson(id);
+  if (session.exerciseKind !== "mutation" || !session.drill)
+    throw new FlowError(409, "This lesson is not a drill");
+  if (session.phase === "briefing") throw new FlowError(409, "Press Start before grading");
+  if (session.phase === "done") throw new FlowError(409, "This lesson is finished");
+  if (session.drill.grades >= MAX_GRADES)
+    throw new FlowError(429, `A drill can be graded ${MAX_GRADES} times`);
+  const spec = readExercise(session.exercise).private.mutation;
+  if (!spec) throw new FlowError(409, "This drill's exercise has no mutants");
+  let tests: Record<string, string>;
+  try {
+    tests = readWorkspaceTests(session.drill.workspace);
+  } catch (err) {
+    if (err instanceof WorkspaceError) throw new FlowError(400, err.message);
+    throw err;
+  }
+  const report = await runMutation(spec, tests, run, pythonBin);
+  const draft: Omit<DrillGrade, "number"> = {
+    at: now,
+    tests: report.tests,
+    killed: report.killed,
+    mutants: report.mutants.length,
+    assertFree: report.assertFree.length,
+    problems: report.problems,
+    passed: report.passed,
+  };
+  const number = recordAnswer(id, gradeSummary({ ...draft, number: 0 }));
+  const grade: DrillGrade = { ...draft, number };
+  writeJson(gradeFile(id, number), { ...report, files: Object.keys(tests) });
+  updateLesson(id, (s) => {
+    if (s.drill) {
+      s.drill.grades += 1;
+      s.drill.latest = grade;
+    }
+  });
+  appendLessonEvent(id, {
+    type: "graded",
+    number,
+    killed: grade.killed,
+    mutants: grade.mutants,
+    passed: grade.passed,
+    at: now,
+  });
+  push(sessionChannel(id), "answer", {
+    number,
+    at: now,
+    html: renderMarkdown(gradeSummary(grade)),
+  });
+  push(sessionChannel(id), "grade", grade);
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return { grade, report };
+}
+
+// ── Flaw reviews and cache plans ─────────────────────────────────────────────
+
+export const MAX_REVIEWS = 3;
+export const MAX_PLANS = 10;
+
+function attemptable(session: LessonSession, kind: LessonSession["exerciseKind"]): void {
+  if (session.exerciseKind !== kind) throw new FlowError(409, `This lesson is not a ${kind}`);
+  if (session.phase === "briefing") throw new FlowError(409, "Press Start first");
+  if (session.phase === "done") throw new FlowError(409, "This lesson is finished");
+}
+
+export function reviewSummary(grade: ReviewGrade): string {
+  return [
+    `Reviewed with ${plural(grade.marks, "mark")}: found ${grade.found} of ${grade.flaws} planted flaws, ${plural(grade.falseAlarms, "false alarm")}. ${grade.passed ? "**Passed the gate.**" : "Not past the gate yet."}`,
+    ...grade.problems.map((p) => `- ${p}`),
+  ].join("\n");
+}
+
+/** Grade a review's marks against the planted flaws. The page sees counts only. */
+export function submitFlawReview(
+  id: string,
+  rawMarks: unknown,
+  now = Date.now(),
+): { grade: ReviewGrade; full: FlawGrade } {
+  const session = readLesson(id);
+  attemptable(session, "flaw-review");
+  const spec = readExercise(session.exercise).private.flawReview;
+  if (!spec) throw new FlowError(409, "This exercise has no diff");
+  if ((session.review?.grades ?? 0) >= MAX_REVIEWS)
+    throw new FlowError(429, `A review can be submitted ${MAX_REVIEWS} times`);
+  const files = new Set(parseDiff(spec.diff).map((f) => f.path));
+  if (!Array.isArray(rawMarks) || rawMarks.length === 0)
+    throw new FlowError(400, "Mark at least one line before submitting");
+  if (rawMarks.length > MAX_MARKS) throw new FlowError(400, `At most ${MAX_MARKS} marks`);
+  const marks: ReviewMark[] = rawMarks.map((raw, i) => {
+    const m = (raw ?? {}) as Record<string, unknown>;
+    if (typeof m["file"] !== "string" || !files.has(m["file"]))
+      throw new FlowError(400, `marks[${i}].file is not a file in the diff`);
+    if (!Number.isInteger(m["line"]))
+      throw new FlowError(400, `marks[${i}].line must be a line number`);
+    if (!(FLAW_CATEGORIES as readonly unknown[]).includes(m["category"]))
+      throw new FlowError(400, `marks[${i}].category must be one of ${FLAW_CATEGORIES.join(", ")}`);
+    const reason = typeof m["reason"] === "string" ? m["reason"].trim().slice(0, 500) : "";
+    return {
+      file: m["file"],
+      line: m["line"] as number,
+      category: m["category"] as FlawCategory,
+      reason,
+    };
+  });
+  const full = gradeReview(spec, marks);
+  const draft = {
+    at: now,
+    marks: marks.length,
+    found: full.found.length,
+    flaws: spec.flaws.length,
+    criticalMissed: full.criticalMissed,
+    falseAlarms: full.falseAlarms.length,
+    problems: full.problems,
+    passed: full.passed,
+  };
+  const number = recordAnswer(id, reviewSummary({ ...draft, number: 0 }));
+  const grade: ReviewGrade = { ...draft, number };
+  writeJson(gradeFile(id, number), { marks, grade: full });
+  updateLesson(id, (s) => {
+    s.review = { grades: (s.review?.grades ?? 0) + 1, latest: grade };
+  });
+  appendLessonEvent(id, {
+    type: "reviewed",
+    number,
+    found: grade.found,
+    flaws: grade.flaws,
+    passed: grade.passed,
+    at: now,
+  });
+  push(sessionChannel(id), "answer", {
+    number,
+    at: now,
+    html: renderMarkdown(reviewSummary(grade)),
+  });
+  push(sessionChannel(id), "review", grade);
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return { grade, full };
+}
+
+export function planSummary(grade: CacheGrade): string {
+  return `Plan ${grade.number}: ${dollars(grade.cost)} for ${plural(grade.requests, "request")}, ${(grade.ratio * 100).toFixed(0)}% of the best plan known (the bar is ${Math.round(COST_SLACK * 100)}%). With no caching it would cost ${dollars(grade.uncachedCost)}. ${grade.passed ? "**Passed the gate.**" : "Not past the gate yet."}`;
+}
+
+/** Simulate the learner's plan. Its own cost breakdown is theirs to see. */
+export function submitCachePlan(id: string, raw: unknown, now = Date.now()): CacheGrade {
+  const session = readLesson(id);
+  attemptable(session, "cache-plan");
+  const spec = readExercise(session.exercise).private.cachePlan;
+  if (!spec) throw new FlowError(409, "This exercise has no scenario");
+  if ((session.cachePlan?.grades ?? 0) >= MAX_PLANS)
+    throw new FlowError(429, `A plan can be checked ${MAX_PLANS} times`);
+  let plan: CachePlan;
+  try {
+    plan = parsePlan(raw);
+  } catch (err) {
+    throw new FlowError(400, (err as Error).message);
+  }
+  const problems = planErrors(spec.scenario, plan);
+  if (problems.length > 0)
+    throw new FlowError(400, `The plan is not valid: ${problems.join("; ")}`);
+  const result = gradePlan(spec.scenario, plan, spec.reference);
+  const draft = {
+    at: now,
+    cost: result.cost.total,
+    referenceCost: result.referenceCost,
+    naiveCost: result.naiveCost,
+    uncachedCost: result.uncachedCost,
+    ratio: result.ratio,
+    hits: result.cost.hits,
+    requests: spec.scenario.requests.length,
+    readTokens: result.cost.readTokens,
+    writeTokens: result.cost.writeTokens,
+    uncachedTokens: result.cost.uncachedTokens,
+    passed: result.passed,
+  };
+  const number = recordAnswer(
+    id,
+    `${planSummary({ ...draft, number: 0 })}\n\n\`\`\`json\n${JSON.stringify(plan, null, 2)}\n\`\`\``,
+  );
+  const grade: CacheGrade = { ...draft, number };
+  writeJson(gradeFile(id, number), { plan, result });
+  updateLesson(id, (s) => {
+    s.cachePlan = { grades: (s.cachePlan?.grades ?? 0) + 1, latest: grade };
+  });
+  appendLessonEvent(id, {
+    type: "planned",
+    number,
+    ratio: grade.ratio,
+    passed: grade.passed,
+    at: now,
+  });
+  push(sessionChannel(id), "answer", {
+    number,
+    at: now,
+    html: renderMarkdown(readAnswer(id, number) ?? ""),
+  });
+  push(sessionChannel(id), "plan", grade);
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return grade;
+}
+
+/** What a scored flaw review or cache plan reveals in the debrief. */
+export function drillReveal(session: LessonSession): DrillReveal | null {
+  if (session.exerciseKind === "flaw-review") {
+    const latest = session.review?.latest;
+    const spec = readExercise(session.exercise).private.flawReview;
+    if (!spec) return null;
+    const graded = latest
+      ? readJson<{ grade: FlawGrade }>(gradeFile(session.id, latest.number))
+      : null;
+    const missedIds = new Set(
+      graded ? graded.grade.missed.map((m) => m.id) : spec.flaws.map((f) => f.id),
+    );
+    return {
+      kind: "flaw-review",
+      flaws: spec.flaws.map((f) => ({
+        file: f.file,
+        line: f.line,
+        category: f.category,
+        critical: f.critical,
+        explanation: f.explanation,
+        found: !missedIds.has(f.id),
+      })),
+      falseAlarms: graded?.grade.falseAlarms ?? [],
+    };
+  }
+  if (session.exerciseKind === "cache-plan") {
+    const spec = readExercise(session.exercise).private.cachePlan;
+    if (!spec) return null;
+    return {
+      kind: "cache-plan",
+      reference: spec.reference,
+      referenceCost: simulate(spec.scenario, spec.reference).total,
+    };
+  }
+  return null;
+}
+
+export type DrillReveal =
+  | {
+      kind: "flaw-review";
+      flaws: Array<{
+        file: string;
+        line: number;
+        category: string;
+        critical: boolean;
+        explanation: string;
+        found: boolean;
+      }>;
+      falseAlarms: FlawGrade["falseAlarms"];
+    }
+  | { kind: "cache-plan"; reference: CachePlan; referenceCost: number };
+
+// ── Refactor drills ───────────────────────────────────────────────────────────
+
+export function refactorSummary(grade: RefactorGrade): string {
+  const mark = (ok: boolean) => (ok ? "yes" : "**no**");
+  return [
+    `Refactor graded: ${grade.passed ? "**passed the gate.**" : "not past the gate yet."}`,
+    `- Tests committed before the change: ${mark(grade.testsFirst)}`,
+    `- Characterisation caught ${grade.killed} of ${grade.mutants} planted bugs in the original`,
+    `- Behaviour kept: ${mark(grade.behaviourKept)}; your tests pass: ${mark(grade.ownTestsPass)}; interface unchanged: ${mark(grade.apiSame)}`,
+    `- Longest function ${grade.before.longestFunction} → ${grade.after.longestFunction} lines, deepest nesting ${grade.before.maxNesting} → ${grade.after.maxNesting}`,
+  ].join("\n");
+}
+
+/** Grade the workspace: history, characterisation tests, behaviour, interface, shape. */
+export async function gradeRefactorDrill(
+  id: string,
+  run: SuiteRun,
+  pythonBin: string,
+  now = Date.now(),
+): Promise<{ grade: RefactorGrade; report: RefactorReport }> {
+  const session = readLesson(id);
+  attemptable(session, "refactor");
+  if (!session.drill) throw new FlowError(409, "This drill has no workspace");
+  if ((session.refactor?.grades ?? 0) >= MAX_GRADES)
+    throw new FlowError(429, `A drill can be graded ${MAX_GRADES} times`);
+  const spec = readExercise(session.exercise).private.refactor;
+  if (!spec) throw new FlowError(409, "This exercise has no refactor spec");
+  let tests: Record<string, string>;
+  let current: string;
+  try {
+    tests = readWorkspaceTests(session.drill.workspace);
+    current = readWorkspaceModule(session.drill.workspace, spec.module);
+  } catch (err) {
+    if (err instanceof WorkspaceError) throw new FlowError(400, err.message);
+    throw err;
+  }
+  const commits = await gitCommits(session.drill.workspace);
+  const report = await gradeRefactor(spec, current, tests, commits, run, pythonBin);
+  const draft = {
+    at: now,
+    testsFirst: report.order.ok,
+    killed: report.characterisation.killed,
+    mutants: report.characterisation.mutants.length,
+    behaviourKept: report.behaviour.passed,
+    ownTestsPass: report.ownTests.passed,
+    apiSame: report.api.same,
+    before: report.before,
+    after: report.after,
+    problems: report.problems,
+    passed: report.passed,
+  };
+  const number = recordAnswer(id, refactorSummary({ ...draft, number: 0 }));
+  const grade: RefactorGrade = { ...draft, number };
+  writeJson(gradeFile(id, number), { ...report, files: Object.keys(tests) });
+  updateLesson(id, (s) => {
+    s.refactor = { grades: (s.refactor?.grades ?? 0) + 1, latest: grade };
+  });
+  appendLessonEvent(id, {
+    type: "graded",
+    number,
+    killed: grade.killed,
+    mutants: grade.mutants,
+    passed: grade.passed,
+    at: now,
+  });
+  push(sessionChannel(id), "answer", {
+    number,
+    at: now,
+    html: renderMarkdown(refactorSummary(grade)),
+  });
+  push(sessionChannel(id), "refactor", grade);
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return { grade, report };
+}
+
+/** The bugs the learner's latest graded suite missed, for the debrief. */
+export function drillSurvivors(session: LessonSession): Array<{ id: string; description: string }> {
+  if (session.exerciseKind === "refactor") {
+    const latest = session.refactor?.latest;
+    if (!latest) return [];
+    const report = readJson<RefactorReport>(gradeFile(session.id, latest.number));
+    return (report?.characterisation.mutants ?? [])
+      .filter((m) => !m.killed)
+      .map((m) => ({ id: m.id, description: m.description }));
+  }
+  const latest = session.drill?.latest;
+  if (!latest) return [];
+  const report = readJson<MutationReport>(gradeFile(session.id, latest.number));
+  return (report?.mutants ?? [])
+    .filter((m) => !m.killed)
+    .map((m) => ({ id: m.id, description: m.description }));
+}
+
 // ── Interviewer actions ───────────────────────────────────────────────────────
 
 export interface LessonRecordInput {
@@ -283,10 +751,28 @@ export function lessonVerdict(
 ): LessonVerdict {
   const rubricOk = session.focus.every((dim) => (scores[dim] ?? -1) >= 2);
   const answered = session.answers > 0;
-  if (session.exerciseKind !== "lab") return { correct: rubricOk && answered, rubricOk, answered };
-  // A lab passes on what was read, so it must have been read, and nothing on the
-  // checklist may be missing outright.
-  const inspected = (session.lab?.inspections ?? 0) > 0;
+  if (
+    session.exerciseKind === "mutation" ||
+    session.exerciseKind === "flaw-review" ||
+    session.exerciseKind === "cache-plan" ||
+    session.exerciseKind === "refactor"
+  ) {
+    // A drill passes on what was graded: the latest attempt must clear the gate.
+    const gatePassed =
+      (session.exerciseKind === "mutation"
+        ? session.drill?.latest?.passed
+        : session.exerciseKind === "flaw-review"
+          ? session.review?.latest?.passed
+          : session.exerciseKind === "refactor"
+            ? session.refactor?.latest?.passed
+            : session.cachePlan?.latest?.passed) ?? false;
+    return { correct: rubricOk && answered && gatePassed, rubricOk, answered, gatePassed };
+  }
+  if (session.exerciseKind !== "lab" && session.exerciseKind !== "transcript")
+    return { correct: rubricOk && answered, rubricOk, answered };
+  // A lab or a transcript review passes on what was read, so it must have been
+  // read, and nothing on the checklist may be missing outright.
+  const inspected = ((session.lab ?? session.transcript)?.inspections ?? 0) > 0;
   const checklistOk = (checklist ?? []).every((c) => c.status !== "missing");
   return {
     correct: rubricOk && answered && inspected && checklistOk,
@@ -346,7 +832,7 @@ export function recordLesson(
   }
 
   let checklist: ChecklistResult[] | undefined;
-  if (before.exerciseKind === "lab") {
+  if (before.exerciseKind === "lab" || before.exerciseKind === "transcript") {
     const lesson = findLesson(before.lesson)?.lesson;
     if (!lesson) throw new FlowError(409, `Lesson ${before.lesson} is no longer in the curriculum`);
     checklist = checkChecklist(lesson, input.checklist);
@@ -378,6 +864,11 @@ export function recordLesson(
     focus: session.focus,
     notesHtml: renderMarkdown(input.notesMd),
     nextDue,
+    // What a drill kept hidden comes out now.
+    ...(session.exerciseKind === "mutation" || session.exerciseKind === "refactor"
+      ? { survivors: drillSurvivors(session) }
+      : {}),
+    ...(drillRevealOrNull(session) ?? {}),
   });
   pushPhase(session);
   notifyDashboard(id);
@@ -417,4 +908,9 @@ function pushPhase(session: LessonSession): void {
   if (session.startedAt !== undefined) payload.startedAt = session.startedAt;
   if (session.endedAt !== undefined) payload.endedAt = session.endedAt;
   push(sessionChannel(session.id), "phase", payload);
+}
+
+function drillRevealOrNull(session: LessonSession): { reveal: DrillReveal } | null {
+  const reveal = drillReveal(session);
+  return reveal ? { reveal } : null;
 }

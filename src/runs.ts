@@ -5,7 +5,8 @@
 
 import { pythonAdapter } from "./runner/adapters/python/adapter.ts";
 import { DockerRunner } from "./runner/docker-runner.ts";
-import { processRunner } from "./runner/process-runner.ts";
+import { processRunner, type ProcessRunner } from "./runner/process-runner.ts";
+import type { SuiteRun } from "./drill/mutation.ts";
 import { sanitizeForCandidate, type CandidateRunResult } from "./runner/sanitize.ts";
 import type { CaseResult, Limits, RunResult, Runner, TestCase } from "./runner/types.ts";
 import type { ProblemBundle } from "./store/problems.ts";
@@ -38,6 +39,12 @@ export function activeRunner(env: NodeJS.ProcessEnv = process.env): Runner {
   if (!docker || (image !== undefined && docker.image !== image))
     docker = new DockerRunner(image === undefined ? {} : { image });
   return docker;
+}
+
+/** The same choice for the drills: DockerRunner inherits `runSuite` from ProcessRunner. */
+export function suiteRunner(env: NodeJS.ProcessEnv = process.env): SuiteRun {
+  const runner = activeRunner(env) as ProcessRunner;
+  return (request) => runner.runSuite(request);
 }
 
 export async function runCode(options: RunOptions): Promise<RunOutcome> {

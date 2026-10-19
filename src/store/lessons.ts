@@ -7,6 +7,7 @@
  *     draft.md          the answer box's latest autosave
  *     answers/NN.md     each submitted answer
  *     lab/NN.json       for a lab, what inspect_lab read for answer NN
+ *     grades/NN.json    for a drill, the full grading report of answer NN
  *
  * Lesson sessions live beside interview sessions, not among them, so nothing that
  * lists, scores, or recovers interviews can pick one up by accident. They share the
@@ -21,7 +22,15 @@ import { appendJsonl, readJson, readJsonl, readText, writeJson, writeText } from
 import { isDir, isValidSessionId, lessonDir, lessonsDir, sessionDir } from "./paths.ts";
 import { generateSessionId, type Phase, type SessionEvent } from "./sessions.ts";
 
-export const EXERCISE_KINDS = ["design-review", "lab"] as const;
+export const EXERCISE_KINDS = [
+  "design-review",
+  "lab",
+  "mutation",
+  "flaw-review",
+  "cache-plan",
+  "refactor",
+  "transcript",
+] as const;
 export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
 
 /** The five lesson dimensions; `null` means the lesson does not exercise it. */
@@ -63,6 +72,91 @@ export interface LessonVerdict {
   /** For a lab: the project was read with inspect_lab, and no checklist item is missing. */
   inspected?: boolean;
   checklistOk?: boolean;
+  /** For a drill: the latest grading passed its gate. */
+  gatePassed?: boolean;
+}
+
+/** What the page may see of a drill's grading: counts, never which bugs survived. */
+export interface DrillGrade {
+  /** The answer number the grade was stored as. */
+  number: number;
+  at: number;
+  tests: number;
+  killed: number;
+  mutants: number;
+  /** Test functions that assert nothing. */
+  assertFree: number;
+  problems: string[];
+  passed: boolean;
+}
+
+/** What the page may see of a flaw review's grading: counts, not which flaws. */
+export interface ReviewGrade {
+  number: number;
+  at: number;
+  marks: number;
+  found: number;
+  flaws: number;
+  criticalMissed: number;
+  falseAlarms: number;
+  problems: string[];
+  passed: boolean;
+}
+
+/** A cache plan's simulated cost against the best plan the exercise knows. */
+export interface CacheGrade {
+  number: number;
+  at: number;
+  /** Dollars. */
+  cost: number;
+  referenceCost: number;
+  naiveCost: number;
+  uncachedCost: number;
+  ratio: number;
+  hits: number;
+  requests: number;
+  readTokens: number;
+  writeTokens: number;
+  uncachedTokens: number;
+  passed: boolean;
+}
+
+/** What the page may see of a refactor's grading. */
+export interface RefactorGrade {
+  number: number;
+  at: number;
+  testsFirst: boolean;
+  killed: number;
+  mutants: number;
+  behaviourKept: boolean;
+  ownTestsPass: boolean;
+  apiSame: boolean;
+  before: { lines: number; longestFunction: number; maxNesting: number };
+  after: { lines: number; longestFunction: number; maxNesting: number };
+  problems: string[];
+  passed: boolean;
+}
+
+export interface TranscriptSubmission {
+  /** The listing's token for the file; the path is resolved again on every read. */
+  id: string;
+  project: string;
+  submittedAt: number;
+  answer: number;
+  inspections: number;
+}
+
+/** A graded attempt counter with the latest public grade. */
+export interface Attempts<G> {
+  grades: number;
+  latest?: G;
+}
+
+export interface DrillState {
+  workspace: string;
+  module: string;
+  grades: number;
+  latest?: DrillGrade;
 }
 
 /** The project a lab submission points at, as the learner consented to it. */
@@ -95,6 +189,16 @@ export interface LessonSession {
   answers: number;
   /** For a lab: the latest project submission. */
   lab?: LabSubmission;
+  /** For a drill: its workspace and latest grade. */
+  drill?: DrillState;
+  /** For a flaw review: its graded reviews. */
+  review?: Attempts<ReviewGrade>;
+  /** For a cache plan: its simulated plans. */
+  cachePlan?: Attempts<CacheGrade>;
+  /** For a transcript review: the session log the learner chose and consented to. */
+  transcript?: TranscriptSubmission;
+  /** For a refactor drill: its graded attempts (the workspace is in `drill`). */
+  refactor?: Attempts<RefactorGrade>;
   rubric?: LessonRubric;
   verdict?: LessonVerdict;
   abandonedReason?: string;
@@ -108,7 +212,17 @@ export type LessonEvent =
     >
   | { at: number; type: "answer"; number: number; chars: number }
   | { at: number; type: "lab"; number: number; root: string; files: number }
-  | { at: number; type: "inspected"; number: number; files: number; lints: number };
+  | { at: number; type: "inspected"; number: number; files: number; lints: number }
+  | {
+      at: number;
+      type: "graded";
+      number: number;
+      killed: number;
+      mutants: number;
+      passed: boolean;
+    }
+  | { at: number; type: "reviewed"; number: number; found: number; flaws: number; passed: boolean }
+  | { at: number; type: "planned"; number: number; ratio: number; passed: boolean };
 
 export interface NewLesson {
   lesson: string;
@@ -192,6 +306,11 @@ export function recordAnswer(id: string, text: string): number {
 
 export function readAnswer(id: string, number: number): string | null {
   return readText(answerFile(id, number));
+}
+
+/** Where a drill's full grading report for answer `number` is kept. */
+export function gradeFile(id: string, number: number): string {
+  return path.join(lessonDir(id), "grades", `${String(number).padStart(2, "0")}.json`);
 }
 
 /** Where inspect_lab's snapshot of answer `number` is kept. */

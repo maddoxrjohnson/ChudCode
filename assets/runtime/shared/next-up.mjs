@@ -36,7 +36,8 @@ export function createNextUp({ from } = {}) {
   async function press(row) {
     setState(row, "waiting");
     try {
-      await postJson(`/api/roadmaps/${row.dataset.roadmap}/next`, from ? { from } : {});
+      const url = row.dataset.url ?? `/api/roadmaps/${row.dataset.roadmap}/next`;
+      await postJson(url, from ? { from } : {});
     } catch (err) {
       idle(row);
       row.querySelector(".next-status").textContent = err.message;

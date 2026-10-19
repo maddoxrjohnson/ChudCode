@@ -91,7 +91,8 @@ export const COMMANDS = {
           "Serve a validated exercise the learner has not seen, or write one with `write_exercise` and `validate_exercise` until it passes. Then call `start_lesson`.",
         "Give the user the URL in the terminal and say one sentence on the page with `say_to_candidate`. " +
           "The learner's actions then arrive here as messages; handle each one and end your turn. They may spend a long time with their own agent between messages. " +
-          "When their answer has arrived and you have asked your follow-ups, score it with `record_lesson` and summarise in the terminal: the verdict, two strengths, two things to work on, and when the lesson comes back.",
+          "A lab or transcript submission is read with `inspect_lab` or `inspect_transcript`; a drill arrives already graded. " +
+          "When their answer has arrived and you have asked your follow-ups, score it with `record_lesson` and summarise in the terminal: the verdict, two strengths, two things to work on, and when the lesson comes back. Then follow what it says about the Next lesson button.",
       ].join("\n\n"),
   },
   research: {

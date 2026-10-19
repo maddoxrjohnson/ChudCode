@@ -1191,3 +1191,177 @@ textarea:focus,
   padding-left: 0;
   list-style: none;
 }
+
+/* ── Drills ──────────────────────────────────────────────────────────────── */
+
+.drill {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.workspace-path {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+.drill .button-row {
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.grade-result meter {
+  width: 100%;
+  height: 0.8rem;
+}
+
+.survivors {
+  padding-left: 1.25rem;
+}
+
+/* ── Flaw reviews ────────────────────────────────────────────────────────── */
+
+.flaw-review,
+.cache-plan {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.diff-file {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.diff-path {
+  padding: 0.3rem 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.diff {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.diff td {
+  padding: 0 0.4rem;
+  white-space: pre;
+  vertical-align: top;
+}
+
+.diff .ln {
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  width: 2.5rem;
+}
+
+.diff .sign {
+  user-select: none;
+  width: 1rem;
+}
+
+.diff tr[data-line] {
+  cursor: pointer;
+}
+
+.diff tr[data-line]:hover,
+.diff tr[data-line]:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.diff-add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.diff-del {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--muted);
+}
+
+.diff tr.marked .ln {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.mark-form {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.mark-form input,
+.mark-form select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.marks {
+  padding-left: 1.5rem;
+}
+
+/* ── Cache plans ─────────────────────────────────────────────────────────── */
+
+.segments {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.segments th,
+.segments td {
+  padding: 0.25rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.segments .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.scenario-json {
+  max-height: 16rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.cache-plan textarea {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+/* ── Transcript reviews ──────────────────────────────────────────────────── */
+
+.transcripts {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 0;
+  list-style: none;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.transcripts label {
+  display: block;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}

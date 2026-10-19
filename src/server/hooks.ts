@@ -30,6 +30,13 @@ export interface NextRequest {
   at: number;
 }
 
+/** The learner pressed Next lesson: start the next lesson in the curriculum. */
+export interface NextLessonRequest {
+  /** The lesson page the press came from, if it was not the dashboard. */
+  from?: string;
+  at: number;
+}
+
 /** One prompt the host bridge has been sent, as `GET /api/inbox` returns it. */
 export interface InboxEntry {
   /** Random per server process, so a bridge can tell a restarted server from a gap. */
@@ -51,6 +58,8 @@ export interface ServerHooks {
   onCandidateEvent?(event: CandidateEvent): void;
   /** The candidate asked for the next roadmap problem from the page. */
   onNextRequested?(request: NextRequest): void;
+  /** The learner asked for the next lesson from the page. */
+  onNextLessonRequested?(request: NextLessonRequest): void;
   /** Prompts after `since` for the host bridge. Only push-delivery hosts register it. */
   agentInbox?(since: number): InboxPage;
   /** Whether an agent is currently waiting for candidate events. */
@@ -74,6 +83,10 @@ export function emitCandidateEvent(event: CandidateEvent): void {
 
 export function emitNextRequest(request: NextRequest): void {
   hooks.onNextRequested?.(request);
+}
+
+export function emitNextLessonRequest(request: NextLessonRequest): void {
+  hooks.onNextLessonRequested?.(request);
 }
 
 export function agentInbox(since: number): InboxPage | null {

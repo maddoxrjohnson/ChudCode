@@ -21,8 +21,10 @@ import { nextUpHtml, type NextButtonView } from "./pages/next-up.ts";
 import { problemPage } from "./pages/problem.ts";
 import { sessionPage } from "./pages/session.ts";
 import { lessonPage } from "./pages/lesson.ts";
+import { nextLessonHtml } from "./pages/next-up.ts";
+import { nextLesson, pendingNextLesson } from "../next-lesson.ts";
 import { findLesson, loadCurriculumProgress } from "../curriculum.ts";
-import { lessonState } from "../lesson-flow.ts";
+import { drillReveal, drillSurvivors, lessonState } from "../lesson-flow.ts";
 import { factFreshness, readFactChecks } from "../store/fact-checks.ts";
 import { lessonExists, listLessons, readAnswer, readLesson } from "../store/lessons.ts";
 
@@ -90,11 +92,24 @@ export function handlePage(
 }
 
 export function agenticData(now = Date.now()): AgenticData {
+  const row = lessonNextHtml();
   return {
     progress: loadCurriculumProgress(),
     lessons: listLessons(10),
     due: reviewItems().filter((i) => i.kind === "lesson" && i.dueAt <= now),
+    ...(row ? { nextRow: row } : {}),
   };
+}
+
+/** The Next lesson row, or "" when every teachable lesson is passed. */
+export function lessonNextHtml(): string {
+  const next = nextLesson();
+  if (!next) return "";
+  return nextLessonHtml(next, {
+    connected: agentConnected(),
+    pending: pendingNextLesson() !== null,
+    command: currentDelivery() === "push" ? "/learn" : "/chudcode:learn",
+  });
 }
 
 function lessonPageFor(id: string): string {
@@ -108,7 +123,14 @@ function lessonPageFor(id: string): string {
     answers,
     ...(session.exerciseKind === "lab"
       ? { checklist: place?.lesson.checklist ?? [], labFiles: place?.lesson.labFiles ?? [] }
+      : session.exerciseKind === "transcript"
+        ? { checklist: place?.lesson.checklist ?? [] }
+        : {}),
+    ...((session.exerciseKind === "mutation" || session.exerciseKind === "refactor") &&
+    session.rubric
+      ? { survivors: drillSurvivors(session) }
       : {}),
+    ...(session.rubric ? { reveal: drillReveal(session), nextHtml: lessonNextHtml() } : {}),
   });
 }
 

@@ -97,14 +97,14 @@ describe("begin_lesson", () => {
     expect(fresh.text).toContain("no need to re-read the sources");
   });
 
-  it("warns about a locked module, and refuses an outline", async () => {
+  it("warns about a locked module, and every lesson is teachable", async () => {
     const locked = await call("begin_lesson", { lesson: "prompt-caching" });
     expect(locked.text).toMatch(/This module is still locked: it builds on `orchestration`/);
     const forced = await call("begin_lesson", { lesson: "prompt-caching", override_lock: true });
     expect(forced.text).toMatch(/The user asked for it anyway/);
-    const outline = await call("begin_lesson", { lesson: "when-to-refactor" });
-    expect(outline.isError).toBe(true);
-    expect(outline.text).toMatch(/is an outline/);
+    // Every lesson has sourced facts now; outlines are covered by curriculum.test.ts.
+    for (const module of ["planning", "refactoring", "cross-provider"])
+      expect((await call("list_curriculum", { module })).text).not.toContain("outline");
   });
 });
 
@@ -219,9 +219,9 @@ describe("a lesson round trip", () => {
     expect((await call("list_curriculum", { module: "planning" })).text).toContain(
       "- passed: `plan-before-code`",
     );
-    // With nothing in progress, an empty wait says to end the turn.
+    // With nothing in progress, an empty wait keeps the interviewer for Next lesson.
     expect((await call("wait_for_candidate", { timeout_seconds: 1 })).text).toContain(
-      "End your turn",
+      "a press of **Next lesson** reaches you",
     );
   });
 

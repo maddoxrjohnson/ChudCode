@@ -18,6 +18,7 @@ export interface Fixture {
 export function makeFixture(): Fixture {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "chudcode-test-"));
   _overrideRootDir(root);
+  process.env["CHUDCODE_WORKSPACES"] = path.join(root, "drills");
   return {
     root,
     cleanup() {

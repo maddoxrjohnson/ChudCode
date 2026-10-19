@@ -8,12 +8,22 @@
  */
 
 import type { ChecklistItem } from "../../curriculum.ts";
-import type { LessonState } from "../../lesson-flow.ts";
+
 import { LESSON_DIMENSION_NAMES } from "../../lesson-prompts.ts";
 import { formatClock } from "../../format.ts";
 import { escapeHtml, renderMarkdown } from "../../markdown.ts";
 import type { FactFreshness } from "../../store/fact-checks.ts";
-import type { LessonSession } from "../../store/lessons.ts";
+import type {
+  CacheGrade,
+  DrillGrade,
+  LessonSession,
+  RefactorGrade,
+  ReviewGrade,
+} from "../../store/lessons.ts";
+import { COST_SLACK, dollars, loadCacheModel } from "../../drill/cache-sim.ts";
+import { FLAW_CATEGORIES, LINE_SLACK, parseDiff, type DiffFile } from "../../drill/flaw-review.ts";
+import { MAX_REVIEWS, type DrillReveal, type LessonState } from "../../lesson-flow.ts";
+import { plural } from "../../format.ts";
 import { FACT_REF } from "../../validate-exercise.ts";
 import { page, topbar } from "./layout.ts";
 
@@ -25,6 +35,12 @@ export interface LessonPageOptions {
   /** For a lab: what the review checks, and the files it may read. */
   checklist?: ChecklistItem[];
   labFiles?: string[];
+  /** For a scored drill: the planted bugs its tests missed. */
+  survivors?: Array<{ id: string; description: string }>;
+  /** For a scored flaw review or cache plan: what was hidden until the debrief. */
+  reveal?: DrillReveal | null;
+  /** The Next lesson row under a debrief. */
+  nextHtml?: string;
 }
 
 const PHASE_LABELS: Record<LessonSession["phase"], string> = {
@@ -60,7 +76,21 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
       <h1>${escapeHtml(exercise.title)}</h1>
       ${renderMarkdown(stripRefs(exercise.brief))}
     </article>
-    ${exercise.kind === "lab" ? labFormHtml(state, options, working) : answerFormHtml(state, working)}
+    ${
+      exercise.kind === "lab"
+        ? labFormHtml(state, options, working)
+        : exercise.kind === "mutation"
+          ? drillHtml(state, working)
+          : exercise.kind === "refactor"
+            ? refactorHtml(state, working)
+            : exercise.kind === "transcript"
+              ? transcriptHtml(state, options, working)
+              : exercise.kind === "flaw-review"
+                ? flawReviewHtml(state, working)
+                : exercise.kind === "cache-plan"
+                  ? cachePlanHtml(state, working)
+                  : answerFormHtml(state, working)
+    }
     <section class="answers" id="answers">${answersHtml(options.answers)}</section>
   </section>
 
@@ -82,7 +112,7 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
       </form>
     </section>
 
-    <section class="rubric" id="rubric">${session.rubric ? lessonRubricHtml(session, options.checklist) : ""}</section>
+    <section class="rubric" id="rubric">${session.rubric ? lessonRubricHtml(session, options.checklist, options.survivors, options.reveal) : ""}${session.rubric && options.nextHtml ? options.nextHtml : ""}</section>
 
     <div class="side-footer">
       <button type="button" class="button" id="done-button" ${session.phase === "review" || session.phase === "done" ? "disabled" : ""}>I'm done</button>
@@ -120,6 +150,217 @@ function answerFormHtml(state: LessonState, working: boolean): string {
         <button type="submit" class="button primary" id="answer-button" ${working ? "" : "disabled"}>Submit answer</button>
       </div>
     </form>`;
+}
+
+/**
+ * A drill: the workspace the learner points their agent at, and the Grade button.
+ * The grade shows counts only; which bugs survived waits for the debrief.
+ */
+function drillHtml(state: LessonState, working: boolean): string {
+  const drill = state.session.drill;
+  const latest = drill?.latest;
+  return `<section class="drill" id="drill">
+      <h2>Your workspace</h2>
+      <p>Point your own agent at this folder. It holds <code>README.md</code>, <code>${escapeHtml(drill?.module ?? "module")}.py</code>, and an empty <code>tests/</code>.</p>
+      <pre class="workspace-path"><code id="workspace-path">cd ${escapeHtml(drill?.workspace ?? "")}</code></pre>
+      <p class="muted small">Tests are unittest files named <code>tests/test_*.py</code>; run them with <code>python3 -m unittest discover tests</code>. Grading runs them against the module, against rewrites of it that behave the same, and against copies with one planted bug each. Only <code>tests/*.py</code> is read back.</p>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="button" class="button primary" id="grade-button" ${working ? "" : "disabled"}>Grade my tests</button>
+      </div>
+      <div class="grade-result" id="grade-result">${latest ? gradeHtml(latest) : ""}</div>
+    </section>`;
+}
+
+/**
+ * A transcript review: list the learner's recent Claude Code sessions on request,
+ * pick one, consent, submit. Nothing is listed until they press the button.
+ */
+function transcriptHtml(state: LessonState, options: LessonPageOptions, working: boolean): string {
+  const checklist = (options.checklist ?? [])
+    .map((c) => `<li data-item="${escapeHtml(c.id)}">${escapeHtml(c.text)}</li>`)
+    .join("\n");
+  const chosen = state.session.transcript;
+  return `<section class="lab-checklist" id="lab-checklist">
+      <h2>What the review checks</h2>
+      <ul>${checklist}</ul>
+    </section>
+    <form class="answer-form lab-form" id="answer-form" data-transcript="true">
+      <label><strong>One of your Claude Code sessions</strong> <span class="muted small">Pick a recent session where you did real work.</span></label>
+      <div class="button-row"><button type="button" class="button" id="transcript-list" ${working ? "" : "disabled"}>List my recent sessions</button></div>
+      <ul class="transcripts" id="transcripts">${chosen ? `<li class="muted">Submitted: a session from <code>${escapeHtml(chosen.project)}</code></li>` : ""}</ul>
+      <p class="muted small">The interviewer gets a summary of the session you pick: request and token counts, models, cache reads and writes, gaps, compactions, and your first prompts with anything that looks like a credential redacted. Never the replies or tool output.</p>
+      <label for="answer-text">Notes for the reviewer <span class="muted small">Optional: what the session was for.</span></label>
+      <textarea id="answer-text" rows="4" spellcheck="true" ${working ? "" : "disabled"}>${escapeHtml(state.draft)}</textarea>
+      <label class="consent"><input type="checkbox" id="lab-consent" disabled> Let ChudCode read the session I picked and show its summary to the interviewer.</label>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="submit" class="button primary" id="answer-button" disabled>Submit for review</button>
+      </div>
+    </form>`;
+}
+
+/** A refactor drill: the workspace, the two steps, and Grade. */
+function refactorHtml(state: LessonState, working: boolean): string {
+  const drill = state.session.drill;
+  const latest = state.session.refactor?.latest;
+  return `<section class="drill" id="drill">
+      <h2>Your workspace</h2>
+      <p>A git repository holding <code>${escapeHtml(drill?.module ?? "module")}.py</code>, a <code>README.md</code>, and an empty <code>tests/</code>. With your own agent:</p>
+      <ol>
+        <li>Pin what the module does now with characterisation tests in <code>tests/test_*.py</code>, and <strong>commit them</strong>.</li>
+        <li>Refactor the module, keeping its public functions and parameters, and commit again.</li>
+      </ol>
+      <pre class="workspace-path"><code id="workspace-path">cd ${escapeHtml(drill?.workspace ?? "")}</code></pre>
+      <p class="muted small">Grade reads the history, runs your tests against the original and against copies with one planted bug each, runs hidden behaviour tests on your refactor, and compares the interface and the shape before and after.</p>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="button" class="button primary" id="grade-button" ${working ? "" : "disabled"}>Grade my refactor</button>
+      </div>
+      <div class="grade-result" id="grade-result">${latest ? refactorGradeHtml(latest) : ""}</div>
+    </section>`;
+}
+
+export function refactorGradeHtml(grade: RefactorGrade): string {
+  const row = (ok: boolean, text: string) =>
+    `<li><span class="badge ${ok ? "ok" : "warn"}">${ok ? "yes" : "no"}</span> ${text}</li>`;
+  return `<p><span class="badge ${grade.passed ? "ok" : "warn"}">${grade.passed ? "Past the gate" : "Not yet"}</span> Grade ${grade.number}</p>
+<ul class="checklist-results">
+${row(grade.testsFirst, "Tests committed before the module changed")}
+${row(grade.mutants > 0 && grade.killed / grade.mutants >= 0.6, `Characterisation caught ${grade.killed} of ${grade.mutants} planted bugs in the original`)}
+${row(grade.behaviourKept, "Hidden behaviour tests pass on your refactor")}
+${row(grade.ownTestsPass, "Your own tests pass on your refactor")}
+${row(grade.apiSame, "Public functions and parameters unchanged")}
+${row(grade.after.longestFunction < grade.before.longestFunction || grade.after.maxNesting < grade.before.maxNesting, `Longest function ${grade.before.longestFunction} → ${grade.after.longestFunction} lines, deepest nesting ${grade.before.maxNesting} → ${grade.after.maxNesting}`)}
+</ul>`;
+}
+
+/** One grade, as counts: the bar, and what kept it from passing. */
+export function gradeHtml(grade: DrillGrade): string {
+  const pct = grade.mutants ? Math.round((grade.killed / grade.mutants) * 100) : 0;
+  return `<p><span class="badge ${grade.passed ? "ok" : "warn"}">${grade.passed ? "Past the gate" : "Not yet"}</span> Grade ${grade.number}: ${grade.tests} tests caught <strong>${grade.killed} of ${grade.mutants}</strong> planted bugs (${pct}%).</p>
+<meter min="0" max="${grade.mutants}" low="${Math.ceil(grade.mutants * 0.8) - 0.5}" optimum="${grade.mutants}" value="${grade.killed}"></meter>
+${grade.problems.length ? `<ul>${grade.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
+${grade.assertFree ? `<p class="muted small">${grade.assertFree} test${grade.assertFree === 1 ? "" : "s"} assert nothing.</p>` : ""}`;
+}
+
+/**
+ * A flaw review: the diff with clickable lines, the learner's marks, and Submit.
+ * Marks live in the page (and the draft) until submitted.
+ */
+function flawReviewHtml(state: LessonState, working: boolean): string {
+  let files: DiffFile[];
+  try {
+    files = parseDiff(state.exercise.diff ?? "");
+  } catch {
+    files = [];
+  }
+  const review = state.session.review;
+  const left = MAX_REVIEWS - (review?.grades ?? 0);
+  const tables = files
+    .map((file) => {
+      const rows = file.lines
+        .map((line) => {
+          const sign = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
+          const attrs =
+            line.newLine === undefined
+              ? ""
+              : ` data-file="${escapeHtml(file.path)}" data-line="${line.newLine}" tabindex="0"`;
+          return `<tr class="diff-${line.kind}"${attrs}><td class="ln">${line.newLine ?? ""}</td><td class="sign">${sign}</td><td class="code">${escapeHtml(line.text)}</td></tr>`;
+        })
+        .join("");
+      return `<div class="diff-file"><div class="diff-path">${escapeHtml(file.path)}</div><table class="diff"><tbody>${rows}</tbody></table></div>`;
+    })
+    .join("\n");
+  const options = FLAW_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+  return `<section class="flaw-review" id="flaw-review">
+      <h2>The diff</h2>
+      <p class="muted small">Click a line to mark it: what you would block the merge on, with a category and a reason. A mark within ${LINE_SLACK} lines of a problem counts. Draft the review with your own agent if you like.</p>
+      ${tables}
+      <form class="mark-form" id="mark-form" hidden>
+        <strong id="mark-where"></strong>
+        <select id="mark-category">${options}</select>
+        <input type="text" id="mark-reason" maxlength="500" placeholder="Why it is wrong">
+        <div class="button-row"><button type="button" class="button" id="mark-cancel">Cancel</button><button type="submit" class="button primary">Add mark</button></div>
+      </form>
+      <h3>Your marks</h3>
+      <ol class="marks" id="marks"></ol>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="button" class="button primary" id="review-button" ${working && left > 0 ? "" : "disabled"}>Submit review</button>
+      </div>
+      <p class="muted small" id="reviews-left">${left} of ${MAX_REVIEWS} submissions left.</p>
+      <div class="grade-result" id="review-result">${review?.latest ? reviewGradeHtml(review.latest) : ""}</div>
+    </section>`;
+}
+
+export function reviewGradeHtml(grade: ReviewGrade): string {
+  return `<p><span class="badge ${grade.passed ? "ok" : "warn"}">${grade.passed ? "Past the gate" : "Not yet"}</span> Review ${grade.number}: found <strong>${grade.found} of ${grade.flaws}</strong> planted flaws, ${grade.falseAlarms} false alarm${grade.falseAlarms === 1 ? "" : "s"}.</p>
+${grade.problems.length ? `<ul>${grade.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}`;
+}
+
+/**
+ * A cache plan: the workload as a table and as JSON for the learner's agent, the plan
+ * editor, and what the simulator says about it.
+ */
+function cachePlanHtml(state: LessonState, working: boolean): string {
+  const scenario = state.exercise.scenario;
+  if (!scenario) return "";
+  const model = loadCacheModel();
+  const pricing = model.models[scenario.model];
+  const segments = scenario.segments
+    .map(
+      (s) =>
+        `<tr><td><code>${escapeHtml(s.id)}</code></td><td>${s.level}</td><td class="num">${s.tokens.toLocaleString("en-US")}</td><td>${escapeHtml(s.label)}</td><td>${s.changesAt?.length ? `at request${s.changesAt.length === 1 ? "" : "s"} ${s.changesAt.join(", ")}` : "never"}</td></tr>`,
+    )
+    .join("");
+  const times = scenario.requests.map((r) => r.at).join(", ");
+  const newTokens = [...new Set(scenario.requests.map((r) => r.newTokens))];
+  const skeleton = JSON.stringify(
+    { order: scenario.segments.map((s) => s.id), breakpoints: [] },
+    null,
+    2,
+  );
+  const latest = state.session.cachePlan?.latest;
+  return `<section class="cache-plan" id="cache-plan">
+      <h2>The workload</h2>
+      <p>Model <code>${escapeHtml(scenario.model)}</code>${pricing ? `: $${pricing.inputPerMTok} per million input tokens, cache reads at ${pricing.readMultiplier}×, nothing cached under ${pricing.minCacheable.toLocaleString("en-US")} tokens` : ""}. Writes cost ${model.writeMultiplier["5m"]}× for five minutes and ${model.writeMultiplier["1h"]}× for an hour; at most ${model.maxBreakpoints} breakpoints.</p>
+      <table class="segments"><thead><tr><th>Segment</th><th>Level</th><th class="num">Tokens</th><th>What</th><th>Changes</th></tr></thead><tbody>${segments}</tbody></table>
+      <p>${plural(scenario.requests.length, "request")}, at minute${scenario.requests.length === 1 ? "" : "s"} ${escapeHtml(times)}, each adding ${newTokens.length === 1 ? (newTokens[0] ?? 0).toLocaleString("en-US") : "its own"} new tokens after every segment.</p>
+      <details><summary>The workload as JSON, for your agent</summary><pre class="scenario-json"><code>${escapeHtml(JSON.stringify(scenario, null, 2))}</code></pre></details>
+      <label for="answer-text"><strong>Your plan</strong> <span class="muted small">JSON: the segment order (tools, then system, then messages) and up to ${model.maxBreakpoints} breakpoints, each 5m or 1h, longer lifetimes first.</span></label>
+      <textarea id="answer-text" rows="12" spellcheck="false" ${working ? "" : "disabled"}>${escapeHtml(state.draft || skeleton)}</textarea>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="button" class="button primary" id="plan-button" ${working ? "" : "disabled"}>Check plan</button>
+      </div>
+      <div class="grade-result" id="plan-result">${latest ? planGradeHtml(latest) : ""}</div>
+      <p class="muted small">A simplified model of prompt caching, with every price and limit from the sources cited: it leaves out output tokens and the 20-block lookback, so read it as the shape of the trade-off, not an invoice.</p>
+    </section>`;
+}
+
+export function planGradeHtml(grade: CacheGrade): string {
+  return `<p><span class="badge ${grade.passed ? "ok" : "warn"}">${grade.passed ? "Past the gate" : "Not yet"}</span> Plan ${grade.number}: <strong>${dollars(grade.cost)}</strong>, ${(grade.ratio * 100).toFixed(0)}% of the best plan known (the bar is ${Math.round(COST_SLACK * 100)}%).</p>
+<p class="muted small">Cache hits on ${grade.hits} of ${grade.requests} requests; ${grade.readTokens.toLocaleString("en-US")} tokens read, ${grade.writeTokens.toLocaleString("en-US")} written, ${grade.uncachedTokens.toLocaleString("en-US")} uncached. With no caching: ${dollars(grade.uncachedCost)}.</p>`;
+}
+
+/** The answers a flaw review or cache plan kept back until the debrief. */
+export function revealHtml(reveal: DrillReveal): string {
+  if (reveal.kind === "cache-plan")
+    return `<h3>The best plan known</h3><p>${dollars(reveal.referenceCost)}</p><pre><code>${escapeHtml(JSON.stringify(reveal.reference, null, 2))}</code></pre>`;
+  const flaws = reveal.flaws
+    .map(
+      (f) =>
+        `<li><span class="badge ${f.found ? "ok" : "warn"}">${f.found ? "found" : "missed"}</span> <code>${escapeHtml(f.file)}:${f.line}</code> ${escapeHtml(f.category)}${f.critical ? " (critical)" : ""}<div class="muted small">${escapeHtml(f.explanation)}</div></li>`,
+    )
+    .join("");
+  const alarms = reveal.falseAlarms
+    .map(
+      (a) =>
+        `<li><code>${escapeHtml(a.file)}:${a.line}</code>${a.decoy ? ` <span class="muted small">${escapeHtml(a.decoy)}</span>` : ""}</li>`,
+    )
+    .join("");
+  return `<h3>The planted flaws</h3><ul class="checklist-results">${flaws}</ul>${alarms ? `<h3>False alarms</h3><ul>${alarms}</ul>` : ""}`;
 }
 
 /**
@@ -194,6 +435,8 @@ ${answers
 export function lessonRubricHtml(
   session: LessonSession,
   items: readonly ChecklistItem[] = [],
+  survivors: ReadonlyArray<{ id: string; description: string }> = [],
+  reveal: DrillReveal | null = null,
 ): string {
   const r = session.rubric;
   if (!r) return "";
@@ -214,5 +457,15 @@ export function lessonRubricHtml(
 <div class="rubric-notes">${renderMarkdown(r.notesMd)}</div>
 ${r.checklist?.length ? `<h3>Checklist</h3><ul class="checklist-results">${r.checklist.map((c) => `<li class="check-${c.status}"><span class="badge ${c.status === "met" ? "ok" : "warn"}">${c.status}</span> ${escapeHtml(items.find((i) => i.id === c.id)?.text ?? c.id)}<div class="muted small">${escapeHtml(c.note)}</div></li>`).join("")}</ul>` : ""}
 ${r.strengths.length ? `<h3>Strengths</h3><ul>${r.strengths.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
+${session.exerciseKind === "mutation" || session.exerciseKind === "refactor" ? survivorsHtml(survivors) : ""}
+${reveal ? revealHtml(reveal) : ""}
 ${r.improvements.length ? `<h3>Work on</h3><ul>${r.improvements.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}`;
+}
+
+/** The planted bugs a drill's tests missed, shown once the lesson is scored. */
+export function survivorsHtml(
+  survivors: ReadonlyArray<{ id: string; description: string }>,
+): string {
+  if (survivors.length === 0) return `<h3>Planted bugs</h3><p>Your tests caught every one.</p>`;
+  return `<h3>Bugs your tests missed</h3><ul class="survivors">${survivors.map((m) => `<li>${escapeHtml(m.description)}</li>`).join("")}</ul>`;
 }

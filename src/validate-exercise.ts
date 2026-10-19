@@ -10,6 +10,10 @@
 import type { Lesson } from "./curriculum.ts";
 import type { ExerciseBundle } from "./store/exercises.ts";
 import type { ExerciseKind } from "./store/lessons.ts";
+import { cacheSpecErrors } from "./drill/cache-sim.ts";
+import { flawSpecErrors } from "./drill/flaw-review.ts";
+import { specErrors } from "./drill/mutation.ts";
+import { refactorSpecErrors } from "./drill/refactor.ts";
 
 /** `[fact:<id>]` in teaching or brief Markdown. */
 export const FACT_REF = /\[fact:([a-z0-9]+(?:-[a-z0-9]+)*)\]/g;
@@ -18,6 +22,11 @@ export const FACT_REF = /\[fact:([a-z0-9]+(?:-[a-z0-9]+)*)\]/g;
 export const BRIEF_SECTIONS: Record<ExerciseKind, readonly string[]> = {
   "design-review": ["## Scenario", "## Your task"],
   lab: ["## Your task"],
+  mutation: ["## Scenario", "## Your task"],
+  "flaw-review": ["## Scenario", "## Your task"],
+  "cache-plan": ["## Scenario", "## Your task"],
+  refactor: ["## Scenario", "## Your task"],
+  transcript: ["## Your task"],
 };
 
 export const LIMITS = {
@@ -49,6 +58,7 @@ export function citedFacts(markdown: string): string[] {
 export function validateExercise(bundle: ExerciseBundle, lesson: Lesson): ExerciseReport {
   const errors: string[] = [];
   const { brief, teaching } = bundle;
+  const hidden = bundle.private;
 
   if (bundle.meta.lesson !== lesson.id)
     errors.push(`The exercise is for ${bundle.meta.lesson}, not ${lesson.id}.`);
@@ -61,6 +71,35 @@ export function validateExercise(bundle: ExerciseBundle, lesson: Lesson): Exerci
     errors.push(
       `brief_md must be ${LIMITS.briefMin} to ${LIMITS.briefMax} characters (it is ${brief.length}).`,
     );
+  if (bundle.meta.kind === "mutation") {
+    if (!hidden.mutation)
+      errors.push("A mutation drill needs its module, rewrites, mutants, and oracle.");
+    else errors.push(...specErrors(hidden.mutation));
+  }
+  if (bundle.meta.kind === "flaw-review") {
+    if (!hidden.flawReview) errors.push("A flaw review needs its diff, flaws, and decoys.");
+    else {
+      errors.push(...flawSpecErrors(hidden.flawReview));
+      // The flaws' explanations are the answers; they must not be on the page.
+      for (const flaw of hidden.flawReview.flaws)
+        if (
+          flaw.explanation.length >= 30 &&
+          (brief.includes(flaw.explanation) || teaching.includes(flaw.explanation))
+        )
+          errors.push(`The explanation of flaw ${flaw.id} appears in the brief or teaching.`);
+    }
+  }
+  if (bundle.meta.kind === "refactor") {
+    if (!hidden.refactor)
+      errors.push("A refactor drill needs its legacy module, clean refactor, mutants, and oracle.");
+    else errors.push(...refactorSpecErrors(hidden.refactor));
+  }
+  if (bundle.meta.kind === "cache-plan") {
+    if (!hidden.cachePlan) errors.push("A cache plan needs its scenario and reference plan.");
+    else errors.push(...cacheSpecErrors(hidden.cachePlan.scenario, hidden.cachePlan.reference));
+  }
+  if (bundle.meta.kind === "transcript" && !lesson.checklist?.length)
+    errors.push(`Lesson ${lesson.id} has no checklist, so it cannot review a transcript.`);
   if (bundle.meta.kind === "lab" && !(lesson.checklist?.length && lesson.labFiles?.length))
     errors.push(`Lesson ${lesson.id} has no lab checklist or lab files, so it cannot run a lab.`);
   for (const heading of BRIEF_SECTIONS[bundle.meta.kind]) {
@@ -83,7 +122,6 @@ export function validateExercise(bundle: ExerciseBundle, lesson: Lesson): Exerci
   if (missing.length > 0)
     errors.push(`teaching_md must teach and cite every core fact. Missing: ${missing.join(", ")}.`);
 
-  const hidden = bundle.private;
   if (hidden.modelOutline.trim().length < LIMITS.outlineMin)
     errors.push(`model_outline must be at least ${LIMITS.outlineMin} characters.`);
   if (hidden.followUps.length < LIMITS.followUpsMin)

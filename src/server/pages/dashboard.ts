@@ -26,6 +26,8 @@ export interface AgenticData {
   lessons: LessonSession[];
   /** Lesson review items that are due now. */
   due: ReviewItem[];
+  /** The Next lesson button, rendered; left out, the plain line is shown. */
+  nextRow?: string;
 }
 
 export interface DashboardData {
@@ -200,9 +202,11 @@ const LESSON_MARKS: Record<LessonState, string> = {
 function agenticHtml(data: AgenticData, now: number): string {
   const { progress } = data;
   const names = new Map(progress.modules.flatMap((m) => m.lessons.map((l) => [l.id, l.title])));
-  const next = progress.next
-    ? `<p id="agentic-next">Next lesson: <strong>${escapeHtml(progress.next.lesson.title)}</strong> <span class="muted">in ${escapeHtml(progress.next.module.name)}</span></p>`
-    : "";
+  const next = data.nextRow
+    ? data.nextRow
+    : progress.next
+      ? `<p id="agentic-next">Next lesson: <strong>${escapeHtml(progress.next.lesson.title)}</strong> <span class="muted">in ${escapeHtml(progress.next.module.name)}</span></p>`
+      : "";
   const due = data.due.length
     ? `<ul class="due-list" id="agentic-due">${data.due
         .map(
