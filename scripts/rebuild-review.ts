@@ -1,5 +1,5 @@
 /**
- * Rebuild the spaced-review log from the sessions on disk.
+ * Rebuild the spaced-review log from the sessions and lessons on disk.
  *
  *   node scripts/rebuild-review.ts [--dry-run]
  *
@@ -9,16 +9,13 @@
  * new sessions. Uses ~/.chudcode unless CHUDCODE_DIR is set.
  */
 
-import { eventsFromSessions, rebuildReviewLog } from "../src/flow.ts";
+import { eventsFromDisk, rebuildReviewLog } from "../src/flow.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { reviewEventsFile } from "../src/store/paths.ts";
-import { listSessions } from "../src/store/sessions.ts";
 
 const dryRun = process.argv.includes("--dry-run");
 const before = readReviewEvents().length;
-const events = dryRun
-  ? eventsFromSessions(listSessions(Number.MAX_SAFE_INTEGER))
-  : rebuildReviewLog();
+const events = dryRun ? eventsFromDisk() : rebuildReviewLog();
 const sessions = new Set(events.map((event) => event.session)).size;
 
 console.log(

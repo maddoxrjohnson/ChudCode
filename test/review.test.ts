@@ -34,10 +34,11 @@ describe("keys", () => {
   it("builds and parses pattern and problem keys", () => {
     expect(makeKey("pattern", "sliding-window")).toBe("pattern:sliding-window");
     expect(parseKey("problem:window-sum")).toEqual({ kind: "problem", id: "window-sum" });
+    expect(makeKey("lesson", "plan-before-code")).toBe("lesson:plan-before-code");
   });
 
   it("rejects malformed keys and ids", () => {
-    expect(() => parseKey("lesson:foo")).toThrow(/Invalid review key/);
+    expect(() => parseKey("topic:foo")).toThrow(/Invalid review key/);
     expect(() => parseKey("pattern:")).toThrow(/Invalid review key/);
     expect(() => makeKey("pattern", "Sliding Window")).toThrow(/Invalid review id/);
     expect(() => makeKey("problem", "../etc")).toThrow(/Invalid review id/);

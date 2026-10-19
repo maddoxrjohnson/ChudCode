@@ -18,6 +18,7 @@ import { DASHBOARD_CHANNEL, push, sessionChannel } from "./server/sse.ts";
 import { readConfig, type Config } from "./store/config.ts";
 import { publicView, readProblem, type Hint, type PublicProblem } from "./store/problems.ts";
 import { appendReviewEvents, reviewItems, rewriteReviewEvents } from "./store/review-events.ts";
+import { eventsFromLessons, listLessons } from "./store/lessons.ts";
 import {
   appendEvent,
   listSessions,
@@ -465,9 +466,17 @@ export function eventsFromSessions(sessions: readonly Session[]): ReviewEvent[] 
   return events.sort((a, b) => a.at - b.at);
 }
 
-/** Regenerate review/events.jsonl from the sessions on disk. Returns the new log. */
+/** Every review event the interviews and lessons on disk imply, oldest first. */
+export function eventsFromDisk(): ReviewEvent[] {
+  return [
+    ...eventsFromSessions(listSessions(Number.MAX_SAFE_INTEGER)),
+    ...eventsFromLessons(listLessons(Number.MAX_SAFE_INTEGER)),
+  ].sort((a, b) => a.at - b.at);
+}
+
+/** Regenerate review/events.jsonl from the sessions and lessons on disk. Returns the new log. */
 export function rebuildReviewLog(): ReviewEvent[] {
-  const events = eventsFromSessions(listSessions(Number.MAX_SAFE_INTEGER));
+  const events = eventsFromDisk();
   rewriteReviewEvents(events);
   return events;
 }

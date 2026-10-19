@@ -9,6 +9,9 @@
  *     problems/<slug>/   meta.json statement.md tests.json reference.py hints.json
  *                        generators.py? checker.py?
  *     sessions/<id>/     session.json events.jsonl draft.py submissions/NN.py NN.result.json
+ *     lessons/<id>/      session.json events.jsonl draft.md answers/NN.md
+ *     exercises/<slug>/  meta.json brief.md teaching.md private.json
+ *     curriculum/fact-checks.jsonl
  *     review/events.jsonl
  *     trends.json
  *     tmp/<runId>/       ephemeral runner workdirs
@@ -99,6 +102,29 @@ export function sessionsDir(): string {
 export function sessionDir(id: string): string {
   if (!isValidSessionId(id)) throw new Error(`Invalid session id: ${JSON.stringify(id)}`);
   return path.join(sessionsDir(), id);
+}
+
+export function lessonsDir(): string {
+  return path.join(baseDir, "lessons");
+}
+
+/** Lesson sessions share the session id format, so one validator guards both. */
+export function lessonDir(id: string): string {
+  if (!isValidSessionId(id)) throw new Error(`Invalid lesson session id: ${JSON.stringify(id)}`);
+  return path.join(lessonsDir(), id);
+}
+
+export function exercisesDir(): string {
+  return path.join(baseDir, "exercises");
+}
+
+export function exerciseDir(slug: string): string {
+  assertSlug(slug);
+  return path.join(exercisesDir(), slug);
+}
+
+export function factChecksFile(): string {
+  return path.join(baseDir, "curriculum", "fact-checks.jsonl");
 }
 
 export function reviewEventsFile(): string {

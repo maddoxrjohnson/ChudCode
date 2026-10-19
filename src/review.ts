@@ -3,7 +3,8 @@
  *
  * Every recorded session appends one ReviewEvent per key it exercised: `pattern:<id>`
  * for each pattern the problem is tagged with and `problem:<slug>` for the problem
- * itself. The schedule is a Leitner system computed on every read from those events.
+ * itself. A recorded agentic-coding lesson appends one `lesson:<id>` event. The
+ * schedule is a Leitner system computed on every read from those events.
  * A correct verdict moves a key up one box, a wrong one sends it back to the first
  * box, and each box waits longer before the key is due again.
  *
@@ -22,11 +23,11 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type Difficulty = "easy" | "medium" | "hard";
 
-export type ReviewKind = "pattern" | "problem";
+export type ReviewKind = "pattern" | "problem" | "lesson";
 
 /** One session's verdict for one key. */
 export interface ReviewEvent {
-  /** `pattern:<id>` or `problem:<slug>`. */
+  /** `pattern:<id>`, `problem:<slug>`, or `lesson:<id>` for an agentic-coding lesson. */
   key: string;
   /** When the session was recorded. */
   at: number;
@@ -42,7 +43,7 @@ export interface ReviewEvent {
 export interface ReviewItem {
   key: string;
   kind: ReviewKind;
-  /** The pattern id or problem slug. */
+  /** The pattern id, problem slug, or lesson id. */
   id: string;
   box: number;
   dueAt: number;
@@ -60,7 +61,7 @@ export interface ScheduleOptions {
   intervalsDays?: readonly number[];
 }
 
-const KEY_PATTERN = /^(pattern|problem):([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const KEY_PATTERN = /^(pattern|problem|lesson):([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
 export function makeKey(kind: ReviewKind, id: string): string {
   const key = `${kind}:${id}`;
