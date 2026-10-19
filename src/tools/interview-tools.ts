@@ -16,6 +16,8 @@ import type { RunScope } from "../runs.ts";
 import { isValidSessionId } from "../store/paths.ts";
 import { readProblem } from "../store/problems.ts";
 import { readSession, sessionExists } from "../store/sessions.ts";
+import { lessonExists } from "../store/lessons.ts";
+import { postLessonMessage } from "../lesson-flow.ts";
 import {
   ok,
   optionalBool,
@@ -48,8 +50,14 @@ export function interviewTools(): ToolDef[] {
         markdown: schema.str("What to say. Keep it short; this is a conversation, not a lecture."),
       }),
       async execute(args) {
-        const id = requireSession(args);
-        const message = postMessage(id, "interviewer", requireString(args, "markdown", 8_000));
+        const id = requireString(args, "session_id", 120);
+        const markdown = requireString(args, "markdown", 8_000);
+        // Lessons share the page's chat, so the interviewer speaks to both the same way.
+        if (lessonExists(id)) {
+          const message = postLessonMessage(id, "interviewer", markdown);
+          return ok(`Sent. ${thenWait()}`, { at: message.at });
+        }
+        const message = postMessage(requireSession(args), "interviewer", markdown);
         return ok(`Sent. ${thenWait()}`, { at: message.at });
       },
     },

@@ -17,7 +17,7 @@ import * as path from "node:path";
 
 import { makeKey, type ReviewEvent } from "../review.ts";
 import { appendJsonl, readJson, readJsonl, readText, writeJson, writeText } from "./json.ts";
-import { isDir, isValidSessionId, lessonDir, lessonsDir } from "./paths.ts";
+import { isDir, isValidSessionId, lessonDir, lessonsDir, sessionDir } from "./paths.ts";
 import { generateSessionId, type Phase, type SessionEvent } from "./sessions.ts";
 
 export const EXERCISE_KINDS = ["design-review"] as const;
@@ -90,7 +90,8 @@ export interface NewLesson {
 
 export function createLesson(input: NewLesson, now = Date.now()): LessonSession {
   let id = generateSessionId(input.exercise, now);
-  while (isDir(lessonDir(id))) id = generateSessionId(input.exercise, now);
+  // Unique across interviews too: the page channel and the URL are keyed by id alone.
+  while (isDir(lessonDir(id)) || isDir(sessionDir(id))) id = generateSessionId(input.exercise, now);
   const session: LessonSession = {
     id,
     kind: "lesson",

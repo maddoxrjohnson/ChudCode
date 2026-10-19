@@ -82,7 +82,11 @@ export function sessionState(id: string, listening = false, now = Date.now()): S
   };
 }
 
-export function remaining(session: Session, now: number): number | null {
+/** Milliseconds left on a clock, for an interview or a lesson. */
+export function remaining(
+  session: Pick<Session, "startedAt" | "endedAt" | "timerMs">,
+  now: number,
+): number | null {
   if (session.startedAt === undefined) return null;
   const end = session.endedAt ?? now;
   return Math.max(0, session.startedAt + session.timerMs - end);

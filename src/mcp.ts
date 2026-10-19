@@ -46,6 +46,23 @@ import {
 } from "./server/sse.ts";
 import { packageRoot } from "./store/paths.ts";
 import { listSessions, readEvents, readSession, type Session } from "./store/sessions.ts";
+import { readExercise } from "./store/exercises.ts";
+import {
+  lessonExists,
+  listLessons,
+  readAnswer,
+  readLesson,
+  type LessonSession,
+} from "./store/lessons.ts";
+import {
+  lessonAnswerPrompt,
+  lessonDonePrompt,
+  lessonMessagePrompt,
+  lessonNothingYetText,
+  lessonStartedPrompt,
+  lessonTimerExpiredPrompt,
+  recoveredLessonPrompt,
+} from "./lesson-prompts.ts";
 import {
   fail,
   isFailure,
@@ -96,7 +113,7 @@ This session cannot push the candidate's actions to you. You listen for them:
 - \`start_session\` creates a session, starts the local server if needed, and returns the URL. \`open_dashboard\` opens the dashboard and recovers any session already in progress. URLs work only while this session runs.
 - \`wait_for_candidate\` blocks until the candidate presses Start, posts an approach note or a message, takes a hint, submits, says they are done, or the timer runs out. It returns the full event and names the tool that handles it. Each wait lasts at most ${MAX_WAIT_SECONDS} seconds.
 
-Keep calling \`wait_for_candidate\` while the clock runs. A wait that returns nothing means the candidate is coding; call it again. Speak only when you have a reason: a question arrived, a submission landed, or several silent minutes have passed and one short check-in would help. The page shows "Interviewer listening" while a wait is open and "Interviewer away" when none is, so do not leave the candidate alone: end your turn only after \`record_session\` or \`abandon_session\`, or when the user talks to you in the terminal. After a roadmap debrief, \`record_session\` asks you to stay a little longer for the page's Next problem button. The user can press Esc to interrupt a wait and talk to you here; answer, then resume waiting.
+Keep calling \`wait_for_candidate\` while the clock runs. A wait that returns nothing means the candidate is coding; call it again. Speak only when you have a reason: a question arrived, a submission landed, or several silent minutes have passed and one short check-in would help. The page shows "Interviewer listening" while a wait is open and "Interviewer away" when none is, so do not leave the candidate alone: end your turn only after \`record_session\` (\`record_lesson\` in a lesson) or \`abandon_session\`, or when the user talks to you in the terminal. After a roadmap debrief, \`record_session\` asks you to stay a little longer for the page's Next problem button. The user can press Esc to interrupt a wait and talk to you here; answer, then resume waiting.
 
 \`say_to_candidate\` is the only way your words reach the page. Terminal text is for setup and the final summary.`;
 
@@ -284,6 +301,10 @@ export function activeSessions(): Session[] {
   return listSessions(10).filter((s) => s.phase !== "done");
 }
 
+export function activeLessons(): LessonSession[] {
+  return listLessons(10).filter((s) => s.phase !== "done");
+}
+
 /**
  * Tell every open page whether the interviewer is listening (the session badge) and
  * whether it is connected at all (the Next problem button). Finished sessions are
@@ -291,7 +312,8 @@ export function activeSessions(): Session[] {
  */
 function broadcastPresence(listening: boolean): void {
   const payload = { listening, connected: agentConnected() };
-  for (const session of listSessions(10)) push(sessionChannel(session.id), "presence", payload);
+  for (const session of [...listSessions(10), ...listLessons(10)])
+    push(sessionChannel(session.id), "presence", payload);
   push(DASHBOARD_CHANNEL, "presence", payload);
 }
 
@@ -340,6 +362,7 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
     inbox.recordRun?.(event.sessionId, event.scope, event.passed, event.total);
     return;
   }
+  if (lessonExists(event.sessionId)) return routeLessonEvent(inbox, event);
   let session: Session;
   try {
     session = readSession(event.sessionId);
@@ -397,6 +420,37 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
   }
 }
 
+function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
+  const id = event.sessionId;
+  const session = readLesson(id);
+  const notDone = () => lessonExists(id) && readLesson(id).phase !== "done";
+  switch (event.kind) {
+    case "started":
+      return inbox.push(lessonStartedPrompt(session, event.at), `started:${id}`, notDone);
+    case "message":
+      return inbox.push(
+        lessonMessagePrompt(session, event.text, event.at),
+        `message:${id}:${event.at}`,
+        notDone,
+      );
+    case "answer": {
+      const answer = readAnswer(id, event.number) ?? "";
+      const hidden = readExercise(session.exercise).private;
+      return inbox.push(
+        lessonAnswerPrompt(session, event.number, answer, hidden, event.at),
+        `answer:${id}:${event.number}`,
+        notDone,
+      );
+    }
+    case "timer_expired":
+      return inbox.push(lessonTimerExpiredPrompt(session, event.at), `timeout:${id}`, notDone);
+    case "candidate_done":
+      return inbox.push(lessonDonePrompt(session, event.at), `done:${id}`, notDone);
+    default:
+      return;
+  }
+}
+
 /** A press of Next problem, dropped once a session answers it. */
 function routeNext(inbox: PromptSink, request: NextRequest): void {
   const progress = loadRoadmapProgress(request.roadmap);
@@ -420,6 +474,14 @@ export function recoverSessions(
   created: ReadonlySet<string>,
   now = Date.now(),
 ): void {
+  for (const lesson of activeLessons()) {
+    if (created.has(lesson.id)) continue;
+    inbox.push(
+      recoveredLessonPrompt(lesson, now),
+      `recover:${lesson.id}`,
+      () => readLesson(lesson.id).phase !== "done",
+    );
+  }
   for (const session of activeSessions()) {
     if (created.has(session.id)) continue;
     inbox.push(
@@ -497,7 +559,7 @@ export class McpSession {
         ...reviewTools(),
         ...roadmapTools(),
         ...trendTools(),
-        ...lessonTools(),
+        ...lessonTools(host),
       ].map((tool) => [tool.name, tool]),
     );
   }
@@ -600,6 +662,12 @@ export class McpSession {
     const digest = inbox.takeDigest();
     if (prompts.length === 0) {
       const active = activeSessions();
+      const lessons = activeLessons();
+      if (active.length === 0 && lessons.length > 0)
+        return result(
+          id,
+          toolResult(ok(lessonNothingYetText(seconds, lessons, digest, Date.now()))),
+        );
       const window = active.length === 0 ? nextWindow() : null;
       // With nothing in progress and no debrief to answer, the text says to end the turn.
       if (active.length === 0 && !window && !pendingNext()) inbox.release();

@@ -91,7 +91,7 @@ export function thenWait(): string {
 }
 
 /** How to collect answers to follow-up questions. */
-function waitForAnswers(each: boolean): string {
+export function waitForAnswers(each: boolean): string {
   if (delivery === "listen")
     return each
       ? "Wait for each answer with `wait_for_candidate`."
@@ -101,7 +101,7 @@ function waitForAnswers(each: boolean): string {
     : "End your turn; their answers arrive as new messages.";
 }
 
-function deliveryNote(): string {
+export function deliveryNote(): string {
   return delivery === "listen"
     ? "This arrived as the result of your `wait_for_candidate` call."
     : "The ChudCode extension pushed this from the candidate's page.";

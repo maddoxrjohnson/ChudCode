@@ -18,6 +18,8 @@ export type CandidateEvent = { sessionId: string; at: number } & (
   | { kind: "submission"; number: number; result: RunResult }
   | { kind: "timer_expired" }
   | { kind: "candidate_done" }
+  /** A lesson's answer box was submitted. */
+  | { kind: "answer"; number: number }
 );
 
 /** The candidate pressed Next problem: serve the next step on this roadmap. */

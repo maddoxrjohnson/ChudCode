@@ -16,6 +16,9 @@
  *   POST /api/sessions/<id>/timeout
  *   POST /api/sessions/<id>/done
  *   GET  /api/sessions/<id>/next-up         { html }  the Next problem row under the debrief
+ *
+ * A lesson session uses the same paths: GET for its state, PUT draft { text }, and
+ * POST start, message, answer { text }, timeout, done.
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
  *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
@@ -31,6 +34,17 @@ import { readConfig } from "../store/config.ts";
 import { isValidSessionId, isValidSlug } from "../store/paths.ts";
 import { listProblems, problemExists, publicView, readProblem } from "../store/problems.ts";
 import { listSessions, sessionExists, writeDraft } from "../store/sessions.ts";
+import { lessonExists } from "../store/lessons.ts";
+import {
+  lessonDone,
+  lessonState,
+  lessonTimerExpired,
+  MAX_ANSWER_CHARS,
+  postLessonMessage,
+  saveLessonDraft,
+  startLesson,
+  submitAnswer,
+} from "../lesson-flow.ts";
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
@@ -85,6 +99,12 @@ export async function handleApi(
     return sendJson(res, publicView(readProblem(id), 0));
   }
 
+  if (resource === "sessions" && id !== undefined && lessonExists(id)) {
+    if (action === undefined && req.method === "GET")
+      return sendJson(res, lessonState(id, agentListening()));
+    if (action !== undefined) return handleLessonAction(req, res, id, action);
+  }
+
   if (resource === "sessions" && id !== undefined) {
     if (!isValidSessionId(id) || !sessionExists(id)) throw new HttpError(404, "No such session");
     if (action === undefined && req.method === "GET")
@@ -99,7 +119,7 @@ function handleEvents(req: http.IncomingMessage, res: http.ServerResponse, url: 
   const session = url.searchParams.get("session");
   const scope = url.searchParams.get("scope");
   if (session !== null) {
-    if (!isValidSessionId(session) || !sessionExists(session))
+    if (!isValidSessionId(session) || !(sessionExists(session) || lessonExists(session)))
       throw new HttpError(404, "No such session");
     return subscribe(sessionChannel(session), req, res);
   }
@@ -180,6 +200,47 @@ async function handleSessionAction(
       return sendJson(res, { session: flow.candidateDone(id) });
     default:
       throw new HttpError(404, "No such session action");
+  }
+}
+
+async function handleLessonAction(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  id: string,
+  action: string,
+): Promise<void> {
+  const method = req.method ?? "GET";
+  if (action === "draft" && method === "PUT") {
+    const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 1024));
+    saveLessonDraft(id, expectString(body["text"], "text", MAX_ANSWER_CHARS));
+    return sendJson(res, { ok: true });
+  }
+  if (method !== "POST") throw new HttpError(405, "Method not allowed");
+  switch (action) {
+    case "start":
+      return sendJson(res, { session: startLesson(id) });
+    case "message": {
+      const body = asRecord(await readJsonBody(req, MAX_TEXT_CHARS * 4));
+      return sendJson(res, {
+        message: postLessonMessage(
+          id,
+          "candidate",
+          expectString(body["text"], "text", MAX_TEXT_CHARS),
+        ),
+      });
+    }
+    case "answer": {
+      const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 1024));
+      return sendJson(res, {
+        number: submitAnswer(id, expectString(body["text"], "text", MAX_ANSWER_CHARS)),
+      });
+    }
+    case "timeout":
+      return sendJson(res, { session: lessonTimerExpired(id) });
+    case "done":
+      return sendJson(res, { session: lessonDone(id) });
+    default:
+      throw new HttpError(404, "No such lesson action");
   }
 }
 

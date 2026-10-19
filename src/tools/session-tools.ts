@@ -36,6 +36,15 @@ import {
   type Difficulty,
 } from "../store/problems.ts";
 import { createSession, sessionExists, type SessionMode } from "../store/sessions.ts";
+import { abandonLesson } from "../lesson-flow.ts";
+import { lessonLine, lessonSummaryText } from "../lesson-prompts.ts";
+import {
+  lessonExists,
+  readAnswer,
+  readLesson,
+  readLessonEvents,
+  type LessonEvent,
+} from "../store/lessons.ts";
 import {
   fail,
   ok,
@@ -280,6 +289,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       ),
       async execute(args) {
         const id = requireString(args, "session_id", 120);
+        if (lessonExists(id)) return ok(lessonSummary(id), { phase: readLesson(id).phase });
         if (!isValidSessionId(id) || !sessionExists(id)) return fail(`No session named ${id}.`);
         const state = sessionState(id);
         return ok(sessionSummaryText(state, optionalBool(args, "include_code") ?? false), {
@@ -302,6 +312,18 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       }),
       async execute(args) {
         const id = requireString(args, "session_id", 120);
+        if (lessonExists(id)) {
+          const outcome = abandonLesson(id, requireString(args, "reason", 500));
+          return ok(
+            [
+              `Abandoned. ${lessonLine(outcome.session)}`,
+              outcome.reviewEvent
+                ? `Recorded as a miss for ${outcome.session.lessonTitle}.`
+                : "Not counted against the learner.",
+              ...(outcome.nextDue ? [outcome.nextDue] : []),
+            ].join("\n"),
+          );
+        }
         if (!isValidSessionId(id) || !sessionExists(id)) return fail(`No session named ${id}.`);
         const outcome = abandonSession(id, requireString(args, "reason", 500));
         const lines = [`Abandoned. ${sessionLine(outcome.session)}`];
@@ -315,4 +337,13 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       },
     },
   ];
+}
+
+function lessonSummary(id: string): string {
+  const session = readLesson(id);
+  const messages = readLessonEvents(id)
+    .filter((e): e is Extract<LessonEvent, { type: "message" }> => e.type === "message")
+    .map((e) => ({ from: e.from, markdown: e.markdown }));
+  const latest = session.answers > 0 ? readAnswer(id, session.answers) : null;
+  return lessonSummaryText(session, messages, latest);
 }

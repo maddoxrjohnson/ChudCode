@@ -223,6 +223,7 @@ describe("protocol", () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       "abandon_session",
       "begin_interview",
+      "begin_lesson",
       "get_session",
       "list_curriculum",
       "list_due",
@@ -232,14 +233,18 @@ describe("protocol", () => {
       "lookup_seed",
       "open_dashboard",
       "record_fact_check",
+      "record_lesson",
       "record_session",
       "record_trends",
       "reveal_hint",
       "run_tests",
       "say_to_candidate",
+      "start_lesson",
       "start_session",
+      "validate_exercise",
       "validate_problem",
       "wait_for_candidate",
+      "write_exercise",
       "write_problem",
     ]);
     expect(session.toolNames().sort()).toEqual(tools.map((t) => t.name).sort());
