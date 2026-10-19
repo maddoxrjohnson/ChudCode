@@ -13,6 +13,7 @@
 
 import * as path from "node:path";
 
+import { allowedPattern } from "./lab.ts";
 import { unlockThreshold } from "./roadmap.ts";
 import { readJson } from "./store/json.ts";
 import { listLessons, LESSON_DIMENSIONS, type LessonDimension } from "./store/lessons.ts";
@@ -207,6 +208,11 @@ function lessonErrors(
       errors.push(`${where} lists a lab, so it needs a checklist`);
     if (!isStringList(lesson["labFiles"]) || lesson["labFiles"].length === 0)
       errors.push(`${where} lists a lab, so it needs labFiles`);
+  }
+  if (isStringList(lesson["labFiles"])) {
+    for (const pattern of lesson["labFiles"])
+      if (!allowedPattern(pattern))
+        errors.push(`${where}.labFiles names ${pattern}, which is not on the lab allow-list`);
   }
   return errors;
 }

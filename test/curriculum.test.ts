@@ -119,6 +119,15 @@ describe("validateCurriculum", () => {
     expect(errors).toMatch(/lists a lab, so it needs labFiles/);
     expect(errors).toMatch(/rubricFocus must list dimensions/);
   });
+
+  it("keeps lab files to the lab allow-list", () => {
+    const bad = structuredClone(SMALL) as Curriculum;
+    bad.modules[0]!.lessons[0]!.labFiles = ["CLAUDE.md", ".env", "src/**/*.ts"];
+    const errors = validateCurriculum(bad).join("\n");
+    expect(errors).toMatch(/labFiles names \.env, which is not on the lab allow-list/);
+    expect(errors).toMatch(/labFiles names src\/\*\*\/\*\.ts/);
+    expect(errors).not.toMatch(/names CLAUDE\.md/);
+  });
 });
 
 describe("buildCurriculumProgress", () => {

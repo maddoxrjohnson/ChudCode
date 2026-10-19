@@ -430,7 +430,7 @@
               "text": "Worker output is checked before it is trusted or merged"
             }
           ],
-          "labFiles": [".claude/agents/*.md", "CLAUDE.md", "AGENTS.md"]
+          "labFiles": [".claude/agents/**/*.md", "CLAUDE.md", "AGENTS.md"]
         },
         {
           "id": "model-and-effort",
@@ -483,7 +483,7 @@
               "text": "Frontmatter uses only documented fields and valid model and effort values"
             }
           ],
-          "labFiles": [".claude/agents/*.md"]
+          "labFiles": [".claude/agents/**/*.md"]
         }
       ]
     },
