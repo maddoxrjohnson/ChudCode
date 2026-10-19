@@ -55,6 +55,7 @@ import {
   type ToolResult,
 } from "./tools/index.ts";
 import { interviewTools } from "./tools/interview-tools.ts";
+import { lessonTools } from "./tools/lesson-tools.ts";
 import { problemTools } from "./tools/problem-tools.ts";
 import { reviewTools } from "./tools/review-tools.ts";
 import { roadmapTools } from "./tools/roadmap-tools.ts";
@@ -496,6 +497,7 @@ export class McpSession {
         ...reviewTools(),
         ...roadmapTools(),
         ...trendTools(),
+        ...lessonTools(),
       ].map((tool) => [tool.name, tool]),
     );
   }

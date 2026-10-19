@@ -1,0 +1,636 @@
+{
+  "version": 1,
+  "factHosts": ["code.claude.com", "docs.claude.com", "platform.claude.com", "www.anthropic.com"],
+  "modules": [
+    {
+      "id": "planning",
+      "name": "Planning and context files",
+      "blurb": "Separate exploring from building, and give the agent the context it cannot infer.",
+      "requires": [],
+      "lessons": [
+        {
+          "id": "plan-before-code",
+          "title": "Explore, plan, then code",
+          "goals": [
+            "Use plan mode to get a reviewable plan before any file changes",
+            "Judge when a task is small enough to skip the plan",
+            "Write a plan another person could execute: phases, files, verification"
+          ],
+          "facts": [
+            {
+              "id": "explore-plan-implement-commit",
+              "claim": "Anthropic's best-practices page recommends four phases: explore, plan, implement, commit, and warns that letting Claude jump straight to coding can produce code that solves the wrong problem.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "plan-mode-behavior",
+              "claim": "In plan mode Claude reads files and runs shell commands to explore and writes a plan, but does not edit source until the plan is approved.",
+              "source": "https://code.claude.com/docs/en/permission-modes",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "plan-mode-entry",
+              "claim": "Plan mode is entered by pressing Shift+Tab until the status bar shows plan mode, by prefixing a prompt with /plan, or by starting with claude --permission-mode plan.",
+              "source": "https://code.claude.com/docs/en/permission-modes",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "plan-approval",
+              "claim": "When Claude presents a plan you can approve it with auto mode, approve it while still approving each edit, or keep planning; approving exits plan mode. Ctrl+G opens the plan in your editor to change it first.",
+              "source": "https://code.claude.com/docs/en/permission-modes",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "plan-mode-overhead",
+              "claim": "Planning adds overhead: for a small, clear change such as a typo or a rename, ask Claude to do it directly. If you could describe the diff in one sentence, skip the plan.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["decomposition", "verification"],
+          "checklist": [
+            {
+              "id": "phases",
+              "text": "The plan is split into phases that each end in something you can check"
+            },
+            {
+              "id": "files",
+              "text": "It names the files or modules each phase touches"
+            },
+            {
+              "id": "verify",
+              "text": "Every phase says how it will be verified, not just what will be built"
+            },
+            {
+              "id": "risks",
+              "text": "It names at least one risk or open question and how it will be resolved"
+            }
+          ],
+          "labFiles": ["PLAN.md", "plan.md", "progress.md", "docs/PLAN.md"]
+        },
+        {
+          "id": "context-files",
+          "title": "CLAUDE.md, AGENTS.md, and progress files",
+          "goals": [
+            "Put in CLAUDE.md only what the agent cannot infer from the code",
+            "Keep context files short, and know what each one costs every session",
+            "Keep a progress file that lets a fresh session pick up where the last one stopped"
+          ],
+          "facts": [
+            {
+              "id": "claude-md-locations",
+              "claim": "CLAUDE.md files live at the user level (~/.claude/CLAUDE.md), the project level (./CLAUDE.md or ./.claude/CLAUDE.md), and an optional managed policy location set by an organisation.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-md-loading",
+              "claim": "Claude Code loads CLAUDE.md and CLAUDE.local.md from the working directory and every directory above it and concatenates them; files in subdirectories load on demand when Claude works there.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-md-imports-cost",
+              "claim": "CLAUDE.md can import other files with @path, but imported files also load at launch, so imports organise a long file without reducing its context cost.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-md-size",
+              "claim": "The docs suggest keeping each CLAUDE.md under 200 lines: longer files consume more context and reduce how well Claude follows them.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-md-content",
+              "claim": "CLAUDE.md should hold what Claude cannot infer from the code, such as non-default style rules, test commands, repository etiquette, and environment quirks, and leave out what it can work out by reading the code.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "agents-md-support",
+              "claim": "Claude Code reads AGENTS.md as project instructions only when there is no CLAUDE.md or CLAUDE.local.md in the working directory or above it.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": false,
+              "verifiedAt": "2026-10-18",
+              "minVersion": "2.1.277"
+            },
+            {
+              "id": "init-command",
+              "claim": "/init generates a starter CLAUDE.md from the project; when one already exists it suggests improvements instead of overwriting it.",
+              "source": "https://code.claude.com/docs/en/memory",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["contextCost", "decomposition"],
+          "checklist": [
+            {
+              "id": "non-inferable",
+              "text": "CLAUDE.md holds commands, conventions, and quirks the code does not show"
+            },
+            {
+              "id": "short",
+              "text": "Each CLAUDE.md is under about 200 lines"
+            },
+            {
+              "id": "no-duplication",
+              "text": "Nothing is repeated that the agent would learn by reading the code"
+            },
+            {
+              "id": "progress-next",
+              "text": "The progress file ends with the next concrete step and what is blocked"
+            }
+          ],
+          "labFiles": [
+            "CLAUDE.md",
+            "CLAUDE.local.md",
+            ".claude/CLAUDE.md",
+            "AGENTS.md",
+            "progress.md"
+          ]
+        },
+        {
+          "id": "managing-context",
+          "title": "Keep the context window clean",
+          "goals": [
+            "Clear between unrelated tasks and compact with a focus",
+            "Know what survives compaction and what does not",
+            "Push exploration into a subagent so its reading does not fill your context"
+          ],
+          "facts": [
+            {
+              "id": "context-clear",
+              "claim": "/clear resets the context window; the best-practices page recommends it between unrelated tasks.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "compact-command",
+              "claim": "/compact replaces the conversation with a summary and accepts focus instructions, for example /compact Focus on the API changes.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "compaction-survival",
+              "claim": "After compaction the project-root CLAUDE.md is re-injected from disk and nested CLAUDE.md files reload on demand, so durable instructions belong there rather than only in the conversation.",
+              "source": "https://code.claude.com/docs/en/context-window",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-context",
+              "claim": "Subagents run in their own context windows and report back only a summary, so their file reading does not fill the main conversation.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review"],
+          "rubricFocus": ["contextCost"]
+        }
+      ]
+    },
+    {
+      "id": "test-strength",
+      "name": "Test strength and verification",
+      "blurb": "Give the agent checks it can run, and make sure those checks test behaviour rather than restate the code.",
+      "requires": ["planning"],
+      "lessons": [
+        {
+          "id": "verify-with-checks",
+          "title": "Give the agent a check it can run",
+          "goals": [
+            "Hand the agent a test, build, or script that decides when it is done",
+            "Start a bug fix with a failing test that reproduces it",
+            "Tell a test that pins behaviour from one that restates whatever the code returns"
+          ],
+          "facts": [
+            {
+              "id": "verify-work",
+              "claim": "The best-practices page notes that Claude stops when the work looks done, and recommends giving it a check it can run, such as tests, a build, a linter, or a script.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "write-failing-test",
+              "claim": "For a bug, the best-practices page's example prompt describes the symptom and asks Claude to write a failing test that reproduces the issue, then fix it.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "test-cases-in-prompt",
+              "claim": "The best-practices page shows putting example test cases in the request and asking Claude to run the tests after implementing.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "mutation"],
+          "rubricFocus": ["verification"]
+        },
+        {
+          "id": "independent-tests",
+          "title": "Tests the agent cannot game",
+          "goals": [
+            "Separate the agent that writes tests from the one that writes code",
+            "Have a fresh context grade the work instead of the one that did it",
+            "Spot tests written around the current output: snapshot-only asserts, mocks of the unit under test, no edge cases"
+          ],
+          "facts": [
+            {
+              "id": "split-test-writer",
+              "claim": "The best-practices page suggests having one Claude write tests and another write code to pass them.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "independent-verifier",
+              "claim": "A verification subagent or a Stop hook can check the work, so the agent doing the work is not the one grading it.",
+              "source": "https://code.claude.com/docs/en/best-practices",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-no-history",
+              "claim": "A subagent does not see the parent conversation or the files the parent already read, which is what makes it an independent checker.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "mutation"],
+          "rubricFocus": ["verification", "delegation"]
+        }
+      ]
+    },
+    {
+      "id": "review-accuracy-security",
+      "name": "Reviewing agent output for accuracy and security",
+      "blurb": "Read an agent's diff the way a careful reviewer would, and set guardrails so the worst mistakes cannot happen.",
+      "requires": ["test-strength"],
+      "lessons": [
+        {
+          "id": "review-agent-diffs",
+          "title": "Catch what the agent got wrong",
+          "goals": [
+            "Find invented APIs, weakened tests, swallowed errors, and scope creep in a diff",
+            "Find injection holes, leaked secrets, and missing authorisation",
+            "Decide what to check by hand and what to hand to a review subagent"
+          ],
+          "facts": [],
+          "exercises": ["flaw-review", "design-review"],
+          "rubricFocus": ["safety", "verification"]
+        },
+        {
+          "id": "permissions-and-guardrails",
+          "title": "Permission modes and guardrails",
+          "goals": [
+            "Choose a permission mode for the task at hand",
+            "Write allow and deny rules that are no broader than needed",
+            "Use hooks for rules that must hold every time, not prompts"
+          ],
+          "facts": [],
+          "exercises": ["lab", "design-review"],
+          "rubricFocus": ["safety"]
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "name": "Skills",
+      "blurb": "Package a repeatable workflow so the agent loads it only when it is needed.",
+      "requires": ["planning"],
+      "lessons": [
+        {
+          "id": "write-a-skill",
+          "title": "Write a skill",
+          "goals": [
+            "Turn a workflow you repeat into a SKILL.md",
+            "Write a description that makes the skill load at the right moment and no other",
+            "Keep the body short and move detail into files the skill reads on demand"
+          ],
+          "facts": [],
+          "exercises": ["lab", "design-review"],
+          "rubricFocus": ["contextCost", "decomposition"]
+        }
+      ]
+    },
+    {
+      "id": "loops-automation",
+      "name": "Loops and automation",
+      "blurb": "Run the agent without a person at every step, and know when it should stop.",
+      "requires": ["skills"],
+      "lessons": [
+        {
+          "id": "headless-runs",
+          "title": "Headless runs and scripts",
+          "goals": [
+            "Run the agent non-interactively for a scripted task",
+            "Limit its tools and permissions for unattended runs",
+            "Read its output in a form a script can check"
+          ],
+          "facts": [],
+          "exercises": ["lab", "design-review"],
+          "rubricFocus": ["safety", "verification"]
+        },
+        {
+          "id": "loops-and-stop-conditions",
+          "title": "Loops and stop conditions",
+          "goals": [
+            "Pick a loop's interval from how fast the thing it watches changes",
+            "Give every loop a condition that ends it",
+            "Know what a loop costs per iteration"
+          ],
+          "facts": [],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["contextCost", "verification"]
+        }
+      ]
+    },
+    {
+      "id": "orchestration",
+      "name": "Orchestrators and workers",
+      "blurb": "Split a task across subagents with the right model, effort, tools, and hand-off for each.",
+      "requires": ["planning", "skills"],
+      "lessons": [
+        {
+          "id": "orchestrator-and-workers",
+          "title": "Split work across subagents",
+          "goals": [
+            "Decide which parts of a task to delegate and which to keep",
+            "Write a hand-off contract: what each worker gets, may touch, and returns",
+            "Run independent workers in parallel and dependent ones in order"
+          ],
+          "facts": [
+            {
+              "id": "subagent-locations",
+              "claim": "Subagents are defined as Markdown files in .claude/agents/ for the current project or ~/.claude/agents/ for every project; the --agents flag, managed settings, and plugins can define them too.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-required-fields",
+              "claim": "Only name and description are required in a subagent's frontmatter.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-own-context",
+              "claim": "Each subagent runs in its own context window with its own system prompt, tool access, and permissions, and does not see the parent's conversation history.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-results",
+              "claim": "Only a subagent's final summary returns to the main conversation; a background subagent's result arrives later as a notification, and a subagent can be resumed with SendMessage.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["delegation", "decomposition", "verification"],
+          "checklist": [
+            {
+              "id": "split",
+              "text": "Each worker has one job, and the orchestrator keeps the parts that need the whole picture"
+            },
+            {
+              "id": "contract",
+              "text": "Each hand-off says what the worker gets, what it may change, and the shape of what it returns"
+            },
+            {
+              "id": "parallel",
+              "text": "Independent workers run in parallel; dependent ones wait for what they need"
+            },
+            {
+              "id": "check",
+              "text": "Worker output is checked before it is trusted or merged"
+            }
+          ],
+          "labFiles": [".claude/agents/*.md", "CLAUDE.md", "AGENTS.md"]
+        },
+        {
+          "id": "model-and-effort",
+          "title": "Pick a model and effort for each worker",
+          "goals": [
+            "Match a worker's model to how hard its job is",
+            "Set effort per worker instead of running everything at the maximum",
+            "Give each worker only the tools its job needs"
+          ],
+          "facts": [
+            {
+              "id": "subagent-model-values",
+              "claim": "A subagent's model field accepts an alias (sonnet, opus, haiku, fable), a full model id, or inherit; when it is omitted Claude Code chooses one.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-effort-values",
+              "claim": "A subagent's effort field accepts low, medium, high, xhigh, or max, and which levels are available depends on the model.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "subagent-frontmatter-fields",
+              "claim": "Subagent frontmatter also documents tools, disallowedTools, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, isolation, color, and initialPrompt.",
+              "source": "https://code.claude.com/docs/en/sub-agents",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["delegation", "contextCost"],
+          "checklist": [
+            {
+              "id": "model-fit",
+              "text": "Each agent's model matches how hard its job is, with a reason"
+            },
+            {
+              "id": "effort-fit",
+              "text": "Effort is set per agent rather than left at the maximum everywhere"
+            },
+            {
+              "id": "tools-minimal",
+              "text": "Each agent lists only the tools its job needs"
+            },
+            {
+              "id": "valid-fields",
+              "text": "Frontmatter uses only documented fields and valid model and effort values"
+            }
+          ],
+          "labFiles": [".claude/agents/*.md"]
+        }
+      ]
+    },
+    {
+      "id": "cost-context",
+      "name": "Cost and prompt caching",
+      "blurb": "Know what a session costs, why cached tokens are cheap until they are not, and what breaks the cache.",
+      "requires": ["orchestration"],
+      "lessons": [
+        {
+          "id": "prompt-caching",
+          "title": "How prompt caching prices a session",
+          "goals": [
+            "Read a session's cost as cache writes, cache reads, and uncached input",
+            "Choose between the five-minute and one-hour cache",
+            "Order a prompt so the stable parts come first"
+          ],
+          "facts": [
+            {
+              "id": "cache-write-multipliers",
+              "claim": "Writing to the five-minute cache costs 1.25 times the base input price; writing to the one-hour cache costs 2 times.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "cache-read-multiplier",
+              "claim": "Reading from the cache costs 0.1 times the base input price for most models, and less on some of the newest models.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "cache-invalidation-order",
+              "claim": "The cache prefix is built in the order tools, system, messages; a change at one level invalidates that level and everything after it, so changing tool definitions invalidates the whole cache.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "cache-breakpoints",
+              "claim": "A request can define up to four cache breakpoints.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "cache-min-length",
+              "claim": "Each model has a minimum cacheable prompt length, from a few hundred to a few thousand tokens; shorter prompts are processed without caching and no error is returned.",
+              "source": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "cache-plan"],
+          "rubricFocus": ["contextCost"]
+        },
+        {
+          "id": "cache-breakers",
+          "title": "What breaks the cache in Claude Code",
+          "goals": [
+            "Recognise the actions that throw away a warm cache",
+            "Plan model and effort switches at natural break points",
+            "Decide when compacting is worth the cache it costs"
+          ],
+          "facts": [
+            {
+              "id": "claude-code-caching-automatic",
+              "claim": "Claude Code manages prompt caching automatically unless it is disabled with environment variables such as DISABLE_PROMPT_CACHING.",
+              "source": "https://code.claude.com/docs/en/prompt-caching",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-code-cache-invalidators",
+              "claim": "In Claude Code, switching models, changing effort on most models, and compacting the conversation invalidate the cache.",
+              "source": "https://code.claude.com/docs/en/prompt-caching",
+              "core": true,
+              "verifiedAt": "2026-10-18"
+            },
+            {
+              "id": "claude-md-midsession",
+              "claim": "Editing CLAUDE.md mid-session does not take effect until /clear, /compact, or a restart.",
+              "source": "https://code.claude.com/docs/en/prompt-caching",
+              "core": false,
+              "verifiedAt": "2026-10-18"
+            }
+          ],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["contextCost", "delegation"],
+          "checklist": [
+            {
+              "id": "stable-prefix",
+              "text": "Instructions that rarely change sit in CLAUDE.md, not in each prompt"
+            },
+            {
+              "id": "switches",
+              "text": "Model and effort switches happen at natural break points, not mid-task"
+            },
+            {
+              "id": "compaction",
+              "text": "Compaction and /clear are used deliberately, with a reason"
+            }
+          ],
+          "labFiles": ["CLAUDE.md", ".claude/settings.json"]
+        }
+      ]
+    },
+    {
+      "id": "refactoring",
+      "name": "Refactoring with agents",
+      "blurb": "Know when a refactor pays for itself, and let an agent do it without changing behaviour.",
+      "requires": ["test-strength"],
+      "lessons": [
+        {
+          "id": "when-to-refactor",
+          "title": "When to refactor, and when not to",
+          "goals": [
+            "Refactor before a change that the current structure makes hard, not for its own sake",
+            "Pin behaviour with characterisation tests before the agent touches the code",
+            "Keep each refactor step small enough to review and revert"
+          ],
+          "facts": [],
+          "exercises": ["design-review", "refactor"],
+          "rubricFocus": ["verification", "decomposition"]
+        }
+      ]
+    },
+    {
+      "id": "cross-provider",
+      "name": "Working across providers",
+      "blurb": "When a second model from another provider pays for itself, and how to wire one in.",
+      "requires": ["orchestration", "review-accuracy-security"],
+      "lessons": [
+        {
+          "id": "second-opinion",
+          "title": "A second model as reviewer",
+          "goals": [
+            "Use a model from another provider to review a plan or a diff",
+            "Weigh what it catches against the cost of a cold context and another vendor seeing the code",
+            "Bridge another tool in through MCP, a multi-provider harness, or a gateway"
+          ],
+          "facts": [],
+          "exercises": ["design-review", "lab"],
+          "rubricFocus": ["verification", "delegation", "safety"]
+        }
+      ]
+    }
+  ]
+}

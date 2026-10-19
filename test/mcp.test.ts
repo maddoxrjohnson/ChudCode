@@ -3,6 +3,7 @@
  * from a browser action to `wait_for_candidate` and back to the page.
  */
 
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -87,6 +88,27 @@ const CORRECT =
   "def max_window_sum(nums, k):\n    if k > len(nums):\n        return 0\n    s = sum(nums[:k]); b = s\n    for i in range(k, len(nums)):\n        s += nums[i] - nums[i - k]; b = max(b, s)\n    return b\n";
 
 // ── Inbox ─────────────────────────────────────────────────────────────────────
+
+const INTERVIEW_TOOLS = [
+  "abandon_session",
+  "begin_interview",
+  "get_session",
+  "list_due",
+  "list_problems",
+  "list_roadmap",
+  "list_trends",
+  "lookup_seed",
+  "open_dashboard",
+  "record_session",
+  "record_trends",
+  "reveal_hint",
+  "run_tests",
+  "say_to_candidate",
+  "start_session",
+  "validate_problem",
+  "wait_for_candidate",
+  "write_problem",
+];
 
 describe("CandidateInbox", () => {
   it("queues prompts until someone waits, then hands over everything at once", async () => {
@@ -180,6 +202,21 @@ describe("protocol", () => {
     );
   });
 
+  it("keeps the interview tools' arguments exactly as they were before lessons", async () => {
+    // The lesson track adds tools; it must not change what an interviewer can pass.
+    const response = await request("tools/list");
+    const tools = (response as { result: { tools: Array<{ name: string; inputSchema: unknown }> } })
+      .result.tools;
+    const interview = tools
+      .filter((t) => INTERVIEW_TOOLS.includes(t.name))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((t) => [t.name, t.inputSchema]);
+    expect(interview).toHaveLength(INTERVIEW_TOOLS.length);
+    expect(createHash("sha256").update(JSON.stringify(interview)).digest("hex")).toBe(
+      "c054f804ebbe1c88c75764546643f7267ed7265459d5183909bffd0459d4b861",
+    );
+  });
+
   it("lists every tool", async () => {
     const response = await request("tools/list");
     const tools = (response as { result: { tools: Array<{ name: string }> } }).result.tools;
@@ -187,12 +224,14 @@ describe("protocol", () => {
       "abandon_session",
       "begin_interview",
       "get_session",
+      "list_curriculum",
       "list_due",
       "list_problems",
       "list_roadmap",
       "list_trends",
       "lookup_seed",
       "open_dashboard",
+      "record_fact_check",
       "record_session",
       "record_trends",
       "reveal_hint",
