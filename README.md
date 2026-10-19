@@ -124,7 +124,30 @@ make sure the patterns you keep missing are the ones you see again.
   tick the consent box. The interviewer gets those files read-only, with anything
   that looks like a credential redacted, plus recent git history and mechanical
   checks drawn from the sourced facts, and grades them against the lesson's
-  checklist. See `docs/EXERCISE-FORMAT.md`. Drills graded by code are next.
+  checklist. See `docs/EXERCISE-FORMAT.md`.
+- Mutation drills: your agent writes tests for a small module in a scratch
+  workspace, and Grade runs them against the module, against rewrites of it that
+  behave the same, and against copies with one planted bug each. Tests that fail on
+  correct code or tie themselves to the implementation fail the drill; tests that
+  catch at least 80% of the bugs pass it. The debrief names the bugs that got
+  through.
+- Flaw reviews: an agent's diff with planted flaws (a SQL injection, a committed
+  key, an API that does not exist, a swallowed error) and decoys that look wrong and
+  are fine. Click the lines you would block, name the problem, and submit; you pass
+  by finding every critical flaw and most of the rest without crying wolf.
+- Cache plans: a workload of requests over time, and your agent's plan for prompt
+  order and cache breakpoints, priced by a simulator that uses only sourced prices
+  and limits. Within 10% of the best plan known passes.
+- Refactor drills: a tangled module in a git workspace. Your agent commits
+  characterisation tests, then the refactor. Grade checks the tests landed first and
+  catch bugs planted in the original, that hidden behaviour tests still pass, that
+  the interface is the same, and that the structure got simpler.
+- Transcript reviews: pick one of your own Claude Code sessions and the interviewer
+  reviews how you worked from its numbers: models and switches, cache reads and
+  writes, long gaps, compactions, and your prompts. Nothing is listed or read until
+  you ask on the page, and the replies and tool output are never read.
+- After any lesson's debrief, the Next lesson button opens the next one; the
+  interviewer writes it while you read the debrief.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -148,6 +171,11 @@ A lab asks for your project folder instead. After the review, each checklist ite
 shows whether your setup met it and the file that shows it.
 
 ![A lab page: the teaching on CLAUDE.md files, what the review checks, the project folder with the two files a review would read and the consent box ticked, and a debrief with checklist results](docs/screenshots/lab-debrief.png)
+
+A flaw review shows an agent's diff; click the lines you would block and name the
+problem.
+
+![A flaw review: an agent's diff to a Flask invoices blueprint with four lines marked, including a committed key and a SQL string built from the search term, and the mark form open on a call to an API that does not exist](docs/screenshots/flaw-review.png)
 
 The dashboard shows every pattern's place in the review schedule, what is due, the
 streak, progress through both roadmaps and the agentic-coding modules, and past

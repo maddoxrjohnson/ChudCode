@@ -5,6 +5,12 @@ A lesson's focus dimensions are always scored, and each must reach 2 for the les
 pass. Score what the learner showed you, in the answer and the follow-ups, not what
 they might know.
 
+The rubric is half of the verdict for some kinds. A lab or a transcript review also
+needs to have been read, with nothing on its checklist missing. A drill graded by
+code (mutation tests, a flaw review, a cache plan, a refactor) also needs its latest
+attempt to have cleared its gate: the rubric cannot pass work the checks failed, and
+a passed gate cannot pass judgement the rubric found wanting.
+
 ## Decomposition
 
 | Score | Looks like                                                                                  |

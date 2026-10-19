@@ -68,6 +68,107 @@ checklist item: met, partial, or missing, each with the file that shows it. A la
 passes when the project was read, nothing on the checklist is missing outright, and
 every focus dimension scored 2 or more.
 
+## Mutation drills
+
+A mutation drill grades the tests the learner's agent writes by the bugs they catch.
+You write a small, realistic Python module (standard library only, 30 to 120 lines,
+with real edges: a boundary, a clock, an error path), and alongside it:
+
+- **rewrites_py**: at least two rewrites that behave identically but are built
+  differently (other helper names, other private attributes, other control flow).
+  A suite that fails on one is testing how the code is written, not what it does.
+- **mutants**: 4 to 15 plausible bugs, each one edit to the module: an off-by-one
+  bound, a dropped guard, a state update that no longer happens, a wrong default.
+  Not syntax errors and not renames; bugs a careful reviewer could miss.
+- **oracle_tests_py**: your own unittest suite. `validate_exercise` runs it against
+  the module (twice), every rewrite, and every mutant: it must pass the first two and
+  kill every mutant. A mutant that survives your own oracle is either not a bug or
+  under-tested by you; fix one or the other.
+
+`start_lesson` lays out a workspace outside `~/.chudcode` with the README, the module,
+and an empty `tests/`, and tells you its path. The learner points their own agent at
+it. Each press of Grade runs their suite through the same steps and sends you the full
+report; the page shows only the counts. Do not name a surviving bug or the input that
+exposes it: ask what kind of case the suite never tries. The debrief reveals the
+survivors. A drill passes when the latest grade cleared the gate (the suite passes on
+the module and every rewrite, nothing reaches for hidden files or pastes in the code,
+and at least 80% of the bugs are caught) and every focus dimension scored 2 or more.
+
+## Flaw reviews
+
+A flaw review grades how the learner reviews an agent's work. Write a unified diff
+an agent plausibly produced for the scenario (40 to 200 lines, one to three files)
+that looks finished and passes its own tests, and plant 4 to 12 flaws in its added
+lines: an injection, a committed secret, a call to an API that does not exist, a
+test weakened until it passes, a permission wider than needed, a missing ownership
+check, an error swallowed, a change outside the task. Mark at least one critical.
+Add two or more decoys: lines that look suspicious and are correct (a parameterised
+query, a secret read from the environment). Each flaw names its first and last line
+in the new file, a category, and an explanation for the debrief.
+
+The learner marks lines on the page, each with a category and a reason, and has
+three submissions. A mark within two lines of a flaw finds it; the category is
+graded apart. You see what was found, what was missed, and which marks hit decoys.
+Ask about the class of risk the review skipped, never the line. A review passes when
+every critical flaw is found, at least 70% are, and false alarms stay under half the
+number of flaws (at least two allowed).
+
+## Cache plans
+
+A cache plan grades whether the learner can reason about what a session costs.
+Write a workload in `scenario`: a model from `data/agentic/cache-model.json`, 3 to
+12 prompt segments (each at the tools, system, or messages level, with its token
+count, what it is, and the requests at which it changes), and the requests with
+their times in minutes and their new tokens. Make it reward a real plan: a segment
+that changes every request sitting before stable ones, a gap longer than five
+minutes, a prefix under the model's minimum. Your `reference_plan` orders the
+segments and places up to four breakpoints with 5m or 1h lifetimes; validation
+refuses it unless the naive plan (listed order, one 5m breakpoint at the end) costs
+at least 15% more.
+
+The learner's agent writes a plan as JSON and they check it on the page as often as
+they like, up to ten times; each check shows its cost, its cache hits, and how it
+compares with your reference. The simulator (`src/drill/cache-sim.ts`) uses only
+sourced prices and limits and says it is simplified. Ask about the decision costing
+them most. A plan passes within 10% of the reference.
+
+## Refactor drills
+
+A refactor drill grades a refactor done the safe way. Write `legacy_py`: a working
+module with one function of 25 lines or more that the next feature would make worse
+(nested branches, repeated rules, one function doing three jobs). Write `clean_py`,
+your own refactor with the same public functions and parameters and a shorter
+longest function or shallower nesting, then mutants of the legacy module and an
+oracle that passes on both modules and kills every mutant. `validate_exercise` runs
+it all.
+
+The workspace starts as a git repository with the legacy module committed. The
+learner's agent pins the module's behaviour with characterisation tests and commits
+them, then refactors and commits again. Grade checks the order in git history, runs
+their tests against the original and your clean version and against the mutants
+(60% must be caught), runs your oracle on their refactor, compares the public
+interface, and compares the shape before and after. Ask why the order matters and
+what their tests never pinned.
+
+## Transcript reviews
+
+A transcript review grades how the learner actually works, from one of their own
+Claude Code sessions. The brief needs only `## Your task`: what kind of session to
+pick and what the review looks at. On the page they list their recent sessions,
+pick one, and consent; `inspect_transcript` then gives you counts, never the
+replies or tool output: requests, models and switches, effort, cache reads and
+writes, gaps over five minutes, compactions, slash commands, an input-cost estimate
+where the model is priced, and their first prompts, clipped and redacted. Judge it
+against the lesson's checklist and point at numbers in your follow-up.
+`record_lesson` needs a result for every checklist item, as for a lab.
+
+## After the debrief
+
+`record_lesson` names the next lesson. Write its exercise ahead of time (begin it,
+write it, validate it, but do not start it) and keep calling `wait_for_candidate`:
+for ten minutes a press of the page's **Next lesson** button reaches you, and the
+waiting pages follow you into the lesson as soon as `start_lesson` returns.
+
 ## The arc of a lesson
 
 1. **Reading.** The page shows the teaching and the brief. Say one sentence: that

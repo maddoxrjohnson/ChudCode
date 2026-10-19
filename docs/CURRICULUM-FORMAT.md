@@ -56,6 +56,8 @@ The agentic-coding track is one file, `data/agentic/curriculum.json`, checked by
 - **Outlines.** A lesson with `"facts": []` is an outline: it shows on the dashboard
   as coming, cannot be taught, and does not count toward unlocking. Write and source
   its facts to make it teachable.
+- **Transcript reviews.** A teachable lesson that lists `transcript` needs a
+  `checklist`.
 - **Labs.** A teachable lesson that lists `lab` needs a `checklist` and the
   `labFiles` a lab reads. Every lab file must be a pattern on `LAB_ALLOW` in
   `src/lab.ts`, so a curriculum edit cannot widen what a lab may read.
