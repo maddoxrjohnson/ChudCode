@@ -308,9 +308,71 @@
             "Write allow and deny rules that are no broader than needed",
             "Use hooks for rules that must hold every time, not prompts"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "permission-modes-list",
+              "claim": "The permission-modes page lists default, acceptEdits, plan, auto, dontAsk, and bypassPermissions as the modes. The config value default is the mode the UI calls Manual, and in it only reads run without a prompt.",
+              "source": "https://code.claude.com/docs/en/permission-modes",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "rule-evaluation-order",
+              "claim": "The permissions page says rules are evaluated in the order deny, then ask, then allow, and the first match in that order decides the outcome, with rule specificity not changing the order.",
+              "source": "https://code.claude.com/docs/en/permissions",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "settings-precedence",
+              "claim": "The settings page ranks settings from highest to lowest as managed settings, command line (claude --settings), project local (.claude/settings.local.json), shared project (.claude/settings.json), and user (~/.claude/settings.json), and says a key set at a higher level overrides the same key set lower down.",
+              "source": "https://code.claude.com/docs/en/settings",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "pretooluse-exit-2-blocks",
+              "claim": "The hooks page says a PreToolUse hook that exits with code 2 blocks the tool call even if it also prints JSON, and that the hook's stderr is the message shown as the reason for the block.",
+              "source": "https://code.claude.com/docs/en/hooks",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "deny-holds-in-bypass",
+              "claim": "The permission-modes page says deny rules block in every mode, including bypassPermissions, and that allow rules have no effect in bypassPermissions.",
+              "source": "https://code.claude.com/docs/en/permission-modes",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "sandbox-bash-isolation",
+              "claim": "The security page says the sandboxed Bash tool isolates bash commands with filesystem and network isolation, reducing permission prompts while maintaining security.",
+              "source": "https://code.claude.com/docs/en/security",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["lab", "design-review"],
-          "rubricFocus": ["safety"]
+          "rubricFocus": ["safety"],
+          "checklist": [
+            {
+              "id": "mode-fit",
+              "text": "The default permission mode fits how the project is worked on, and bypassPermissions is not the default"
+            },
+            {
+              "id": "allow-narrow",
+              "text": "Allow rules name specific commands, not whole tools like Bash"
+            },
+            {
+              "id": "deny-sensitive",
+              "text": "Deny rules cover what must never happen, such as reading secrets or pushing to main"
+            },
+            {
+              "id": "hooks-for-musts",
+              "text": "A rule that must hold every time is a hook, not a line in CLAUDE.md"
+            }
+          ],
+          "labFiles": [".claude/settings.json", "CLAUDE.md"]
         }
       ]
     },
@@ -328,9 +390,78 @@
             "Write a description that makes the skill load at the right moment and no other",
             "Keep the body short and move detail into files the skill reads on demand"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "skill-locations",
+              "claim": "The skills page says a personal skill lives at ~/.claude/skills/<skill-name>/SKILL.md and a project skill lives at .claude/skills/<skill-name>/SKILL.md, and that enterprise skills take precedence over personal ones, which take precedence over project ones.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "frontmatter-description-recommended",
+              "claim": "The skills page says only the description frontmatter field is recommended, name defaults to the directory name, and all other frontmatter fields are optional.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "description-decides-loading",
+              "claim": "The skills page says Claude uses the description, plus when_to_use if set, to decide when to load a skill automatically, and advises putting the key use case first because the combined text is cut at 1,536 characters in the listing.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "progressive-disclosure",
+              "claim": "The skills page says a skill's body loads only when it is used, and supporting files referenced from SKILL.md are read on demand, while scripts are executed rather than loaded.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "skill-size-guidance",
+              "claim": "The skills page advises keeping SKILL.md under 500 lines and moving detailed reference material into separate files.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "disable-model-invocation",
+              "claim": "The skills page says setting disable-model-invocation to true prevents Claude from loading the skill automatically, so the skill runs only when the user invokes it with /name.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "skill-frontmatter-fields",
+              "claim": "The skills page documents frontmatter fields including name, description, when_to_use, argument-hint, disable-model-invocation, user-invocable, allowed-tools, model, effort, context, agent, hooks, and paths, and Claude Code ignores fields it does not recognise.",
+              "source": "https://code.claude.com/docs/en/skills",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["lab", "design-review"],
-          "rubricFocus": ["contextCost", "decomposition"]
+          "rubricFocus": ["contextCost", "decomposition"],
+          "checklist": [
+            {
+              "id": "trigger",
+              "text": "The description says when to use the skill, with the key use case first"
+            },
+            {
+              "id": "one-job",
+              "text": "The skill does one repeatable job, not a grab bag"
+            },
+            {
+              "id": "short-body",
+              "text": "SKILL.md stays short and moves detail into files it reads on demand"
+            },
+            {
+              "id": "invocation",
+              "text": "A skill with side effects can only be run by the user (disable-model-invocation)"
+            }
+          ],
+          "labFiles": [".claude/skills/*/SKILL.md", ".claude/skills/*/*.md"]
         }
       ]
     },
@@ -348,9 +479,77 @@
             "Limit its tools and permissions for unattended runs",
             "Read its output in a form a script can check"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "headless-output-formats",
+              "claim": "The headless page says --output-format accepts text (the default), json, and stream-json, where json returns structured output with the result, session ID, and metadata, and stream-json returns newline-delimited JSON for real-time streaming.",
+              "source": "https://code.claude.com/docs/en/headless",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "headless-prompts-unattended",
+              "claim": "The headless page says to pass --permission-prompts none when nobody can answer permission prompts, such as in a scheduled job, and then anything that would prompt is denied unless a PermissionRequest hook allows it.",
+              "source": "https://code.claude.com/docs/en/headless",
+              "core": true,
+              "verifiedAt": "2026-10-19",
+              "minVersion": "2.1.259"
+            },
+            {
+              "id": "headless-trust-dialog-skipped",
+              "claim": "The headless page says a -p session shows no workspace trust dialog and no per-server MCP approval prompt, and without --bare it still runs hooks from a project's .claude/settings.json even in a folder you have never trusted.",
+              "source": "https://code.claude.com/docs/en/headless",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "headless-allowed-tools",
+              "claim": "The headless page says --allowedTools lets Claude use the listed tools without prompting, and a rule like Bash(git diff *) uses prefix matching because of the space before the star.",
+              "source": "https://code.claude.com/docs/en/headless",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "headless-max-turns",
+              "claim": "The CLI reference says --max-turns limits agentic turns in print mode, exits with an error when the limit is reached, and has no limit by default.",
+              "source": "https://code.claude.com/docs/en/cli-reference",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "headless-resume",
+              "claim": "The headless page says --continue continues the most recent conversation, and --resume with a session ID continues a specific conversation.",
+              "source": "https://code.claude.com/docs/en/headless",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["lab", "design-review"],
-          "rubricFocus": ["safety", "verification"]
+          "rubricFocus": ["safety", "verification"],
+          "checklist": [
+            {
+              "id": "tools-limited",
+              "text": "Unattended runs name the tools they may use instead of allowing everything"
+            },
+            {
+              "id": "no-prompts",
+              "text": "Nothing waits on a permission prompt nobody will answer"
+            },
+            {
+              "id": "bounded",
+              "text": "Each run is bounded, for example with --max-turns"
+            },
+            {
+              "id": "output-checked",
+              "text": "A script reads structured output and checks the result, not just the exit code"
+            }
+          ],
+          "labFiles": [
+            ".github/workflows/*.yml",
+            ".github/workflows/*.yaml",
+            ".claude/settings.json",
+            "CLAUDE.md"
+          ]
         },
         {
           "id": "loops-and-stop-conditions",
@@ -360,9 +559,75 @@
             "Give every loop a condition that ends it",
             "Know what a loop costs per iteration"
           ],
-          "facts": [],
+          "facts": [
+            {
+              "id": "loop-bundled-skill",
+              "claim": "The scheduled-tasks page says the /loop bundled skill is the quickest way to run a prompt on repeat while the session stays open.",
+              "source": "https://code.claude.com/docs/en/scheduled-tasks",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "loop-self-paced-delay",
+              "claim": "The scheduled-tasks page says that when /loop is run without an interval, Claude picks a delay of between one minute and one hour after each iteration, based on what it observed.",
+              "source": "https://code.claude.com/docs/en/scheduled-tasks",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "loop-stop-with-escape",
+              "claim": "The scheduled-tasks page says pressing Esc stops a self-paced /loop while it waits for the next iteration by clearing the pending wakeup, and Claude can end the loop itself by calling ScheduleWakeup with stop set to true.",
+              "source": "https://code.claude.com/docs/en/scheduled-tasks",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "stop-hook-blocks-stopping",
+              "claim": "The hooks page says a Stop hook can prevent Claude from stopping and continue the conversation, either by exiting with code 2 or by returning decision block with a reason.",
+              "source": "https://code.claude.com/docs/en/hooks",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "stop-hook-active-guard",
+              "claim": "The hooks page says the Stop hook input field stop_hook_active is true when Claude Code is already continuing because of a stop hook, and advises checking it to avoid blocking on a condition that will never resolve.",
+              "source": "https://code.claude.com/docs/en/hooks",
+              "core": true,
+              "verifiedAt": "2026-10-19"
+            },
+            {
+              "id": "stop-hook-continuation-cap",
+              "claim": "The hooks page says Claude Code applies a cap of 8 consecutive stop-hook continuations, overriding the next block after eight in a row, that the count resets whenever Claude calls a tool, and that CLAUDE_CODE_STOP_HOOK_BLOCK_CAP raises the cap.",
+              "source": "https://code.claude.com/docs/en/hooks",
+              "core": false,
+              "verifiedAt": "2026-10-19"
+            }
+          ],
           "exercises": ["design-review", "lab"],
-          "rubricFocus": ["contextCost", "verification"]
+          "rubricFocus": ["contextCost", "verification"],
+          "checklist": [
+            {
+              "id": "ends",
+              "text": "Every loop or Stop hook has a condition that ends it"
+            },
+            {
+              "id": "guard",
+              "text": "A Stop hook checks stop_hook_active so it cannot block forever"
+            },
+            {
+              "id": "interval",
+              "text": "A loop's interval matches how fast the thing it watches changes"
+            },
+            {
+              "id": "cost",
+              "text": "The cost of each iteration is known and kept small"
+            }
+          ],
+          "labFiles": [
+            ".claude/settings.json",
+            ".claude/commands/*.md",
+            ".claude/skills/*/SKILL.md"
+          ]
         }
       ]
     },

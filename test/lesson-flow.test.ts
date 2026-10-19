@@ -102,7 +102,7 @@ describe("begin_lesson", () => {
     expect(locked.text).toMatch(/This module is still locked: it builds on `orchestration`/);
     const forced = await call("begin_lesson", { lesson: "prompt-caching", override_lock: true });
     expect(forced.text).toMatch(/The user asked for it anyway/);
-    const outline = await call("begin_lesson", { lesson: "write-a-skill" });
+    const outline = await call("begin_lesson", { lesson: "when-to-refactor" });
     expect(outline.isError).toBe(true);
     expect(outline.text).toMatch(/is an outline/);
   });

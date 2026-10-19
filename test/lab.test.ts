@@ -20,6 +20,7 @@ import {
   matchesPattern,
   redactSecrets,
   resolveProjectRoot,
+  SKILL_LINES,
   type LabFile,
 } from "../src/lab.ts";
 
@@ -278,8 +279,57 @@ describe("lints", () => {
       file("AGENTS.md", "x"),
       file(".claude/agents/a.md", "---\nfoo: 1\nmodel: x\neffort: y\n---\n"),
       file(".claude/agents/b.md", "nothing"),
+      file(".claude/skills/a/SKILL.md", "---\nname: a\ntriggers: x\n---\n" + "x\n".repeat(600)),
+      file(
+        ".claude/settings.json",
+        JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } }),
+      ),
+      file(".claude/skills/b/SKILL.md", `---\ndescription: ${"d".repeat(2000)}\n---\n`),
+      file("x/.claude/settings.json", JSON.stringify({ permissions: { defaultMode: "yolo" } })),
     ]);
     for (const lint of lints) if (lint.fact) expect(facts.has(lint.fact)).toBe(true);
-    expect(lints.length).toBeGreaterThanOrEqual(6);
+    expect(lints.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("reads a block-scalar description", () => {
+    expect(
+      frontmatter("---\ndescription: >\n  Use when the\n  user asks.\nname: x\n---\n")?.get(
+        "description",
+      ),
+    ).toEqual({ value: "Use when the user asks.", line: 2 });
+  });
+
+  it("flags skills with no description, unknown fields, and long bodies", () => {
+    const lints = lintLab([
+      file(".claude/skills/deploy/SKILL.md", "---\nname: deploy\ntriggers: ship it\n---\nBody"),
+      file(
+        ".claude/skills/review/SKILL.md",
+        `---\ndescription: ${"Review. ".repeat(150)}\nwhen_to_use: ${"x".repeat(400)}\n---\n${"line\n".repeat(SKILL_LINES + 1)}`,
+      ),
+      file(".claude/skills/ok/SKILL.md", "---\ndescription: Use when asked to ok.\n---\nBody"),
+      file(".claude/skills/ok/reference.md", "no frontmatter needed here"),
+    ]);
+    expect(lints.map((l) => [l.file, l.id])).toEqual([
+      [".claude/skills/deploy/SKILL.md", "skill-no-description"],
+      [".claude/skills/deploy/SKILL.md", "skill-unknown-field"],
+      [".claude/skills/review/SKILL.md", "skill-description-long"],
+      [".claude/skills/review/SKILL.md", "skill-long"],
+    ]);
+  });
+
+  it("flags a bad or bypassing default mode and allow rules that hand over a tool", () => {
+    const lint = (settings: unknown) =>
+      lintLab([file(".claude/settings.json", JSON.stringify(settings))]).map((l) => l.id);
+    expect(lint({ permissions: { defaultMode: "yolo" } })).toEqual(["settings-bad-mode"]);
+    expect(lint({ permissions: { defaultMode: "bypassPermissions" } })).toEqual([
+      "settings-bypass-default",
+    ]);
+    expect(
+      lint({ permissions: { defaultMode: "acceptEdits", allow: ["Bash", "Bash(npm test)"] } }),
+    ).toEqual(["settings-broad-allow"]);
+    expect(lint({ permissions: { allow: ["Bash(git diff *)"], deny: ["Read(.env)"] } })).toEqual(
+      [],
+    );
+    expect(lint({ model: "opus" })).toEqual([]);
   });
 });

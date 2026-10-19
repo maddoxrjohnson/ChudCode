@@ -47,6 +47,8 @@ export const LAB_ALLOW = [
   ".claude/skills/*/*.md",
   ".claude/agents/**/*.md",
   ".claude/commands/*.md",
+  ".github/workflows/*.yml",
+  ".github/workflows/*.yaml",
 ] as const;
 
 /** Never read, whatever a pattern says. Tested against each path segment. */
@@ -59,6 +61,8 @@ const LAB_DENY: readonly RegExp[] = [
   /credential/i,
   /^node_modules$/,
 ];
+
+const WALKED_DIRS = [".claude", ".github", "docs"];
 
 export const LAB_LIMITS = {
   fileBytes: 64 * 1024,
@@ -192,8 +196,8 @@ export function listLabFiles(root: string, patterns: readonly string[]): LabList
       const relative = rel ? `${rel}/${entry.name}` : entry.name;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        // Only .claude and docs can hold allowed files below the root.
-        if (depth === 0 && entry.name !== ".claude" && entry.name !== "docs") continue;
+        // Only these can hold allowed files below the root.
+        if (depth === 0 && !WALKED_DIRS.includes(entry.name)) continue;
         if (isDenied(relative) || depth >= LAB_LIMITS.depth) continue;
         walk(full, relative, depth + 1);
         continue;
@@ -394,7 +398,18 @@ export function frontmatter(content: string): Map<string, { value: string; line:
     const line = lines[i] as string;
     if (line.trim() === "---") return out;
     const match = /^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/.exec(line);
-    if (match) out.set(match[1] as string, { value: unquote(match[2] as string), line: i + 1 });
+    if (!match) continue;
+    let value = unquote(match[2] as string);
+    // A block scalar (`key: >` or `key: |`) continues on the indented lines below.
+    if (/^[|>][+-]?$/.test(value)) {
+      const block: string[] = [];
+      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1] as string))
+        block.push((lines[++i] as string).trim());
+      value = block.join(" ");
+      out.set(match[1] as string, { value, line: i + 1 - block.length });
+      continue;
+    }
+    out.set(match[1] as string, { value, line: i + 1 });
   }
   return null;
 }
@@ -427,6 +442,46 @@ export const SUBAGENT_FIELDS = [
 export const MODEL_ALIASES = ["sonnet", "opus", "haiku", "fable", "inherit"] as const;
 export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 
+/** Skill frontmatter fields the skills page documents. */
+export const SKILL_FIELDS = [
+  "name",
+  "description",
+  "when_to_use",
+  "argument-hint",
+  "arguments",
+  "disable-model-invocation",
+  "user-invocable",
+  "allowed-tools",
+  "disallowed-tools",
+  "model",
+  "effort",
+  "context",
+  "agent",
+  "background",
+  "hooks",
+  "paths",
+  "shell",
+  "metadata",
+  "license",
+  "compatibility",
+] as const;
+
+/** Where the skill listing cuts a description (with when_to_use), and the body's suggested cap. */
+export const SKILL_DESCRIPTION_CHARS = 1_536;
+export const SKILL_LINES = 500;
+
+export const PERMISSION_MODES = [
+  "default",
+  "acceptEdits",
+  "plan",
+  "auto",
+  "dontAsk",
+  "bypassPermissions",
+] as const;
+
+/** Allow rules that hand over a whole tool. */
+const BROAD_ALLOWS = new Set(["Bash", "Bash(*)", "Bash(:*)", "Bash(**)", "Edit", "Write"]);
+
 /** The longest CLAUDE.md the memory docs suggest. */
 export const CLAUDE_MD_LINES = 200;
 
@@ -458,21 +513,100 @@ export function lintLab(files: readonly LabFile[]): LabLint[] {
     });
 
   for (const file of files) {
-    if (!/^\.claude\/agents\/.+\.md$/.test(file.path)) continue;
-    lints.push(...lintSubagent(file));
+    if (/^\.claude\/agents\/.+\.md$/.test(file.path)) lints.push(...lintSubagent(file));
+    if (/^\.claude\/skills\/[^/]+\/SKILL\.md$/.test(file.path)) lints.push(...lintSkill(file));
   }
 
   const settings = byPath.get(".claude/settings.json");
-  if (settings) {
-    try {
-      JSON.parse(settings.content);
-    } catch {
+  if (settings) lints.push(...lintSettings(settings));
+  return lints;
+}
+
+function lintSkill(file: LabFile): LabLint[] {
+  const lints: LabLint[] = [];
+  const fields = frontmatter(file.content);
+  const description = fields?.get("description")?.value ?? "";
+  if (!description)
+    lints.push({
+      id: "skill-no-description",
+      file: file.path,
+      line: 1,
+      message: "This skill has no description, which is how Claude decides when to load it.",
+      fact: "frontmatter-description-recommended",
+    });
+  for (const [key, { line }] of fields ?? []) {
+    if (!(SKILL_FIELDS as readonly string[]).includes(key))
       lints.push({
-        id: "settings-invalid-json",
-        file: settings.path,
-        message: ".claude/settings.json is not valid JSON, so none of it applies.",
+        id: "skill-unknown-field",
+        file: file.path,
+        line,
+        message: `"${key}" is not a documented skill field, so Claude Code ignores it.`,
+        fact: "skill-frontmatter-fields",
       });
-    }
+  }
+  const listed = description.length + (fields?.get("when_to_use")?.value.length ?? 0);
+  if (listed > SKILL_DESCRIPTION_CHARS)
+    lints.push({
+      id: "skill-description-long",
+      file: file.path,
+      line: fields?.get("description")?.line ?? 1,
+      message: `The description and when_to_use come to ${listed} characters; the listing cuts them at ${SKILL_DESCRIPTION_CHARS}, so put the key use case first.`,
+      fact: "description-decides-loading",
+    });
+  if (file.lines > SKILL_LINES)
+    lints.push({
+      id: "skill-long",
+      file: file.path,
+      message: `SKILL.md is ${file.lines} lines; the docs suggest under ${SKILL_LINES}, with detail in files it reads on demand.`,
+      fact: "skill-size-guidance",
+    });
+  return lints;
+}
+
+function lintSettings(file: LabFile): LabLint[] {
+  let settings: unknown;
+  try {
+    settings = JSON.parse(file.content);
+  } catch {
+    return [
+      {
+        id: "settings-invalid-json",
+        file: file.path,
+        message: ".claude/settings.json is not valid JSON, so none of it applies.",
+      },
+    ];
+  }
+  const permissions =
+    settings && typeof settings === "object"
+      ? (settings as Record<string, unknown>)["permissions"]
+      : undefined;
+  if (!permissions || typeof permissions !== "object") return [];
+  const lints: LabLint[] = [];
+  const { defaultMode, allow } = permissions as Record<string, unknown>;
+  if (typeof defaultMode === "string") {
+    if (!(PERMISSION_MODES as readonly string[]).includes(defaultMode))
+      lints.push({
+        id: "settings-bad-mode",
+        file: file.path,
+        message: `defaultMode "${defaultMode}" is not one of ${PERMISSION_MODES.join(", ")}.`,
+        fact: "permission-modes-list",
+      });
+    else if (defaultMode === "bypassPermissions")
+      lints.push({
+        id: "settings-bypass-default",
+        file: file.path,
+        message:
+          "defaultMode is bypassPermissions: nothing prompts, allow rules stop mattering, and only deny rules still hold.",
+        fact: "deny-holds-in-bypass",
+      });
+  }
+  for (const rule of Array.isArray(allow) ? allow : []) {
+    if (typeof rule === "string" && BROAD_ALLOWS.has(rule.trim()))
+      lints.push({
+        id: "settings-broad-allow",
+        file: file.path,
+        message: `The allow rule "${rule}" lets every use of that tool through without a prompt; name the commands instead. (Advice, not a documented rule.)`,
+      });
   }
   return lints;
 }
