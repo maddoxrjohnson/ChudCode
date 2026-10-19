@@ -18,7 +18,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline";
 
-import { tmpDir } from "../store/paths.ts";
+import { pythonAdapterDir, safeJoin, tmpDir } from "../store/paths.ts";
+import { PYTHON_FLAGS } from "./adapters/python/adapter.ts";
 import { countPassed, evaluateCase, skippedCase } from "./evaluate.ts";
 import type {
   CaseResult,
@@ -59,8 +60,8 @@ export interface Prepared {
   abort?: () => void;
 }
 
-interface SpawnOutcome {
-  lines: HarnessLine[];
+interface SpawnOutcome<T = HarnessLine> {
+  lines: T[];
   stderr: string;
   stderrTruncated: boolean;
   timedOut: boolean;
@@ -98,7 +99,7 @@ export class ProcessRunner implements Runner {
           request.adapter.compileCommand(workdir),
           workdir,
           request.limits,
-          request.adapter,
+          (text) => request.adapter.parseLine(text),
           () => undefined,
         );
         if (compile.exitCode !== 0) {
@@ -123,7 +124,7 @@ export class ProcessRunner implements Runner {
         request.adapter.runCommand(workdir),
         workdir,
         request.limits,
-        request.adapter,
+        (text) => request.adapter.parseLine(text),
         (line) => {
           if (line.event === "case") {
             const testCase = byId.get(line.result.id);
@@ -164,6 +165,68 @@ export class ProcessRunner implements Runner {
     }
   }
 
+  /**
+   * Run a test suite against one module, for the agentic drills: `files` is laid out
+   * in a fresh workdir (paths may hold one directory, like `tests/test_x.py`), the
+   * suite harness discovers and runs the tests, and each test's outcome comes back.
+   */
+  async runSuite(request: SuiteRequest): Promise<SuiteResult> {
+    return this.queue.enqueue(() => this.executeSuite(request));
+  }
+
+  private async executeSuite(request: SuiteRequest): Promise<SuiteResult> {
+    fs.mkdirSync(tmpDir(), { recursive: true });
+    const workdir = fs.mkdtempSync(path.join(tmpDir(), "suite-"));
+    try {
+      for (const [name, contents] of Object.entries(request.files)) {
+        const target = safeJoin(workdir, name);
+        if (!target || name.split("/").length > 2) throw new Error(`Bad suite path: ${name}`);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, contents, "utf8");
+      }
+      fs.mkdirSync(path.join(workdir, "tests"), { recursive: true });
+      fs.writeFileSync(path.join(workdir, "tests", "__init__.py"), "", { flag: "a" });
+      fs.writeFileSync(path.join(workdir, "suite_harness.py"), suiteHarness(), "utf8");
+      fs.writeFileSync(
+        path.join(workdir, "suite.json"),
+        JSON.stringify({ limits: request.limits }),
+      );
+
+      const tests: SuiteTest[] = [];
+      let scan: SuiteScan[] = [];
+      let fatal: string | null = null;
+      let done = false;
+      const outcome = await this.spawnAndCollect(
+        { cmd: request.pythonBin, args: [...PYTHON_FLAGS, "suite_harness.py"] },
+        workdir,
+        request.limits,
+        parseSuiteLine,
+        (line) => {
+          if (line.event === "test") tests.push(line.test);
+          else if (line.event === "scan") scan = line.tests;
+          else if (line.event === "fatal") fatal = line.message;
+          else done = true;
+        },
+      );
+      const status: SuiteResult["status"] = fatal
+        ? "error"
+        : outcome.timedOut
+          ? "timeout"
+          : done
+            ? "ok"
+            : "crashed";
+      return {
+        status,
+        tests,
+        scan,
+        wallMs: outcome.wallMs,
+        stderrTail: fatal ?? outcome.stderr.slice(-4000),
+      };
+    } finally {
+      fs.rmSync(workdir, { recursive: true, force: true });
+    }
+  }
+
   private populate(workdir: string, request: RunRequest): void {
     const write = (name: string, contents: string) => {
       const target = path.join(workdir, path.basename(name));
@@ -182,13 +245,13 @@ export class ProcessRunner implements Runner {
     );
   }
 
-  private spawnAndCollect(
+  private spawnAndCollect<T>(
     adapterCommand: Command,
     workdir: string,
     limits: Limits,
-    adapter: RunRequest["adapter"],
-    onLine: (line: HarnessLine) => void,
-  ): Promise<SpawnOutcome> {
+    parse: (text: string) => T | null,
+    onLine: (line: T) => void,
+  ): Promise<SpawnOutcome<T>> {
     const { command, env, abort } = this.prepare(adapterCommand, workdir, limits);
     return new Promise((resolve, reject) => {
       const started = Date.now();
@@ -224,10 +287,10 @@ export class ProcessRunner implements Runner {
         abort?.();
       }, limits.wallMs);
 
-      const lines: HarnessLine[] = [];
+      const lines: T[] = [];
       const reader = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
       reader.on("line", (text) => {
-        const line = adapter.parseLine(text);
+        const line = parse(text);
         if (!line) return;
         lines.push(line);
         onLine(line);
@@ -318,6 +381,90 @@ function skipReason(status: RunResult["status"]): string {
     default:
       return "not run";
   }
+}
+
+export interface SuiteRequest {
+  /** Relative path to contents: the module under test and `tests/*.py`. */
+  files: Record<string, string>;
+  limits: Limits;
+  pythonBin: string;
+}
+
+export type SuiteTestStatus = "pass" | "fail" | "error" | "timeout" | "skip";
+
+export interface SuiteTest {
+  id: string;
+  status: SuiteTestStatus;
+  message: string;
+}
+
+export interface SuiteScan {
+  id: string;
+  asserts: number;
+}
+
+export interface SuiteResult {
+  /** ok: every test ran. timeout: the wall clock killed the suite. error: discovery failed. */
+  status: "ok" | "timeout" | "error" | "crashed";
+  tests: SuiteTest[];
+  scan: SuiteScan[];
+  wallMs: number;
+  stderrTail: string;
+}
+
+type SuiteLine =
+  | { event: "test"; test: SuiteTest }
+  | { event: "scan"; tests: SuiteScan[] }
+  | { event: "fatal"; message: string }
+  | { event: "done" };
+
+const SUITE_STATUSES: readonly string[] = ["pass", "fail", "error", "timeout", "skip"];
+
+function parseSuiteLine(text: string): SuiteLine | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  let record: Record<string, unknown>;
+  try {
+    record = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  switch (record["event"]) {
+    case "test": {
+      const status = String(record["status"]);
+      if (!SUITE_STATUSES.includes(status)) return null;
+      return {
+        event: "test",
+        test: {
+          id: String(record["id"] ?? ""),
+          status: status as SuiteTestStatus,
+          message: String(record["message"] ?? ""),
+        },
+      };
+    }
+    case "scan":
+      return {
+        event: "scan",
+        tests: Array.isArray(record["tests"])
+          ? (record["tests"] as Array<Record<string, unknown>>).map((t) => ({
+              id: String(t["id"]),
+              asserts: Number(t["asserts"]) || 0,
+            }))
+          : [],
+      };
+    case "fatal":
+      return { event: "fatal", message: String(record["message"] ?? "") };
+    case "done":
+      return { event: "done" };
+    default:
+      return null;
+  }
+}
+
+let suiteHarnessSource: string | null = null;
+function suiteHarness(): string {
+  suiteHarnessSource ??= fs.readFileSync(path.join(pythonAdapterDir(), "suite_harness.py"), "utf8");
+  return suiteHarnessSource;
 }
 
 export const processRunner = new ProcessRunner();
