@@ -18,7 +18,8 @@
  *   GET  /api/sessions/<id>/next-up         { html }  the Next problem row under the debrief
  *
  * A lesson session uses the same paths: GET for its state, PUT draft { text }, and
- * POST start, message, answer { text }, timeout, done.
+ * POST start, message, answer { text }, timeout, done. A lab adds
+ * POST lab-preview { path } (what it would read) and lab { path, note, consent }.
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
  *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
@@ -41,9 +42,11 @@ import {
   lessonTimerExpired,
   MAX_ANSWER_CHARS,
   postLessonMessage,
+  previewLab,
   saveLessonDraft,
   startLesson,
   submitAnswer,
+  submitLab,
 } from "../lesson-flow.ts";
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
@@ -234,6 +237,21 @@ async function handleLessonAction(
       const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 1024));
       return sendJson(res, {
         number: submitAnswer(id, expectString(body["text"], "text", MAX_ANSWER_CHARS)),
+      });
+    }
+    case "lab-preview": {
+      const body = asRecord(await readJsonBody(req, 8 * 1024));
+      return sendJson(res, previewLab(id, expectString(body["path"], "path", 4096)));
+    }
+    case "lab": {
+      const body = asRecord(await readJsonBody(req, MAX_ANSWER_CHARS * 4 + 8 * 1024));
+      // Consent is given on the page, by the learner; nothing else can name a folder.
+      if (body["consent"] !== true)
+        throw new HttpError(400, "Tick the box to let ChudCode read these files");
+      const note =
+        body["note"] === undefined ? "" : expectString(body["note"], "note", MAX_ANSWER_CHARS);
+      return sendJson(res, {
+        number: submitLab(id, expectString(body["path"], "path", 4096), note),
       });
     }
     case "timeout":

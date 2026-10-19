@@ -75,7 +75,7 @@ describe("begin_lesson", () => {
     expect(begun.text).toContain("# Teaching agentic coding");
     expect(begun.text).toContain("# Agentic rubric");
     expect(begun.text).toContain("`wait_for_candidate`");
-    expect(begun.text).toContain("lab come in a later version");
+    expect(begun.text).toContain("can be served now: design-review, lab.");
     expect(begun.text).toContain("Write a fresh exercise with `write_exercise`");
   });
 

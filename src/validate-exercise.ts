@@ -9,11 +9,16 @@
 
 import type { Lesson } from "./curriculum.ts";
 import type { ExerciseBundle } from "./store/exercises.ts";
+import type { ExerciseKind } from "./store/lessons.ts";
 
 /** `[fact:<id>]` in teaching or brief Markdown. */
 export const FACT_REF = /\[fact:([a-z0-9]+(?:-[a-z0-9]+)*)\]/g;
 
-export const BRIEF_SECTIONS = ["## Scenario", "## Your task"] as const;
+/** The headings a brief needs, by kind. A lab's scenario is the learner's own project. */
+export const BRIEF_SECTIONS: Record<ExerciseKind, readonly string[]> = {
+  "design-review": ["## Scenario", "## Your task"],
+  lab: ["## Your task"],
+};
 
 export const LIMITS = {
   briefMin: 200,
@@ -56,7 +61,9 @@ export function validateExercise(bundle: ExerciseBundle, lesson: Lesson): Exerci
     errors.push(
       `brief_md must be ${LIMITS.briefMin} to ${LIMITS.briefMax} characters (it is ${brief.length}).`,
     );
-  for (const heading of BRIEF_SECTIONS) {
+  if (bundle.meta.kind === "lab" && !(lesson.checklist?.length && lesson.labFiles?.length))
+    errors.push(`Lesson ${lesson.id} has no lab checklist or lab files, so it cannot run a lab.`);
+  for (const heading of BRIEF_SECTIONS[bundle.meta.kind]) {
     if (!new RegExp(`^${heading}\\s*$`, "m").test(brief))
       errors.push(`brief_md needs a "${heading}" section.`);
   }

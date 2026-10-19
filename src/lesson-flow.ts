@@ -8,8 +8,16 @@
  * written answer, which the interviewer probes with follow-ups and then scores.
  */
 
-import { findLesson } from "./curriculum.ts";
+import { findLesson, type Lesson } from "./curriculum.ts";
 import { FlowError, notifyDashboard, remaining, type ChatMessage } from "./flow.ts";
+import {
+  inspectProject,
+  LabError,
+  listLabFiles,
+  resolveProjectRoot,
+  type LabListing,
+  type LabSnapshot,
+} from "./lab.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { relativeDay, type ReviewEvent } from "./review.ts";
 import { emitCandidateEvent } from "./server/hooks.ts";
@@ -17,6 +25,8 @@ import { push, sessionChannel } from "./server/sse.ts";
 import { publicExercise, readExercise, type PublicExercise } from "./store/exercises.ts";
 import {
   appendLessonEvent,
+  CHECKLIST_STATUSES,
+  labSnapshotFile,
   LESSON_DIMENSIONS,
   lessonReviewEvent,
   readLesson,
@@ -25,12 +35,14 @@ import {
   recordAnswer,
   updateLesson,
   writeLessonDraft,
+  type ChecklistResult,
   type LessonEvent,
   type LessonRubric,
   type LessonScores,
   type LessonSession,
   type LessonVerdict,
 } from "./store/lessons.ts";
+import { writeJson } from "./store/json.ts";
 import { appendReviewEvents, reviewItems } from "./store/review-events.ts";
 
 export const MAX_ANSWER_CHARS = 20_000;
@@ -158,6 +170,90 @@ export function lessonDone(id: string, now = Date.now()): LessonSession {
   return session;
 }
 
+// ── Labs ──────────────────────────────────────────────────────────────────────
+
+function labLesson(session: LessonSession): Lesson {
+  if (session.exerciseKind !== "lab") throw new FlowError(409, "This lesson is not a lab");
+  const lesson = findLesson(session.lesson)?.lesson;
+  if (!lesson?.labFiles?.length) throw new FlowError(409, "This lesson has no lab files");
+  return lesson;
+}
+
+function resolveRoot(input: string): string {
+  try {
+    return resolveProjectRoot(input);
+  } catch (err) {
+    if (err instanceof LabError) throw new FlowError(400, err.message);
+    throw err;
+  }
+}
+
+/** What a lab would read in this project, for the page to show before consent. */
+export function previewLab(id: string, projectPath: string): LabListing {
+  const lesson = labLesson(readLesson(id));
+  return listLabFiles(resolveRoot(projectPath), lesson.labFiles ?? []);
+}
+
+/**
+ * The learner consented to a project being read. It is stored as an answer (the path,
+ * the files, and their note) and the interviewer is told to call inspect_lab.
+ */
+export function submitLab(id: string, projectPath: string, note: string, now = Date.now()): number {
+  const session = readLesson(id);
+  const lesson = labLesson(session);
+  if (session.phase === "briefing") throw new FlowError(409, "Press Start before submitting");
+  if (session.phase === "done") throw new FlowError(409, "This lesson is finished");
+  if (note.length > MAX_ANSWER_CHARS)
+    throw new FlowError(400, `Notes are capped at ${MAX_ANSWER_CHARS} characters`);
+  const listing = listLabFiles(resolveRoot(projectPath), lesson.labFiles ?? []);
+  if (listing.files.length === 0)
+    throw new FlowError(
+      400,
+      `None of the files this lab reads are in ${listing.root}: ${(lesson.labFiles ?? []).join(", ")}.`,
+    );
+  const files = listing.files.map((f) => f.path);
+  const text = [
+    `Project: ${listing.root}`,
+    "",
+    `Files: ${files.join(", ")}`,
+    ...(note.trim() ? ["", note.trim()] : []),
+  ].join("\n");
+  writeLessonDraft(id, note);
+  const number = recordAnswer(id, text);
+  updateLesson(id, (s) => {
+    s.lab = { root: listing.root, files, submittedAt: now, answer: number, inspections: 0 };
+  });
+  appendLessonEvent(id, { type: "lab", number, root: listing.root, files: files.length, at: now });
+  push(sessionChannel(id), "answer", { number, at: now, html: renderMarkdown(text) });
+  emitCandidateEvent({ kind: "answer", sessionId: id, number, at: now });
+  return number;
+}
+
+/**
+ * Read the submitted project now, through every guard again: the folder may have
+ * changed since the learner consented. The snapshot is kept as evidence.
+ */
+export async function inspectLab(id: string, now = Date.now()): Promise<LabSnapshot> {
+  const session = readLesson(id);
+  const lesson = labLesson(session);
+  const lab = session.lab;
+  if (!lab)
+    throw new FlowError(409, "The learner has not submitted a project yet; it comes from the page");
+  const snapshot = await inspectProject(resolveRoot(lab.root), lesson.labFiles ?? [], now);
+  writeJson(labSnapshotFile(id, lab.answer), snapshot);
+  updateLesson(id, (s) => {
+    if (s.lab) s.lab.inspections += 1;
+  });
+  appendLessonEvent(id, {
+    type: "inspected",
+    number: lab.answer,
+    files: snapshot.files.length,
+    lints: snapshot.lints.length,
+    at: now,
+  });
+  return snapshot;
+}
+
 // ── Interviewer actions ───────────────────────────────────────────────────────
 
 export interface LessonRecordInput {
@@ -165,6 +261,8 @@ export interface LessonRecordInput {
   notesMd: string;
   strengths: string[];
   improvements: string[];
+  /** Required for a lab: one result for each checklist item. */
+  checklist?: ChecklistResult[];
 }
 
 export interface LessonRecordOutcome {
@@ -178,10 +276,55 @@ export interface LessonRecordOutcome {
  * The verdict: the learner submitted an answer, and every dimension the lesson
  * focuses on scored 2 or more. A dimension outside the focus may be null.
  */
-export function lessonVerdict(session: LessonSession, scores: LessonScores): LessonVerdict {
+export function lessonVerdict(
+  session: LessonSession,
+  scores: LessonScores,
+  checklist?: readonly ChecklistResult[],
+): LessonVerdict {
   const rubricOk = session.focus.every((dim) => (scores[dim] ?? -1) >= 2);
   const answered = session.answers > 0;
-  return { correct: rubricOk && answered, rubricOk, answered };
+  if (session.exerciseKind !== "lab") return { correct: rubricOk && answered, rubricOk, answered };
+  // A lab passes on what was read, so it must have been read, and nothing on the
+  // checklist may be missing outright.
+  const inspected = (session.lab?.inspections ?? 0) > 0;
+  const checklistOk = (checklist ?? []).every((c) => c.status !== "missing");
+  return {
+    correct: rubricOk && answered && inspected && checklistOk,
+    rubricOk,
+    answered,
+    inspected,
+    checklistOk,
+  };
+}
+
+/** A lab's checklist results must cover every item of the lesson exactly once. */
+export function checkChecklist(
+  lesson: Lesson,
+  results: readonly ChecklistResult[] | undefined,
+): ChecklistResult[] {
+  const items = lesson.checklist ?? [];
+  if (!results)
+    throw new FlowError(
+      400,
+      `checklist is required for a lab: answer ${items.map((i) => i.id).join(", ")}`,
+    );
+  const ids = items.map((i) => i.id);
+  const seen = new Set<string>();
+  for (const result of results) {
+    if (!ids.includes(result.id))
+      throw new FlowError(400, `checklist names ${result.id}; the items are ${ids.join(", ")}`);
+    if (seen.has(result.id)) throw new FlowError(400, `checklist answers ${result.id} twice`);
+    if (!(CHECKLIST_STATUSES as readonly string[]).includes(result.status))
+      throw new FlowError(
+        400,
+        `checklist ${result.id}: status must be ${CHECKLIST_STATUSES.join(", ")}`,
+      );
+    seen.add(result.id);
+  }
+  const missing = ids.filter((id) => !seen.has(id));
+  if (missing.length > 0)
+    throw new FlowError(400, `checklist must answer every item. Missing: ${missing.join(", ")}`);
+  return ids.map((id) => results.find((r) => r.id === id) as ChecklistResult);
 }
 
 export function recordLesson(
@@ -202,12 +345,19 @@ export function recordLesson(
       throw new FlowError(400, `scores.${dim} must be an integer from 0 to 4, or null`);
   }
 
-  const verdict = lessonVerdict(before, input.scores);
+  let checklist: ChecklistResult[] | undefined;
+  if (before.exerciseKind === "lab") {
+    const lesson = findLesson(before.lesson)?.lesson;
+    if (!lesson) throw new FlowError(409, `Lesson ${before.lesson} is no longer in the curriculum`);
+    checklist = checkChecklist(lesson, input.checklist);
+  }
+  const verdict = lessonVerdict(before, input.scores, checklist);
   const rubric: LessonRubric = {
     ...input.scores,
     notesMd: input.notesMd,
     strengths: input.strengths,
     improvements: input.improvements,
+    ...(checklist ? { checklist } : {}),
   };
   const session = updateLesson(id, (s) => {
     s.phase = "done";

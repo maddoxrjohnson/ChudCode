@@ -4,9 +4,10 @@
 
 import { findLesson, loadCurriculumProgress, type LessonPlace } from "../curriculum.ts";
 import { notifyDashboard } from "../flow.ts";
-import { recordLesson, startLesson } from "../lesson-flow.ts";
+import { inspectLab, recordLesson, startLesson } from "../lesson-flow.ts";
 import {
   curriculumText,
+  labSnapshotText,
   lessonBrief,
   lessonLine,
   LESSON_DIMENSION_NAMES,
@@ -33,11 +34,14 @@ import {
   type FactCheck,
 } from "../store/fact-checks.ts";
 import {
+  CHECKLIST_STATUSES,
   createLesson,
   EXERCISE_KINDS,
   LESSON_DIMENSIONS,
   lessonExists,
   listLessons,
+  readLesson,
+  type ChecklistResult,
   type ExerciseKind,
   type LessonScores,
 } from "../store/lessons.ts";
@@ -66,6 +70,21 @@ function requireLesson(args: Record<string, unknown>): LessonPlace {
   const place = findLesson(id);
   if (!place) throw new ToolArgumentError(`No lesson ${id}. Call list_curriculum.`);
   return place;
+}
+
+function readChecklist(raw: unknown): ChecklistResult[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) throw new ToolArgumentError("checklist must be a list");
+  return raw.map((item, i) => {
+    if (!item || typeof item !== "object")
+      throw new ToolArgumentError(`checklist[${i}] must be an object`);
+    const entry = item as Record<string, unknown>;
+    return {
+      id: requireString(entry, "id", 64),
+      status: requireString(entry, "status", 16) as ChecklistResult["status"],
+      note: requireString(entry, "note", 1_000),
+    };
+  });
 }
 
 export function lessonTools(host: ToolHost): ToolDef[] {
@@ -322,8 +341,16 @@ export function lessonTools(host: ToolHost): ToolDef[] {
             schema.str("Something to work on"),
             "Two or three things to work on.",
           ),
+          checklist: schema.list(
+            schema.obj({
+              id: schema.str("The checklist item id."),
+              status: schema.oneOf(CHECKLIST_STATUSES, "How far the project meets it."),
+              note: schema.str("The evidence: a file and what it does or lacks."),
+            }),
+            "Labs only, and required for them: one result for every item of the lesson's checklist, from what inspect_lab read.",
+          ),
         },
-        ["strengths", "improvements"],
+        ["strengths", "improvements", "checklist"],
       ),
       async execute(args) {
         const id = requireString(args, "session_id", 120);
@@ -339,11 +366,13 @@ export function lessonTools(host: ToolHost): ToolDef[] {
             throw new ToolArgumentError(`scores.${dim} is required (a number, or null)`);
           scores[dim] = value as number | null;
         }
+        const checklist = readChecklist(args["checklist"]);
         const outcome = recordLesson(id, {
           scores,
           notesMd: requireString(args, "notes_md", 10_000),
           strengths: stringList(args, "strengths", 6),
           improvements: stringList(args, "improvements", 6),
+          ...(checklist ? { checklist } : {}),
         });
         const scored = LESSON_DIMENSION_NAMES.map(
           ([k, name]) => `${name} ${scores[k] ?? "n/a"}`,
@@ -357,6 +386,27 @@ export function lessonTools(host: ToolHost): ToolDef[] {
           ].join("\n"),
           { verdict: outcome.session.verdict },
         );
+      },
+    },
+    {
+      name: "inspect_lab",
+      title: "Inspect Lab",
+      description:
+        "Read the project the learner submitted for a lab: the lesson's lab files from the folder they named on the page, read-only, with secrets redacted, plus recent git history and mechanical lints. " +
+        "The learner chooses the folder on the page; you cannot name one. Call it after they submit, and again if they resubmit.",
+      inputSchema: schema.obj({ session_id: schema.str("The lab session id.") }),
+      async execute(args) {
+        const id = requireString(args, "session_id", 120);
+        if (!isValidSessionId(id) || !lessonExists(id))
+          return fail(`No lesson session named ${id}.`);
+        const session = readLesson(id);
+        const place = findLesson(session.lesson);
+        if (!place) return fail(`Lesson ${session.lesson} is no longer in the curriculum.`);
+        const snapshot = await inspectLab(id);
+        return ok(labSnapshotText(snapshot, place.lesson), {
+          files: snapshot.files.map((f) => f.path),
+          lints: snapshot.lints.length,
+        });
       },
     },
     {

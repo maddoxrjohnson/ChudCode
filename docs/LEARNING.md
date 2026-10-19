@@ -48,6 +48,26 @@ team: a plan, a CLAUDE.md, a progress file, a delegation spec with each worker's
 model, effort, tools, and hand-off. Tell them in the brief that they may draft it with
 their own agent; what you are grading is the judgement in it.
 
+## Labs
+
+A lab grades something the learner built in their own repository: a CLAUDE.md, a
+progress file, a plan, a set of subagents. The brief needs only a `## Your task`
+section, because the scenario is their project: say what to build or improve, with
+their own agent, and what the review will look for. The page shows the lesson's
+checklist and the files a lab may read.
+
+The learner names the folder on the page and consents there; you never ask for a
+path in the terminal and cannot pass one. When they submit, call `inspect_lab`. It
+reads only the lesson's lab files, follows no link out of the project, redacts
+anything that looks like a credential, and adds recent git history and mechanical
+lints (an unknown subagent field, a CLAUDE.md past 200 lines). The lints are
+evidence, not the grade. Judge the files against the checklist, point at specific
+lines in your follow-up, and let them fix and resubmit if they want; call
+`inspect_lab` again when they do. `record_lesson` then needs a result for every
+checklist item: met, partial, or missing, each with the file that shows it. A lab
+passes when the project was read, nothing on the checklist is missing outright, and
+every focus dimension scored 2 or more.
+
 ## The arc of a lesson
 
 1. **Reading.** The page shows the teaching and the brief. Say one sentence: that

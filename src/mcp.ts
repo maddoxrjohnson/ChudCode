@@ -55,6 +55,7 @@ import {
   type LessonSession,
 } from "./store/lessons.ts";
 import {
+  labSubmittedPrompt,
   lessonAnswerPrompt,
   lessonDonePrompt,
   lessonMessagePrompt,
@@ -436,11 +437,11 @@ function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
     case "answer": {
       const answer = readAnswer(id, event.number) ?? "";
       const hidden = readExercise(session.exercise).private;
-      return inbox.push(
-        lessonAnswerPrompt(session, event.number, answer, hidden, event.at),
-        `answer:${id}:${event.number}`,
-        notDone,
-      );
+      const prompt =
+        session.exerciseKind === "lab"
+          ? labSubmittedPrompt(session, event.number, answer, hidden, event.at)
+          : lessonAnswerPrompt(session, event.number, answer, hidden, event.at);
+      return inbox.push(prompt, `answer:${id}:${event.number}`, notDone);
     }
     case "timer_expired":
       return inbox.push(lessonTimerExpiredPrompt(session, event.at), `timeout:${id}`, notDone);

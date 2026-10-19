@@ -6,6 +6,7 @@
  *     events.jsonl      everything that happened, in order
  *     draft.md          the answer box's latest autosave
  *     answers/NN.md     each submitted answer
+ *     lab/NN.json       for a lab, what inspect_lab read for answer NN
  *
  * Lesson sessions live beside interview sessions, not among them, so nothing that
  * lists, scores, or recovers interviews can pick one up by accident. They share the
@@ -20,7 +21,7 @@ import { appendJsonl, readJson, readJsonl, readText, writeJson, writeText } from
 import { isDir, isValidSessionId, lessonDir, lessonsDir, sessionDir } from "./paths.ts";
 import { generateSessionId, type Phase, type SessionEvent } from "./sessions.ts";
 
-export const EXERCISE_KINDS = ["design-review"] as const;
+export const EXERCISE_KINDS = ["design-review", "lab"] as const;
 export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
 
 /** The five lesson dimensions; `null` means the lesson does not exercise it. */
@@ -35,10 +36,22 @@ export type LessonDimension = (typeof LESSON_DIMENSIONS)[number];
 
 export type LessonScores = Record<LessonDimension, number | null>;
 
+export const CHECKLIST_STATUSES = ["met", "partial", "missing"] as const;
+export type ChecklistStatus = (typeof CHECKLIST_STATUSES)[number];
+
+/** The interviewer's verdict on one lab checklist item. */
+export interface ChecklistResult {
+  id: string;
+  status: ChecklistStatus;
+  note: string;
+}
+
 export interface LessonRubric extends LessonScores {
   notesMd: string;
   strengths: string[];
   improvements: string[];
+  /** For a lab: one result per checklist item of the lesson. */
+  checklist?: ChecklistResult[];
 }
 
 export interface LessonVerdict {
@@ -47,6 +60,21 @@ export interface LessonVerdict {
   rubricOk: boolean;
   /** At least one answer was submitted before the debrief. */
   answered: boolean;
+  /** For a lab: the project was read with inspect_lab, and no checklist item is missing. */
+  inspected?: boolean;
+  checklistOk?: boolean;
+}
+
+/** The project a lab submission points at, as the learner consented to it. */
+export interface LabSubmission {
+  root: string;
+  /** The files the page listed when the learner consented. */
+  files: string[];
+  submittedAt: number;
+  /** The answer number this submission was stored as. */
+  answer: number;
+  /** How many times inspect_lab has read it. */
+  inspections: number;
 }
 
 export interface LessonSession {
@@ -65,6 +93,8 @@ export interface LessonSession {
   endedAt?: number;
   phase: Phase;
   answers: number;
+  /** For a lab: the latest project submission. */
+  lab?: LabSubmission;
   rubric?: LessonRubric;
   verdict?: LessonVerdict;
   abandonedReason?: string;
@@ -76,7 +106,9 @@ export type LessonEvent =
       SessionEvent,
       { type: "created" | "started" | "message" | "timeout" | "done" | "rubric" | "abandoned" }
     >
-  | { at: number; type: "answer"; number: number; chars: number };
+  | { at: number; type: "answer"; number: number; chars: number }
+  | { at: number; type: "lab"; number: number; root: string; files: number }
+  | { at: number; type: "inspected"; number: number; files: number; lints: number };
 
 export interface NewLesson {
   lesson: string;
@@ -160,6 +192,11 @@ export function recordAnswer(id: string, text: string): number {
 
 export function readAnswer(id: string, number: number): string | null {
   return readText(answerFile(id, number));
+}
+
+/** Where inspect_lab's snapshot of answer `number` is kept. */
+export function labSnapshotFile(id: string, number: number): string {
+  return path.join(lessonDir(id), "lab", `${String(number).padStart(2, "0")}.json`);
 }
 
 function answerFile(id: string, number: number): string {

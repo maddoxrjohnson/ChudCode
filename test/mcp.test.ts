@@ -225,6 +225,7 @@ describe("protocol", () => {
       "begin_interview",
       "begin_lesson",
       "get_session",
+      "inspect_lab",
       "list_curriculum",
       "list_due",
       "list_problems",
