@@ -106,6 +106,9 @@ function lessonPageFor(id: string): string {
     moduleName: place?.module.name ?? session.module,
     facts: factFreshness(place?.lesson.facts ?? [], readFactChecks(), Date.now()),
     answers,
+    ...(session.exerciseKind === "lab"
+      ? { checklist: place?.lesson.checklist ?? [], labFiles: place?.lesson.labFiles ?? [] }
+      : {}),
   });
 }
 

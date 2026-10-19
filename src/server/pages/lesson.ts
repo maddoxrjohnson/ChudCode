@@ -7,6 +7,7 @@
  * exercise with their own agent and writes their answer in Markdown.
  */
 
+import type { ChecklistItem } from "../../curriculum.ts";
 import type { LessonState } from "../../lesson-flow.ts";
 import { LESSON_DIMENSION_NAMES } from "../../lesson-prompts.ts";
 import { formatClock } from "../../format.ts";
@@ -21,6 +22,9 @@ export interface LessonPageOptions {
   /** The lesson's facts with when each was last confirmed, for the sources list. */
   facts: FactFreshness[];
   answers: string[];
+  /** For a lab: what the review checks, and the files it may read. */
+  checklist?: ChecklistItem[];
+  labFiles?: string[];
 }
 
 const PHASE_LABELS: Record<LessonSession["phase"], string> = {
@@ -56,14 +60,7 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
       <h1>${escapeHtml(exercise.title)}</h1>
       ${renderMarkdown(stripRefs(exercise.brief))}
     </article>
-    <form class="answer-form" id="answer-form">
-      <label for="answer-text"><strong>Your answer</strong> <span class="muted small">Markdown. Draft it with your own agent if you like; what is graded is the judgement in it.</span></label>
-      <textarea id="answer-text" rows="16" spellcheck="true" ${working ? "" : "disabled"}>${escapeHtml(state.draft)}</textarea>
-      <div class="button-row">
-        <span class="save-state" id="save-state"></span>
-        <button type="submit" class="button primary" id="answer-button" ${working ? "" : "disabled"}>Submit answer</button>
-      </div>
-    </form>
+    ${exercise.kind === "lab" ? labFormHtml(state, options, working) : answerFormHtml(state, working)}
     <section class="answers" id="answers">${answersHtml(options.answers)}</section>
   </section>
 
@@ -85,7 +82,7 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
       </form>
     </section>
 
-    <section class="rubric" id="rubric">${session.rubric ? lessonRubricHtml(session) : ""}</section>
+    <section class="rubric" id="rubric">${session.rubric ? lessonRubricHtml(session, options.checklist) : ""}</section>
 
     <div class="side-footer">
       <button type="button" class="button" id="done-button" ${session.phase === "review" || session.phase === "done" ? "disabled" : ""}>I'm done</button>
@@ -107,9 +104,53 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
       draft: state.draft,
       listening: state.listening,
       focus: session.focus,
+      kind: exercise.kind,
+      checklist: options.checklist ?? [],
     },
     module: "runtime/lesson/main.mjs",
   });
+}
+
+function answerFormHtml(state: LessonState, working: boolean): string {
+  return `<form class="answer-form" id="answer-form">
+      <label for="answer-text"><strong>Your answer</strong> <span class="muted small">Markdown. Draft it with your own agent if you like; what is graded is the judgement in it.</span></label>
+      <textarea id="answer-text" rows="16" spellcheck="true" ${working ? "" : "disabled"}>${escapeHtml(state.draft)}</textarea>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="submit" class="button primary" id="answer-button" ${working ? "" : "disabled"}>Submit answer</button>
+      </div>
+    </form>`;
+}
+
+/**
+ * A lab's form: the project folder, the files a review would read, and the consent
+ * box. Nothing is read until the learner ticks it and submits.
+ */
+function labFormHtml(state: LessonState, options: LessonPageOptions, working: boolean): string {
+  const patterns = (options.labFiles ?? []).map((p) => `<code>${escapeHtml(p)}</code>`).join(", ");
+  const checklist = (options.checklist ?? [])
+    .map((c) => `<li data-item="${escapeHtml(c.id)}">${escapeHtml(c.text)}</li>`)
+    .join("\n");
+  return `<section class="lab-checklist" id="lab-checklist">
+      <h2>What the review checks</h2>
+      <ul>${checklist}</ul>
+    </section>
+    <form class="answer-form lab-form" id="answer-form" data-lab="true">
+      <label for="lab-path"><strong>Your project</strong> <span class="muted small">The folder you worked in with your agent.</span></label>
+      <div class="lab-path-row">
+        <input type="text" id="lab-path" autocomplete="off" spellcheck="false" placeholder="~/code/my-project" value="${escapeHtml(state.session.lab?.root ?? "")}" ${working ? "" : "disabled"}>
+        <button type="button" class="button" id="lab-preview" ${working ? "" : "disabled"}>Show the files</button>
+      </div>
+      <p class="muted small">A review reads only ${patterns}, read-only, from that folder. It never follows a link out of it, never reads <code>.env</code> files or keys, and redacts anything that looks like a credential before the interviewer sees it.</p>
+      <ul class="lab-files" id="lab-files" aria-live="polite"></ul>
+      <label for="answer-text">Notes for the reviewer <span class="muted small">Optional: what you changed and why.</span></label>
+      <textarea id="answer-text" rows="5" spellcheck="true" ${working ? "" : "disabled"}>${escapeHtml(state.draft)}</textarea>
+      <label class="consent"><input type="checkbox" id="lab-consent" disabled> Let ChudCode read the files listed above and show them to the interviewer.</label>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="submit" class="button primary" id="answer-button" disabled>Submit for review</button>
+      </div>
+    </form>`;
 }
 
 /** The teaching with each `[fact:<id>]` as a numbered link to its source below. */
@@ -150,7 +191,10 @@ ${answers
   .join("\n")}`;
 }
 
-export function lessonRubricHtml(session: LessonSession): string {
+export function lessonRubricHtml(
+  session: LessonSession,
+  items: readonly ChecklistItem[] = [],
+): string {
   const r = session.rubric;
   if (!r) return "";
   const rows = LESSON_DIMENSION_NAMES.map(([key, label]) => {
@@ -168,6 +212,7 @@ export function lessonRubricHtml(session: LessonSession): string {
   ${rows}
 </ul>
 <div class="rubric-notes">${renderMarkdown(r.notesMd)}</div>
+${r.checklist?.length ? `<h3>Checklist</h3><ul class="checklist-results">${r.checklist.map((c) => `<li class="check-${c.status}"><span class="badge ${c.status === "met" ? "ok" : "warn"}">${c.status}</span> ${escapeHtml(items.find((i) => i.id === c.id)?.text ?? c.id)}<div class="muted small">${escapeHtml(c.note)}</div></li>`).join("")}</ul>` : ""}
 ${r.strengths.length ? `<h3>Strengths</h3><ul>${r.strengths.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
 ${r.improvements.length ? `<h3>Work on</h3><ul>${r.improvements.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}`;
 }

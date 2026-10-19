@@ -53,6 +53,7 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 | `src/roadmap.ts`        | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                                  |
 | `src/curriculum.ts`     | The agentic-coding track (`data/agentic/curriculum.json`): modules, lessons, and sourced facts, with module unlocks derived from scored lessons.                                                  |
 | `src/lesson-flow.ts`    | Every operation that moves a lesson session along: start, message, answer, timeout, done, record. Lessons live in `lessons/`, apart from interviews.                                              |
+| `src/lab.ts`            | Reads a lab's project folder read-only: path guards, the allow and deny lists, size caps, redaction, a hardened `git log`, and fact-based lints.                                                  |
 | `src/lesson-prompts.ts` | What the agent reads for lessons: the lesson brief with its facts and their freshness, and the lesson event prompts.                                                                              |
 | `assets/runtime/`       | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                                   |
 | `pi/`                   | The Pi extension: slash commands, the bridge, the status line.                                                                                                                                    |
@@ -99,6 +100,13 @@ and the review schedule, and keeps its own store and prompts.
    like an interview event; the answer arrives beside the private outline.
 5. `record_lesson` scores the five agentic dimensions, appends one `lesson:<id>`
    review event, and pushes the debrief.
+
+A lab differs at step 4: the learner names their project folder on the page, sees
+the files a review would read, and consents. `inspect_lab` then reads those files
+through `src/lab.ts` (an allow-list, a deny-list that wins, no links out of the
+folder, size caps, secret redaction, and a hardened `git log`), keeps the snapshot
+in the session, and returns it fenced as data with mechanical lints. `record_lesson`
+needs a result for every item on the lesson's checklist.
 
 ## Two hosts, one server
 

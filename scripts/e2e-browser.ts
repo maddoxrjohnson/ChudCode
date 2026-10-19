@@ -9,11 +9,12 @@
  * and Submit buttons, custom input, the hint ladder, the chat in both directions,
  * the debrief card arriving over SSE, the dashboard reflecting the scored session and
  * reloading when another one starts, the Next problem button following the
- * interviewer to the session it opens, and an agentic-coding lesson from its sourced
- * teaching to the debrief.
+ * interviewer to the session it opens, an agentic-coding lesson from its sourced
+ * teaching to the debrief, and a lab that reads a project the learner consents to.
  */
 
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import { chromium, type Page } from "playwright";
@@ -25,11 +26,12 @@ import * as server from "../src/server/server.ts";
 import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { createSession, readDraft, readSession } from "../src/store/sessions.ts";
-import { postLessonMessage, recordLesson } from "../src/lesson-flow.ts";
+import { loadCurriculumProgress } from "../src/curriculum.ts";
+import { inspectLab, postLessonMessage, recordLesson } from "../src/lesson-flow.ts";
 import { updateExerciseMeta, writeExercise } from "../src/store/exercises.ts";
-import { createLesson, lessonExists } from "../src/store/lessons.ts";
+import { createLesson, lessonExists, readLesson } from "../src/store/lessons.ts";
 import { makeFixture, seedExample } from "../test/helpers.ts";
-import { exerciseArgs } from "../test/lesson-fixtures.ts";
+import { exerciseArgs, labArgs } from "../test/lesson-fixtures.ts";
 
 process.env["CHUDCODE_AUTO_OPEN"] = "0";
 
@@ -99,6 +101,7 @@ function interviewer(event: CandidateEvent): void {
 let followedUp = false;
 function lessonInterviewer(event: CandidateEvent): void {
   const id = event.sessionId;
+  if (readLesson(id).exerciseKind === "lab") return labInterviewer(event);
   switch (event.kind) {
     case "started":
       postLessonMessage(id, "interviewer", "Take your time. Ask me anything about the scenario.");
@@ -124,6 +127,44 @@ function lessonInterviewer(event: CandidateEvent): void {
         notesMd: "Pinned behaviour before changing it, and every phase ends in a check.",
         strengths: ["Characterisation tests come first.", "Phases are small enough to review."],
         improvements: ["Say which phase you would not run unattended."],
+      });
+      return;
+    default:
+      return;
+  }
+}
+
+/** A lab: read the project when it arrives, ask about it, then score the checklist. */
+function labInterviewer(event: CandidateEvent): void {
+  const id = event.sessionId;
+  switch (event.kind) {
+    case "answer":
+      void inspectLab(id).then((snapshot) =>
+        postLessonMessage(
+          id,
+          "interviewer",
+          `I read ${snapshot.files.map((f) => f.path).join(", ")}. Where does a fresh session find **the next step**?`,
+        ),
+      );
+      return;
+    case "message":
+      recordLesson(id, {
+        scores: {
+          decomposition: 2,
+          verification: null,
+          contextCost: 3,
+          safety: null,
+          delegation: null,
+        },
+        notesMd: "A short CLAUDE.md that holds only what the code cannot show.",
+        strengths: ["Commands and quirks only."],
+        improvements: ["End progress.md with the next step."],
+        checklist: [
+          { id: "non-inferable", status: "met", note: "CLAUDE.md: make test, UTC dates" },
+          { id: "short", status: "met", note: "4 lines" },
+          { id: "no-duplication", status: "met", note: "Nothing the code shows" },
+          { id: "progress-next", status: "partial", note: "progress.md has no next step" },
+        ],
       });
       return;
     default:
@@ -433,9 +474,84 @@ try {
   const lessonsBadge = await page.locator("#agentic .badge").first().textContent();
   check(
     "the dashboard counts the passed lesson",
-    lessonsBadge === "1/9 lessons passed",
+    lessonsBadge === `1/${loadCurriculumProgress().total} lessons passed`,
     lessonsBadge,
   );
+
+  // A lab: the learner names their project, sees what would be read, and consents.
+  const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "chudcode-e2e-lab-")));
+  fs.writeFileSync(
+    path.join(project, "CLAUDE.md"),
+    "# Ledger\n\nRun `make test`.\nDates are UTC.\n",
+  );
+  fs.writeFileSync(path.join(project, "progress.md"), "Done: OFX parser.\n");
+  fs.writeFileSync(path.join(project, ".env"), "TOKEN=never-read");
+  const lab = labArgs();
+  writeExercise({
+    meta: {
+      slug: lab["slug"] as string,
+      kind: "lab",
+      lesson: "context-files",
+      title: lab["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: lab["teaching_md"] as string,
+    brief: lab["brief_md"] as string,
+    private: {
+      modelOutline: lab["model_outline"] as string,
+      followUps: lab["follow_ups"] as string[],
+      pitfalls: lab["pitfalls"] as string[],
+    },
+  });
+  updateExerciseMeta("tighten-your-claude-md", { validatedAt: Date.now() });
+  const labSession = createLesson({
+    lesson: "context-files",
+    lessonTitle: "CLAUDE.md, AGENTS.md, and progress files",
+    module: "planning",
+    exercise: "tighten-your-claude-md",
+    exerciseKind: "lab",
+    focus: ["contextCost", "decomposition"],
+    timerMs: 45 * 60_000,
+  });
+  await page.goto(`${base}/s/${labSession.id}`);
+  check(
+    "the lab page lists what the review checks",
+    (await page.locator("#lab-checklist li").count()) === 4,
+  );
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  check(
+    "submit waits for a preview and consent",
+    await page.locator("#answer-button").isDisabled(),
+  );
+  await page.locator("#lab-path").fill(project);
+  await page.locator("#lab-preview").click();
+  await page.locator("#lab-files li", { hasText: "progress.md" }).waitFor();
+  const listed = await page.locator("#lab-files li").allTextContents();
+  check(
+    "the preview lists only the lab's files",
+    listed.length === 2 && listed.every((l) => !l.includes(".env")),
+    listed.join(" | "),
+  );
+  check("submit still waits for consent", await page.locator("#answer-button").isDisabled());
+  await page.locator("#lab-consent").check();
+  await page.locator("#answer-text").fill("Cut CLAUDE.md to the commands.");
+  await screenshot(page, "lab");
+  await page.locator("#answer-button").click();
+  await page.locator(".answers .answer summary", { hasText: "Answer 1" }).waitFor();
+  await page.locator(".message.from-interviewer", { hasText: "I read" }).waitFor();
+  check("the interviewer reads the project and asks about it", true);
+  await page.locator("#composer-text").fill("It doesn't yet; I'll add a Next section.");
+  await page.locator("#composer button[type=submit]").click();
+  const labVerdict = await page.locator("#rubric .badge").first().textContent({ timeout: 5000 });
+  check("the lab debrief arrives", labVerdict === "Passed", labVerdict);
+  check(
+    "the debrief shows every checklist result",
+    (await page.locator("#rubric .checklist-results li").count()) === 4,
+  );
+  await screenshot(page, "lab-debrief");
+  fs.rmSync(project, { recursive: true, force: true });
 
   // Server state.
   check("the verdict is recorded", readSession(session.id).verdict?.correct === true);
@@ -444,7 +560,8 @@ try {
     readReviewEvents()
       .map((e) => e.key)
       .sort()
-      .join() === "lesson:plan-before-code,pattern:sliding-window,problem:window-sum",
+      .join() ===
+      "lesson:context-files,lesson:plan-before-code,pattern:sliding-window,problem:window-sum",
   );
   check("no browser errors", errors.length === 0, errors.join("; "));
 

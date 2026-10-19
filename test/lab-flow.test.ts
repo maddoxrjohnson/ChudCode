@@ -185,6 +185,18 @@ describe("lab exercises", () => {
     ]);
   });
 
+  it("serves a lab page with the checklist and the consent box, and nothing private", async () => {
+    const id = await startLab();
+    const html = await (await fetch(`${server.getBaseUrl()}/s/${id}`)).text();
+    expect(html).toContain('id="lab-checklist"');
+    expect(html).toContain("The progress file ends with the next concrete step");
+    expect(html).toContain('id="lab-consent"');
+    expect(html).toContain("<code>.claude/CLAUDE.md</code>");
+    expect(html).toContain('data-lab="true"');
+    expect(html).not.toContain(LAB_OUTLINE.slice(0, 60));
+    expect(html).not.toContain("Which line would you cut first");
+  });
+
   it("refuses a project with none of the lab's files, and a design review's lab calls", async () => {
     const id = await startLab();
     fs.rmSync(path.join(project, "CLAUDE.md"));

@@ -63,5 +63,34 @@ describe("lessonRubricHtml", () => {
     expect(html.match(/n\/a/g)).toHaveLength(2);
     expect(html).toContain("<strong>unchecked</strong>");
     expect(html).toContain("<li>Verify phase 3</li>");
+    expect(html).not.toContain("Checklist");
+  });
+
+  it("shows a lab's checklist results by their text", () => {
+    const session = {
+      focus: ["contextCost"],
+      rubric: {
+        decomposition: null,
+        verification: null,
+        contextCost: 3,
+        safety: null,
+        delegation: null,
+        notesMd: "Tight.",
+        strengths: [],
+        improvements: [],
+        checklist: [
+          { id: "short", status: "met", note: "12 lines" },
+          { id: "progress-next", status: "missing", note: "No <progress.md>" },
+        ],
+      },
+      verdict: { correct: false, rubricOk: true, answered: true, checklistOk: false },
+    } as unknown as LessonSession;
+    const html = lessonRubricHtml(session, [
+      { id: "short", text: "Each CLAUDE.md is short" },
+      { id: "progress-next", text: "The progress file ends with the next step" },
+    ]);
+    expect(html).toContain('<span class="badge ok">met</span> Each CLAUDE.md is short');
+    expect(html).toContain('<span class="badge warn">missing</span> The progress file ends');
+    expect(html).toContain("No &lt;progress.md&gt;");
   });
 });

@@ -62,8 +62,11 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+const isLab = answerForm?.dataset.lab === "true";
+
 answerForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isLab) return submitLab();
   if (!answer.value.trim()) {
     notify("Write your answer first.", "warn");
     answer.focus();
@@ -80,6 +83,92 @@ answerForm?.addEventListener("submit", async (event) => {
     answerButton.disabled = !(phase === "coding" || phase === "review");
   }
 });
+
+// ── Lab: preview the files, consent, submit ─────────────────────────────────
+
+const labPath = document.getElementById("lab-path");
+const labFiles = document.getElementById("lab-files");
+const labConsent = document.getElementById("lab-consent");
+const labPreview = document.getElementById("lab-preview");
+let previewed = null;
+
+function labReady() {
+  return Boolean(previewed && previewed.files.length > 0 && labConsent?.checked);
+}
+
+function syncLabButton() {
+  if (!isLab || !answerButton) return;
+  const working = phase === "coding" || phase === "review";
+  answerButton.disabled = !(working && labReady());
+}
+
+function renderLabFiles(listing) {
+  if (!labFiles) return;
+  labFiles.textContent = "";
+  if (listing.files.length === 0)
+    labFiles.append(el("li", { class: "skipped" }, "None of the files this lab reads are there."));
+  for (const file of listing.files)
+    labFiles.append(el("li", {}, `${file.path} (${file.bytes.toLocaleString()} bytes)`));
+  for (const skip of listing.skipped)
+    labFiles.append(el("li", { class: "skipped" }, `${skip.path}: ${skip.reason}`));
+}
+
+async function previewLab() {
+  previewed = null;
+  if (labConsent) {
+    labConsent.checked = false;
+    labConsent.disabled = true;
+  }
+  syncLabButton();
+  try {
+    previewed = await postJson(api("lab-preview"), { path: labPath.value });
+    labPath.value = previewed.root;
+    renderLabFiles(previewed);
+    if (labConsent) labConsent.disabled = previewed.files.length === 0;
+  } catch (err) {
+    if (labFiles) labFiles.textContent = "";
+    notify(err.message, "error");
+  }
+  syncLabButton();
+}
+
+async function submitLab() {
+  if (!labReady()) {
+    notify("Show the files and tick the box first.", "warn");
+    return;
+  }
+  answerButton.disabled = true;
+  try {
+    const { number } = await postJson(api("lab"), {
+      path: previewed.root,
+      note: answer.value,
+      consent: true,
+    });
+    lastSaved = answer.value;
+    notify(`Submission ${number} sent to the interviewer`);
+  } catch (err) {
+    notify(err.message, "error");
+  }
+  syncLabButton();
+}
+
+labPreview?.addEventListener("click", () => void previewLab());
+labPath?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void previewLab();
+  }
+});
+labPath?.addEventListener("input", () => {
+  // Consent covers the files that were listed; a new path needs a new look.
+  previewed = null;
+  if (labConsent) {
+    labConsent.checked = false;
+    labConsent.disabled = true;
+  }
+  syncLabButton();
+});
+labConsent?.addEventListener("change", syncLabButton);
 
 function showAnswer({ number, html }) {
   const host = document.getElementById("answers");
@@ -114,6 +203,9 @@ function applyPhase(next) {
   const working = phase === "coding" || phase === "review";
   if (answer) answer.disabled = !working;
   if (answerButton) answerButton.disabled = !working;
+  if (labPath) labPath.disabled = !working;
+  if (labPreview) labPreview.disabled = !working;
+  syncLabButton();
   if (doneButton) doneButton.disabled = phase === "review" || phase === "done";
   if (phase === "coding") answer?.focus();
 }
@@ -190,6 +282,23 @@ function renderDebrief({ rubric, verdict, focus, notesHtml, nextDue }) {
     rubric.improvements?.length ? el("h3", {}, "Work on") : null,
     rubric.improvements?.length
       ? el("ul", {}, ...rubric.improvements.map((s) => el("li", {}, s)))
+      : null,
+    rubric.checklist?.length ? el("h3", {}, "Checklist") : null,
+    rubric.checklist?.length
+      ? el(
+          "ul",
+          { class: "checklist-results" },
+          ...rubric.checklist.map((c) =>
+            el(
+              "li",
+              { class: `check-${c.status}` },
+              el("span", { class: `badge ${c.status === "met" ? "ok" : "warn"}` }, c.status),
+              " ",
+              config.checklist?.find((i) => i.id === c.id)?.text ?? c.id,
+              el("div", { class: "muted small" }, c.note),
+            ),
+          ),
+        )
       : null,
     nextDue ? el("p", { class: "muted" }, nextDue) : null,
   );

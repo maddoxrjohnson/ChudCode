@@ -1132,3 +1132,62 @@ textarea:focus,
 .item.outline {
   color: var(--muted);
 }
+
+/* ── Labs ────────────────────────────────────────────────────────────────── */
+
+.lab-checklist ul {
+  display: grid;
+  gap: 0.3rem;
+  padding-left: 1.25rem;
+}
+
+.lab-path-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lab-path-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.lab-path-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lab-form textarea {
+  min-height: 6rem;
+}
+
+.lab-files {
+  display: grid;
+  gap: 0.2rem;
+  padding-left: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.lab-files .skipped {
+  color: var(--muted);
+}
+
+.consent {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.checklist-results {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 0;
+  list-style: none;
+}

@@ -117,8 +117,14 @@ make sure the patterns you keep missing are the ones you see again.
   own agent, submit your plan or spec, answer follow-ups, and are scored on
   decomposition, verification, context and cost, safety, and delegation. Missed
   lessons come back on the review schedule. See `docs/LEARNING.md` and
-  `docs/CURRICULUM-FORMAT.md`. Labs on your own repository and drills graded by code
-  are next.
+  `docs/CURRICULUM-FORMAT.md`.
+- Labs on your own repository: build or tighten something real with your agent (a
+  CLAUDE.md, a progress file, subagents), then name the folder on the lesson page.
+  The page lists exactly which files a review would read; nothing is read until you
+  tick the consent box. The interviewer gets those files read-only, with anything
+  that looks like a credential redacted, plus recent git history and mechanical
+  checks drawn from the sourced facts, and grades them against the lesson's
+  checklist. See `docs/EXERCISE-FORMAT.md`. Drills graded by code are next.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -137,6 +143,11 @@ A lesson shows its teaching with numbered sources on the left, the scenario and 
 answer in the middle, and the interviewer on the right.
 
 ![A lesson page: the teaching on planning with three cited sources, the brief for planning OFX import into a ledger CLI with a submitted answer, and a debrief that passed on decomposition and verification](docs/screenshots/lesson-debrief.png)
+
+A lab asks for your project folder instead. After the review, each checklist item
+shows whether your setup met it and the file that shows it.
+
+![A lab page: the teaching on CLAUDE.md files, what the review checks, the project folder with the two files a review would read and the consent box ticked, and a debrief with checklist results](docs/screenshots/lab-debrief.png)
 
 The dashboard shows every pattern's place in the review schedule, what is due, the
 streak, progress through both roadmaps and the agentic-coding modules, and past
