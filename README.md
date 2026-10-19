@@ -9,6 +9,11 @@ them, probes edge cases and complexity after you submit, and scores the session 
 rubric. Patterns you miss come back on a spaced-review schedule with a fresh problem,
 not the one you already saw.
 
+A second track teaches coding _with_ agents: planning with plan mode, context files,
+tests an agent cannot game, subagents with the right model and effort, prompt-caching
+cost, and more. Each lesson teaches a few facts sourced from Anthropic's docs, then
+hands you a realistic scenario to work with your own agent, and grades your judgement.
+
 **Status:** early development. Mock interviews work; the interviewer writes its own
 problems, validated against a reference solution before they are served; the
 patterns you miss come back on a Leitner schedule with a problem you have not seen;
@@ -35,7 +40,8 @@ and the plugin prints the session's link in your terminal every time one starts.
 again. `/chudcode:roadmap` takes you through NeetCode 150 in order, or Grind 75 if you
 name it: each step is an original problem in the shape of the next one on the list,
 and after each debrief a Next problem button takes you straight to the one after.
-`/chudcode:research <company>` finds what that company has been asking lately,
+`/chudcode:learn` teaches the next lesson on coding with agents, or the topic you
+name. `/chudcode:research <company>` finds what that company has been asking lately,
 so an interview for it has the right shape. `/chudcode:dashboard` opens the page with
 your review schedule, streak, and past sessions.
 
@@ -69,7 +75,7 @@ Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your cl
 ```
 
 `CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
-are `/interview`, `/review`, `/roadmap`, `/research <company>`, and `/dashboard`. While the
+are `/interview`, `/review`, `/roadmap`, `/learn`, `/research <company>`, and `/dashboard`. While the
 interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
 below the editor, and the link of the session it opened last.
 
@@ -102,6 +108,17 @@ make sure the patterns you keep missing are the ones you see again.
   so a "like Two Sum" interview counts too. After a roadmap debrief the interviewer
   writes the next step ahead of time and stays for a while; the Next problem button
   on the debrief or the dashboard opens it without a trip back to the terminal.
+- Agentic coding lessons: nine modules, from planning and context files through test
+  strength, subagents with chosen models and effort, and prompt-caching cost, to
+  working across providers. Every claim a lesson teaches about Claude Code cites a
+  fact in `data/agentic/curriculum.json`, each with the page that states it; the
+  interviewer re-reads sources older than two weeks before teaching, and an exercise
+  that cites anything else fails validation. You get a scenario, work it with your
+  own agent, submit your plan or spec, answer follow-ups, and are scored on
+  decomposition, verification, context and cost, safety, and delegation. Missed
+  lessons come back on the review schedule. See `docs/LEARNING.md` and
+  `docs/CURRICULUM-FORMAT.md`. Labs on your own repository and drills graded by code
+  are next.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -116,10 +133,16 @@ when the pattern comes back, and, on a roadmap, the button for the next problem.
 
 ![The page after the debrief: 12 of 12 cases passed, the rubric card with scores, strengths, and things to work on, and a Next problem button for Contains Duplicate on NeetCode 150](docs/screenshots/session-debrief.png)
 
-The dashboard shows every pattern's place in the review schedule, what is due, the
-streak, progress through both roadmaps, and past sessions.
+A lesson shows its teaching with numbered sources on the left, the scenario and your
+answer in the middle, and the interviewer on the right.
 
-![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, a Next problem button under each roadmap, and recent sessions](docs/screenshots/dashboard.png)
+![A lesson page: the teaching on planning with three cited sources, the brief for planning OFX import into a ledger CLI with a submitted answer, and a debrief that passed on decomposition and verification](docs/screenshots/lesson-debrief.png)
+
+The dashboard shows every pattern's place in the review schedule, what is due, the
+streak, progress through both roadmaps and the agentic-coding modules, and past
+sessions.
+
+![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, a Next problem button under each roadmap, the agentic-coding modules with the next lesson, and recent sessions](docs/screenshots/dashboard.png)
 
 The screenshots come from `npm run e2e:browser -- <dir>`, which drives the real page.
 How the pieces fit is in `docs/ARCHITECTURE.md`.

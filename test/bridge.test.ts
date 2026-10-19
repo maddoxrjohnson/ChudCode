@@ -251,6 +251,7 @@ describe("commands", () => {
       "interview",
       "review",
       "roadmap",
+      "learn",
       "research",
       "dashboard",
     ]);

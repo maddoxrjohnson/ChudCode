@@ -78,6 +78,22 @@ export const COMMANDS = {
         "After the debrief, write and validate the next step ahead of time as `record_session` asks, without starting it, then end your turn. A press of Next problem on the page arrives as a new message; start the session then.",
       ].join("\n\n"),
   },
+  learn: {
+    description:
+      "Take a lesson on coding with agents: planning, context, tests, subagents, cost, and more. Usage: /learn [topic or lesson]",
+    prompt: (args: string) =>
+      [
+        "Teach a ChudCode lesson on agentic coding.",
+        args
+          ? `The user asked to learn about: ${args}`
+          : "The user named no topic, so take the next lesson.",
+        "Call `list_curriculum` if you need to match a topic to a lesson, then `begin_lesson` and follow the method it returns in full. " +
+          "Serve a validated exercise the learner has not seen, or write one with `write_exercise` and `validate_exercise` until it passes. Then call `start_lesson`.",
+        "Give the user the URL in the terminal and say one sentence on the page with `say_to_candidate`. " +
+          "The learner's actions then arrive here as messages; handle each one and end your turn. They may spend a long time with their own agent between messages. " +
+          "When their answer has arrived and you have asked your follow-ups, score it with `record_lesson` and summarise in the terminal: the verdict, two strengths, two things to work on, and when the lesson comes back.",
+      ].join("\n\n"),
+  },
   research: {
     description:
       "Find what a company has been asking in coding interviews. Usage: /research <company> [role]",

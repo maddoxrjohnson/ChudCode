@@ -36,23 +36,26 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 
 ## Modules
 
-| Path                    | Job                                                                                                                                                                                    |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mcp/launch.mjs`        | Entry point both hosts run. Checks Node can run TypeScript, installs runtime deps on first launch, warns if Python is missing.                                                         |
-| `src/mcp.ts`            | Hand-written JSON-RPC dispatch, the tool table, the listening inbox, and routing of candidate events to prompts.                                                                       |
-| `src/next-up.ts`        | The Next problem button: one pending press, handed to the host and answered by the next roadmap session `start_session` creates.                                                       |
-| `hooks/session-link.ts` | Claude Code hook on `start_session`: prints the session's link in the terminal, so it never depends on the model's reply. Pi's extension shows the same link under the editor.         |
-| `src/outbox.ts`         | The pushing host's numbered prompt log, replayable with `GET /api/inbox?since`.                                                                                                        |
-| `src/tools/`            | One file per tool group. Tools validate arguments and call `flow.ts` or a store.                                                                                                       |
-| `src/flow.ts`           | Every operation that moves a session along: start, note, message, run, submit, hint, timeout, done, record. Writes disk, appends the event log, pushes SSE, emits the candidate event. |
-| `src/prompts.ts`        | Everything the agent reads: the brief, event prompts, result text. One place to tune the interviewer.                                                                                  |
-| `src/server/`           | Loopback HTTP: pages, the JSON API, SSE channels, the agent token.                                                                                                                     |
-| `src/runner/`           | `Runner` and `LanguageAdapter` interfaces, the process and Docker runners, comparators, and the candidate-safe view of a result.                                                       |
-| `src/store/`            | On-disk formats: config, problems, sessions, review events, trends. Atomic JSON writes, strict id validation.                                                                          |
-| `src/review.ts`         | Leitner scheduling over pattern and problem keys, derived from the review log on every read.                                                                                           |
-| `src/roadmap.ts`        | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                       |
-| `assets/runtime/`       | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                        |
-| `pi/`                   | The Pi extension: slash commands, the bridge, the status line.                                                                                                                         |
+| Path                    | Job                                                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp/launch.mjs`        | Entry point both hosts run. Checks Node can run TypeScript, installs runtime deps on first launch, warns if Python is missing.                                                                    |
+| `src/mcp.ts`            | Hand-written JSON-RPC dispatch, the tool table, the listening inbox, and routing of candidate events to prompts.                                                                                  |
+| `src/next-up.ts`        | The Next problem button: one pending press, handed to the host and answered by the next roadmap session `start_session` creates.                                                                  |
+| `hooks/session-link.ts` | Claude Code hook on `start_session` and `start_lesson`: prints the session's link in the terminal, so it never depends on the model's reply. Pi's extension shows the same link under the editor. |
+| `src/outbox.ts`         | The pushing host's numbered prompt log, replayable with `GET /api/inbox?since`.                                                                                                                   |
+| `src/tools/`            | One file per tool group. Tools validate arguments and call `flow.ts` or a store.                                                                                                                  |
+| `src/flow.ts`           | Every operation that moves a session along: start, note, message, run, submit, hint, timeout, done, record. Writes disk, appends the event log, pushes SSE, emits the candidate event.            |
+| `src/prompts.ts`        | Everything the agent reads: the brief, event prompts, result text. One place to tune the interviewer.                                                                                             |
+| `src/server/`           | Loopback HTTP: pages, the JSON API, SSE channels, the agent token.                                                                                                                                |
+| `src/runner/`           | `Runner` and `LanguageAdapter` interfaces, the process and Docker runners, comparators, and the candidate-safe view of a result.                                                                  |
+| `src/store/`            | On-disk formats: config, problems, sessions, review events, trends. Atomic JSON writes, strict id validation.                                                                                     |
+| `src/review.ts`         | Leitner scheduling over pattern, problem, and lesson keys, derived from the review log on every read.                                                                                             |
+| `src/roadmap.ts`        | NeetCode 150's topic tree and Grind 75's weeks as stages, and each title's state, derived from sessions whose problem mimics it.                                                                  |
+| `src/curriculum.ts`     | The agentic-coding track (`data/agentic/curriculum.json`): modules, lessons, and sourced facts, with module unlocks derived from scored lessons.                                                  |
+| `src/lesson-flow.ts`    | Every operation that moves a lesson session along: start, message, answer, timeout, done, record. Lessons live in `lessons/`, apart from interviews.                                              |
+| `src/lesson-prompts.ts` | What the agent reads for lessons: the lesson brief with its facts and their freshness, and the lesson event prompts.                                                                              |
+| `assets/runtime/`       | The browser code, plain ES modules served as-is. `assets/vendor/` holds the one bundled dependency, CodeMirror.                                                                                   |
+| `pi/`                   | The Pi extension: slash commands, the bridge, the status line.                                                                                                                                    |
 
 ## One interview, end to end
 
@@ -76,6 +79,26 @@ runs in a fourth place, inside Pi, and bridges the two hosts' different abilitie
 7. `record_session` writes the rubric and verdict, appends review events for the
    problem and its patterns, and pushes the debrief card to the page and a reload
    to the dashboard.
+
+## One lesson, end to end
+
+The agentic-coding track reuses the server, the page's chat and clock, the inbox,
+and the review schedule, and keeps its own store and prompts.
+
+1. The agent calls `begin_lesson`. It returns the method (`docs/LEARNING.md`), the
+   lesson's goals and facts with their sources and which are due a re-check, the
+   exercises on disk, the learner's history, and the rubric (`docs/AGENTIC-RUBRIC.md`).
+2. The agent re-reads stale sources and logs each with `record_fact_check`, then
+   writes an exercise with `write_exercise` and validates it with
+   `validate_exercise`, which rejects teaching that cites a fact the lesson lacks or
+   misses a core one (`docs/EXERCISE-FORMAT.md`).
+3. `start_lesson` creates `lessons/<id>/` and returns the same "Session … is ready"
+   line, so the link hook and the Pi status line work unchanged.
+4. The learner reads, presses Start, works the scenario with their own agent, and
+   submits an answer. Each action goes through `lesson-flow.ts` and reaches the agent
+   like an interview event; the answer arrives beside the private outline.
+5. `record_lesson` scores the five agentic dimensions, appends one `lesson:<id>`
+   review event, and pushes the debrief.
 
 ## Two hosts, one server
 
