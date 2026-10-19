@@ -238,6 +238,33 @@ describe("a lesson round trip", () => {
     expect(readReviewEvents()).toHaveLength(1);
   });
 
+  it("serves the lesson page with sourced teaching and never the private material", async () => {
+    const id = await startLesson();
+    const html = await (await fetch(`${server.getBaseUrl()}/s/${id}`)).text();
+    expect(html).toContain("Explore, plan, then code");
+    expect(html).toContain('id="answer-text"');
+    expect(html).toContain('<sup class="fact-ref"><a href="#fact-plan-mode-behavior"');
+    expect(html).toContain('<li id="fact-plan-mode-behavior">');
+    expect(html).toContain('href="https://code.claude.com/docs/en/permission-modes"');
+    expect(html).toContain("runtime/lesson/main.mjs");
+    expect(html).not.toContain("[fact:");
+    expect(html).not.toContain("editor-host");
+    for (const secret of [
+      OUTLINE.slice(0, 60),
+      "How would you know the refactor",
+      "Adding OFX before",
+    ])
+      expect(html).not.toContain(secret);
+
+    const dashboard = await (await fetch(`${server.getBaseUrl()}/`)).text();
+    expect(dashboard).toContain('<section id="agentic">');
+    expect(dashboard).toContain("Next lesson: <strong>Explore, plan, then code</strong>");
+    expect(dashboard).toContain(`href="/s/${id}"`);
+    const json = await (await fetch(`${server.getBaseUrl()}/api/dashboard`)).json();
+    expect(json.agentic.progress.next.lesson.id).toBe("plan-before-code");
+    expect(JSON.stringify(json)).not.toContain(OUTLINE.slice(0, 60));
+  });
+
   it("refuses an answer before Start and after the debrief", async () => {
     const id = await startLesson();
     expect((await browser(`/api/sessions/${id}/answer`, { text: "early" })).status).toBe(409);

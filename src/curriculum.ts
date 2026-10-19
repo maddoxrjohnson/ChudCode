@@ -266,6 +266,7 @@ export interface LessonStanding {
   state: LessonState;
   attempts: number;
   lastAt: number | null;
+  lastSession: string | null;
 }
 
 export interface ModuleStanding {
@@ -319,6 +320,7 @@ export function buildCurriculumProgress(
         state,
         attempts: list.length,
         lastAt: list.length > 0 ? (list[list.length - 1] as LessonAttempt).at : null,
+        lastSession: list.length > 0 ? (list[list.length - 1] as LessonAttempt).session : null,
       };
     });
     const total = lessons.filter((l) => l.state !== "outline").length;

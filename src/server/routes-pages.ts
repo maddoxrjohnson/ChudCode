@@ -15,10 +15,16 @@ import { listProblems, problemExists, publicView, readProblem } from "../store/p
 import { listSessions, readSession, sessionExists } from "../store/sessions.ts";
 import { agentConnected, agentListening } from "./hooks.ts";
 import { HttpError, sendFile, sendHtml } from "./http.ts";
-import { dashboardPage } from "./pages/dashboard.ts";
+import { dashboardPage, type AgenticData } from "./pages/dashboard.ts";
+import { reviewItems } from "../store/review-events.ts";
 import { nextUpHtml, type NextButtonView } from "./pages/next-up.ts";
 import { problemPage } from "./pages/problem.ts";
 import { sessionPage } from "./pages/session.ts";
+import { lessonPage } from "./pages/lesson.ts";
+import { findLesson, loadCurriculumProgress } from "../curriculum.ts";
+import { lessonState } from "../lesson-flow.ts";
+import { factFreshness, readFactChecks } from "../store/fact-checks.ts";
+import { lessonExists, listLessons, readAnswer, readLesson } from "../store/lessons.ts";
 
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1f6feb"/><path d="M11 10l-5 6 5 6M21 10l5 6-5 6M18 8l-4 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -38,6 +44,7 @@ export function handlePage(
         progress: loadProgress(),
         roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
         next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
+        agentic: agenticData(),
       }),
     );
   }
@@ -52,6 +59,10 @@ export function handlePage(
     const file = safeJoin(assetsDir(), rest.join("/"));
     if (!file || rest.length === 0) throw new HttpError(404, "No such asset");
     return sendFile(res, file);
+  }
+
+  if (head === "s" && rest.length === 1 && lessonExists(rest[0] ?? "")) {
+    return sendHtml(res, lessonPageFor(rest[0] as string));
   }
 
   if (head === "s" && rest.length === 1) {
@@ -76,6 +87,26 @@ export function handlePage(
   }
 
   throw new HttpError(404, "No such page");
+}
+
+export function agenticData(now = Date.now()): AgenticData {
+  return {
+    progress: loadCurriculumProgress(),
+    lessons: listLessons(10),
+    due: reviewItems().filter((i) => i.kind === "lesson" && i.dueAt <= now),
+  };
+}
+
+function lessonPageFor(id: string): string {
+  const session = readLesson(id);
+  const place = findLesson(session.lesson);
+  const answers: string[] = [];
+  for (let n = 1; n <= session.answers; n += 1) answers.push(readAnswer(id, n) ?? "");
+  return lessonPage(lessonState(id, agentListening()), {
+    moduleName: place?.module.name ?? session.module,
+    facts: factFreshness(place?.lesson.facts ?? [], readFactChecks(), Date.now()),
+    answers,
+  });
 }
 
 /** Whether a press of Next problem will be answered, and what to type if not. */

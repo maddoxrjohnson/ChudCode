@@ -15,8 +15,18 @@ import { dueText, MASTERED_BOX, relativeDay, type ReviewItem } from "../../revie
 import type { ItemStanding, RoadmapProgress, StageStanding } from "../../roadmap.ts";
 import type { ProblemMeta } from "../../store/problems.ts";
 import type { Session } from "../../store/sessions.ts";
+import type { CurriculumProgress, LessonState } from "../../curriculum.ts";
+import type { LessonSession } from "../../store/lessons.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
 import { nextUpHtml, type NextButtonView } from "./next-up.ts";
+
+export interface AgenticData {
+  progress: CurriculumProgress;
+  /** Recent lesson sessions, newest first. */
+  lessons: LessonSession[];
+  /** Lesson review items that are due now. */
+  due: ReviewItem[];
+}
 
 export interface DashboardData {
   sessions: Session[];
@@ -25,6 +35,8 @@ export interface DashboardData {
   roadmaps: RoadmapProgress[];
   /** The Next problem button for each roadmap; left out, the rows are not shown. */
   next?: { ups: NextUp[]; view: NextButtonView };
+  /** The agentic-coding lessons; left out, the section is not shown. */
+  agentic?: AgenticData;
 }
 
 export function dashboardPage(data: DashboardData): string {
@@ -48,6 +60,7 @@ export function dashboardPage(data: DashboardData): string {
     ${data.roadmaps.map((r, i) => roadmapHtml(r, i === 0, data.next)).join("\n")}
     <p class="muted small">Press Next problem, or ask your agent for the next roadmap problem. You get an original problem in the shape of the listed one, and solving it checks the listed one off. A topic opens once half of every topic before it is solved.</p>
   </section>
+  ${data.agentic ? agenticHtml(data.agentic, progress.now) : ""}
   <section id="sessions">
     <h2>Recent sessions</h2>
     ${sessionsHtml(data.sessions)}
@@ -175,6 +188,93 @@ ${stages}
 </details>
 ${up && buttons ? nextUpHtml(up, buttons.view) : ""}
 </div>`;
+}
+
+const LESSON_MARKS: Record<LessonState, string> = {
+  passed: "✓",
+  attempted: "✗",
+  new: "○",
+  outline: "·",
+};
+
+function agenticHtml(data: AgenticData, now: number): string {
+  const { progress } = data;
+  const names = new Map(progress.modules.flatMap((m) => m.lessons.map((l) => [l.id, l.title])));
+  const next = progress.next
+    ? `<p id="agentic-next">Next lesson: <strong>${escapeHtml(progress.next.lesson.title)}</strong> <span class="muted">in ${escapeHtml(progress.next.module.name)}</span></p>`
+    : "";
+  const due = data.due.length
+    ? `<ul class="due-list" id="agentic-due">${data.due
+        .map(
+          (item) =>
+            `<li data-lesson="${escapeHtml(item.id)}"><strong>${escapeHtml(names.get(item.id) ?? item.id)}</strong> <span class="badge warn">${escapeHtml(dueText(item.dueAt, now))}</span></li>`,
+        )
+        .join("\n")}</ul>`
+    : "";
+  const modules = progress.modules
+    .map((m) => {
+      const state = !m.unlocked ? "locked" : m.total > 0 && m.passed === m.total ? "done" : "open";
+      const note = m.unlocked
+        ? m.total === 0
+          ? "outline"
+          : ""
+        : `opens once ${m.waitingOn.map((id) => progress.modules.find((x) => x.id === id)?.name ?? id).join(" and ")} is half passed`;
+      const lessons = m.lessons
+        .map((l) => {
+          const title = l.lastSession
+            ? `<a href="/s/${escapeHtml(l.lastSession)}">${escapeHtml(l.title)}</a>`
+            : escapeHtml(l.title);
+          return `<li class="item lesson-item ${l.state}"><span class="mark" aria-label="${l.state}">${LESSON_MARKS[l.state]}</span> ${title}${l.state === "outline" ? ` <span class="muted small">coming</span>` : ""}</li>`;
+        })
+        .join("\n");
+      return `<li class="stage ${state}" data-module="${escapeHtml(m.id)}">
+<details>
+<summary><span class="stage-name">${escapeHtml(m.name)}</span> <progress max="${Math.max(1, m.total)}" value="${m.passed}"></progress> <span class="stage-count">${m.passed}/${m.total}</span>${note ? ` <span class="muted small">${escapeHtml(note)}</span>` : ""}</summary>
+<p class="muted small">${escapeHtml(m.blurb)}</p>
+<ul class="item-list">
+${lessons}
+</ul>
+</details>
+</li>`;
+    })
+    .join("\n");
+  const recent = data.lessons.length
+    ? `<table class="table" id="lesson-sessions">
+<thead><tr><th>When</th><th>Lesson</th><th>Exercise</th><th>Result</th></tr></thead>
+<tbody>${data.lessons
+        .map(
+          (s) => `<tr>
+  <td><a href="/s/${escapeHtml(s.id)}">${escapeHtml(formatDate(s.createdAt))}</a></td>
+  <td>${escapeHtml(s.lessonTitle)}</td>
+  <td>${escapeHtml(s.exerciseKind)}</td>
+  <td>${lessonResult(s)}</td>
+</tr>`,
+        )
+        .join("\n")}</tbody>
+</table>`
+    : "";
+  return `<section id="agentic">
+    <h2>Agentic coding</h2>
+    <div class="roadmap-card">
+    <p><span class="badge">${progress.passed}/${progress.total} lessons passed</span></p>
+    ${next}
+    ${due}
+    <ul class="stage-list" id="agentic-modules">
+${modules}
+    </ul>
+    </div>
+    ${recent}
+    <p class="muted small">Ask your agent for a lesson, or run /chudcode:learn. Each lesson teaches a few sourced facts about coding with agents, then gives you a scenario to work with your own agent; the interviewer grades your judgement. A module opens once half of every module before it is passed.</p>
+  </section>`;
+}
+
+function lessonResult(session: LessonSession): string {
+  if (session.verdict)
+    return session.verdict.correct
+      ? `<span class="badge ok">passed</span>`
+      : `<span class="badge warn">not passed</span>`;
+  if (session.abandonedReason) return `<span class="muted">abandoned</span>`;
+  return `<span class="muted">${escapeHtml(session.phase === "coding" ? "working" : session.phase)}</span>`;
 }
 
 function stageHtml(stage: StageStanding, all: readonly StageStanding[]): string {

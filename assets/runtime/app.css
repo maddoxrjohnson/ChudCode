@@ -1052,3 +1052,83 @@ textarea:focus,
     animation: none;
   }
 }
+
+/* ── Lesson page ─────────────────────────────────────────────────────────── */
+
+.lesson-panes {
+  grid-template-columns: minmax(320px, 1.2fr) minmax(380px, 1.3fr) minmax(280px, 0.9fr);
+}
+
+.lesson-teaching h2 {
+  margin-top: 1.25rem;
+}
+
+.fact-ref a {
+  text-decoration: none;
+  padding: 0 0.15rem;
+  font-size: 0.75em;
+}
+
+.fact-sources {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  padding-left: 1.25rem;
+}
+
+.fact-sources li:target {
+  background: var(--warn-bg);
+  border-radius: var(--radius);
+}
+
+.lesson-work {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lesson-brief h1 {
+  margin-top: 0;
+}
+
+.answer-form {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.answer-form textarea {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  min-height: 14rem;
+  resize: vertical;
+}
+
+.answer-form .button-row {
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.answers .answer {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  margin-bottom: 0.4rem;
+  background: var(--surface);
+}
+
+.answers summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.item.passed .mark {
+  color: var(--ok);
+}
+
+.item.attempted .mark {
+  color: var(--danger);
+}
+
+.item.outline {
+  color: var(--muted);
+}

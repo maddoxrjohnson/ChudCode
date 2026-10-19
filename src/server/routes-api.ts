@@ -48,7 +48,7 @@ import {
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
-import { nextButtonView, sessionNextHtml } from "./routes-pages.ts";
+import { agenticData, nextButtonView, sessionNextHtml } from "./routes-pages.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
 export const MAX_CODE_BYTES = 200 * 1024;
@@ -80,6 +80,7 @@ export async function handleApi(
       progress: loadProgress(),
       roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
       next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
+      agentic: agenticData(),
     });
   }
 

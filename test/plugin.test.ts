@@ -39,20 +39,25 @@ describe("Claude Code plugin", () => {
     expect(manifest["contributors"]).toBeUndefined();
   });
 
-  it("prints every session's link from a hook on start_session", () => {
+  it("prints every session's link from a hook on start_session and start_lesson", () => {
     const hooks = readJson("hooks/hooks.json")["hooks"].PostToolUse;
     const tool = `mcp__plugin_${manifest["name"]}_chudcode__start_session`;
-    expect(hooks).toEqual([
+    const link = (matcher: string) =>
       expect.objectContaining({
-        matcher: tool,
+        matcher,
         hooks: [
           expect.objectContaining({
             command: expect.stringContaining("${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts"),
           }),
         ],
-      }),
+      });
+    expect(hooks).toEqual([
+      link(tool),
+      link(`mcp__plugin_${manifest["name"]}_chudcode__start_lesson`),
     ]);
-    expect(new McpSession(new CandidateInbox()).toolNames()).toContain("start_session");
+    const names = new McpSession(new CandidateInbox()).toolNames();
+    expect(names).toContain("start_session");
+    expect(names).toContain("start_lesson");
 
     const url = "http://127.0.0.1:4100/s/20261018-1652-two-pass-f2cc";
     const input = JSON.stringify({
@@ -64,9 +69,9 @@ describe("Claude Code plugin", () => {
         },
       ],
     });
-    const link = sessionLink(input);
-    expect(link).toEqual({ sessionId: "20261018-1652-two-pass-f2cc", url });
-    expect(hookOutput(link!).systemMessage).toBe(`ChudCode session ready: ${url}`);
+    const found = sessionLink(input);
+    expect(found).toEqual({ sessionId: "20261018-1652-two-pass-f2cc", url });
+    expect(hookOutput(found!).systemMessage).toBe(`ChudCode session ready: ${url}`);
     expect(sessionLink(JSON.stringify({ tool_response: "No problem named x." }))).toBeNull();
     expect(sessionLink("not json")).toBeNull();
   });

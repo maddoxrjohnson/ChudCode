@@ -8,8 +8,9 @@
  * directory. This covers what the unit tests cannot: the editor, autosave, the Run
  * and Submit buttons, custom input, the hint ladder, the chat in both directions,
  * the debrief card arriving over SSE, the dashboard reflecting the scored session and
- * reloading when another one starts, and the Next problem button following the
- * interviewer to the session it opens.
+ * reloading when another one starts, the Next problem button following the
+ * interviewer to the session it opens, and an agentic-coding lesson from its sourced
+ * teaching to the debrief.
  */
 
 import * as fs from "node:fs";
@@ -24,7 +25,11 @@ import * as server from "../src/server/server.ts";
 import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { createSession, readDraft, readSession } from "../src/store/sessions.ts";
+import { postLessonMessage, recordLesson } from "../src/lesson-flow.ts";
+import { updateExerciseMeta, writeExercise } from "../src/store/exercises.ts";
+import { createLesson, lessonExists } from "../src/store/lessons.ts";
 import { makeFixture, seedExample } from "../test/helpers.ts";
+import { exerciseArgs } from "../test/lesson-fixtures.ts";
 
 process.env["CHUDCODE_AUTO_OPEN"] = "0";
 
@@ -55,6 +60,7 @@ function check(name: string, condition: boolean, detail?: unknown): void {
 let solved = false;
 function interviewer(event: CandidateEvent): void {
   const id = event.sessionId;
+  if (lessonExists(id)) return lessonInterviewer(event);
   switch (event.kind) {
     case "started":
       postMessage(id, "interviewer", "Hi, I'm your interviewer today. Ask me anything as you go.");
@@ -84,6 +90,41 @@ function interviewer(event: CandidateEvent): void {
         solved = true;
         postMessage(id, "interviewer", "Every case passed. What is the time complexity?");
       }
+      return;
+    default:
+      return;
+  }
+}
+
+let followedUp = false;
+function lessonInterviewer(event: CandidateEvent): void {
+  const id = event.sessionId;
+  switch (event.kind) {
+    case "started":
+      postLessonMessage(id, "interviewer", "Take your time. Ask me anything about the scenario.");
+      return;
+    case "answer":
+      followedUp = true;
+      postLessonMessage(
+        id,
+        "interviewer",
+        "How would you know the parser refactor changed **nothing**?",
+      );
+      return;
+    case "message":
+      if (!followedUp) return;
+      recordLesson(id, {
+        scores: {
+          decomposition: 3,
+          verification: 3,
+          contextCost: null,
+          safety: 2,
+          delegation: null,
+        },
+        notesMd: "Pinned behaviour before changing it, and every phase ends in a check.",
+        strengths: ["Characterisation tests come first.", "Phases are small enough to review."],
+        improvements: ["Say which phase you would not run unattended."],
+      });
       return;
     default:
       return;
@@ -324,6 +365,78 @@ try {
     page.url(),
   );
 
+  // An agentic-coding lesson: sourced teaching, an answer, a follow-up, the debrief.
+  const exercise = exerciseArgs();
+  writeExercise({
+    meta: {
+      slug: exercise["slug"] as string,
+      kind: "design-review",
+      lesson: "plan-before-code",
+      title: exercise["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: exercise["teaching_md"] as string,
+    brief: exercise["brief_md"] as string,
+    private: {
+      modelOutline: exercise["model_outline"] as string,
+      followUps: exercise["follow_ups"] as string[],
+      pitfalls: exercise["pitfalls"] as string[],
+    },
+  });
+  updateExerciseMeta("plan-ofx-import", { validatedAt: Date.now() });
+  const lesson = createLesson({
+    lesson: "plan-before-code",
+    lessonTitle: "Explore, plan, then code",
+    module: "planning",
+    exercise: "plan-ofx-import",
+    exerciseKind: "design-review",
+    focus: ["decomposition", "verification"],
+    timerMs: 45 * 60_000,
+  });
+  await page.goto(`${base}/s/${lesson.id}`);
+  check("the lesson page renders", (await page.title()).startsWith("Explore, plan, then code"));
+  check("it shows no code editor", (await page.locator(".cm-editor").count()) === 0);
+  check(
+    "teaching cites its sources",
+    (await page.locator(".fact-sources li").count()) === 3 &&
+      (await page.locator(".fact-ref a").count()) === 3,
+  );
+  check("the answer box waits for Start", await page.locator("#answer-text").isDisabled());
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  await page
+    .locator(".message.from-interviewer", { hasText: "Ask me anything about the scenario" })
+    .waitFor();
+  check("Start reaches the interviewer, who greets the learner", true);
+  await page
+    .locator("#answer-text")
+    .fill(
+      "1. Pin today's CSV parsing with tests on real exports from both banks.\n2. Extract a parser interface; the suite stays green.\n3. Add OFX behind it with fixtures.\n4. Wire the CLI flag.",
+    );
+  await screenshot(page, "lesson");
+  await page.locator("#answer-button").click();
+  await page.locator(".answers .answer summary", { hasText: "Answer 1" }).waitFor();
+  check("the submitted answer is listed", true);
+  await page.locator(".message.from-interviewer", { hasText: "changed nothing" }).waitFor();
+  check("the interviewer follows up on the answer", true);
+  await page.locator("#composer-text").fill("The phase 0 tests run unchanged before and after.");
+  await page.locator("#composer button[type=submit]").click();
+  const lessonVerdict = await page.locator("#rubric .badge").textContent({ timeout: 5000 });
+  check("the lesson debrief says Passed", lessonVerdict === "Passed", lessonVerdict);
+  check(
+    "unscored dimensions show as n/a",
+    (await page.locator("#rubric .scores li", { hasText: "n/a" }).count()) === 2,
+  );
+  await screenshot(page, "lesson-debrief");
+  await page.goto(base);
+  const lessonsBadge = await page.locator("#agentic .badge").first().textContent();
+  check(
+    "the dashboard counts the passed lesson",
+    lessonsBadge === "1/9 lessons passed",
+    lessonsBadge,
+  );
+
   // Server state.
   check("the verdict is recorded", readSession(session.id).verdict?.correct === true);
   check(
@@ -331,7 +444,7 @@ try {
     readReviewEvents()
       .map((e) => e.key)
       .sort()
-      .join() === "pattern:sliding-window,problem:window-sum",
+      .join() === "lesson:plan-before-code,pattern:sliding-window,problem:window-sum",
   );
   check("no browser errors", errors.length === 0, errors.join("; "));
 

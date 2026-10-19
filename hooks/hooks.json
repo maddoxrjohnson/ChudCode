@@ -11,6 +11,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__plugin_chudcode_chudcode__start_lesson",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts\"",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
