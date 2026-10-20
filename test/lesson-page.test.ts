@@ -60,7 +60,9 @@ describe("lessonRubricHtml", () => {
     expect(html).toContain('<span class="badge warn">Not yet</span>');
     expect(html).toContain('Decomposition <span class="muted small">focus</span>');
     expect(html).toContain("●●●○");
-    expect(html.match(/n\/a/g)).toHaveLength(2);
+    // A rubric saved before Presentation existed shows it as n/a too.
+    expect(html.match(/n\/a/g)).toHaveLength(3);
+    expect(html).toContain("Presentation");
     expect(html).toContain("<strong>unchecked</strong>");
     expect(html).toContain("<li>Verify phase 3</li>");
     expect(html).not.toContain("Checklist");

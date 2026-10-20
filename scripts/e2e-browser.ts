@@ -28,12 +28,18 @@ import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { createSession, readDraft, readSession } from "../src/store/sessions.ts";
 import { loadCurriculumProgress } from "../src/curriculum.ts";
-import { inspectLab, postLessonMessage, recordLesson } from "../src/lesson-flow.ts";
+import {
+  inspectLab,
+  inspectMediaLab,
+  postLessonMessage,
+  recordLesson,
+} from "../src/lesson-flow.ts";
 import { updateExerciseMeta, writeExercise } from "../src/store/exercises.ts";
 import { createLesson, lessonExists, readLesson, updateLesson } from "../src/store/lessons.ts";
 import { createWorkspace } from "../src/drill/workspace.ts";
 import { makeFixture, seedExample } from "../test/helpers.ts";
-import { exerciseArgs, labArgs } from "../test/lesson-fixtures.ts";
+import { exerciseArgs, labArgs, mediaLabArgs } from "../test/lesson-fixtures.ts";
+import { writeSite } from "../test/media-site.ts";
 import { drillArgs, ORACLE, SPEC, WEAK_TESTS } from "../test/mutation-fixtures.ts";
 import { cacheArgs, REFERENCE, SCENARIO } from "../test/cache-fixtures.ts";
 import { FLAW_SPEC, flawArgs } from "../test/flaw-fixtures.ts";
@@ -107,6 +113,7 @@ let followedUp = false;
 function lessonInterviewer(event: CandidateEvent): void {
   const id = event.sessionId;
   if (readLesson(id).exerciseKind === "lab") return labInterviewer(event);
+  if (readLesson(id).exerciseKind === "media-lab") return mediaInterviewer(event);
   if (readLesson(id).exerciseKind === "mutation") return drillInterviewer(event);
   const kind = readLesson(id).exerciseKind;
   if (kind === "flaw-review" || kind === "cache-plan") {
@@ -192,6 +199,48 @@ function labInterviewer(event: CandidateEvent): void {
           { id: "no-duplication", status: "met", note: "Nothing the code shows" },
           { id: "progress-next", status: "partial", note: "progress.md has no next step" },
         ],
+      });
+      return;
+    default:
+      return;
+  }
+}
+
+/** A media lab: measure each submission, then score once the gate is clear. */
+function mediaInterviewer(event: CandidateEvent): void {
+  const id = event.sessionId;
+  switch (event.kind) {
+    case "answer": {
+      const snapshot = inspectMediaLab(id);
+      const failed = snapshot.checks.filter((c) => c.status === "fail").length;
+      postLessonMessage(
+        id,
+        "interviewer",
+        failed
+          ? `I measured the site: ${failed} checks fail. Start with the **autoplaying video**.`
+          : "Every check passes now. What does a visitor see before the first frame?",
+      );
+      return;
+    }
+    case "message":
+      if (!readLesson(id).lab?.gatePassed) return;
+      recordLesson(id, {
+        scores: {
+          decomposition: null,
+          verification: 3,
+          contextCost: null,
+          safety: null,
+          delegation: null,
+          presentation: 3,
+        },
+        notesMd: "The demo plays inline with a poster, and the preview image names the app.",
+        strengths: ["Faststart H.264 demo"],
+        improvements: ["Add a captions track."],
+        checklist: ["deploys", "paths", "video", "first-screen"].map((item) => ({
+          id: item,
+          status: "met" as const,
+          note: "docs/index.html",
+        })),
       });
       return;
     default:
@@ -525,7 +574,7 @@ try {
   );
   check(
     "unscored dimensions show as n/a",
-    (await page.locator("#rubric .scores li", { hasText: "n/a" }).count()) === 2,
+    (await page.locator("#rubric .scores li", { hasText: "n/a" }).count()) === 3,
   );
   await page.locator("#rubric .next-up", { hasText: "Next lesson" }).waitFor({ timeout: 5000 });
   check("the debrief offers the next lesson", true);
@@ -612,6 +661,86 @@ try {
   );
   await screenshot(page, "lab-debrief");
   fs.rmSync(project, { recursive: true, force: true });
+
+  // A media lab: the site and media are measured; a failed check blocks the pass.
+  const site = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "chudcode-e2e-site-")));
+  writeSite(site, "bad");
+  const media = mediaLabArgs();
+  writeExercise({
+    meta: {
+      slug: media["slug"] as string,
+      kind: "media-lab",
+      lesson: "pages-site",
+      title: media["title"] as string,
+      createdAt: Date.now(),
+      timesServed: 0,
+    },
+    teaching: media["teaching_md"] as string,
+    brief: media["brief_md"] as string,
+    private: {
+      modelOutline: media["model_outline"] as string,
+      followUps: media["follow_ups"] as string[],
+      pitfalls: media["pitfalls"] as string[],
+    },
+  });
+  updateExerciseMeta("ship-your-pages-site", { validatedAt: Date.now() });
+  const mediaSession = createLesson({
+    lesson: "pages-site",
+    lessonTitle: "A GitHub Pages site for your app",
+    module: "showcase",
+    exercise: "ship-your-pages-site",
+    exerciseKind: "media-lab",
+    focus: ["verification", "presentation"],
+    timerMs: 45 * 60_000,
+  });
+  await page.goto(`${base}/s/${mediaSession.id}`);
+  check(
+    "the media lab page lists what the review checks",
+    (await page.locator("#lab-checklist li").count()) === 4,
+  );
+  await page.locator("#start-button").click();
+  await page.locator("#phase", { hasText: "Working" }).waitFor();
+  await page.locator("#lab-path").fill(site);
+  await page.locator("#lab-preview").click();
+  await page.locator("#lab-files li", { hasText: "docs/index.html" }).waitFor();
+  const measured = await page.locator("#lab-files li").allTextContents();
+  check(
+    "the media preview lists pages and media, never .env",
+    measured.some((l) => l.includes("slow.mp4")) && measured.every((l) => !l.includes(".env")),
+    measured.join(" | "),
+  );
+  await page.locator("#lab-consent").check();
+  await page.locator("#answer-button").click();
+  await page.locator("#media-results .check-fail").first().waitFor();
+  check(
+    "the measurement lists the failed checks first",
+    (await page.locator("#media-results .media-checks > li").first().getAttribute("class")) ===
+      "check check-fail",
+  );
+  check(
+    "a finding names the file and line",
+    (await page.locator("#media-results").innerText()).includes(
+      "docs/index.html:7 autoplays without muted",
+    ),
+  );
+  await page.mouse.move(0, 0);
+  await page.locator("#media-results").scrollIntoViewIfNeeded();
+  await screenshot(page, "media-lab");
+  fs.rmSync(site, { recursive: true, force: true });
+  fs.mkdirSync(site);
+  writeSite(site, "good");
+  await page.locator("#lab-preview").click();
+  await page.locator("#lab-files li", { hasText: "og.png" }).waitFor();
+  await page.locator("#lab-consent").check();
+  await page.locator("#answer-button").click();
+  await page.locator("#media-results", { hasText: "Every fail-level check passed." }).waitFor();
+  check("a resubmission is measured again", true);
+  await page.locator(".message.from-interviewer", { hasText: "Every check passes" }).waitFor();
+  await page.locator("#composer-text").fill("The poster, then it plays muted.");
+  await page.locator("#composer button[type=submit]").click();
+  const mediaVerdict = await page.locator("#rubric .badge").first().textContent({ timeout: 5000 });
+  check("the media lab debrief says Passed", mediaVerdict === "Passed", mediaVerdict);
+  fs.rmSync(site, { recursive: true, force: true });
 
   // A mutation drill: the agent's tests in the workspace, graded against hidden variants.
   const drill = drillArgs();
@@ -807,7 +936,7 @@ try {
       .map((e) => e.key)
       .sort()
       .join() ===
-      "lesson:context-files,lesson:plan-before-code,lesson:prompt-caching,lesson:review-agent-diffs,lesson:verify-with-checks,pattern:sliding-window,problem:window-sum",
+      "lesson:context-files,lesson:pages-site,lesson:plan-before-code,lesson:prompt-caching,lesson:review-agent-diffs,lesson:verify-with-checks,pattern:sliding-window,problem:window-sum",
   );
   check("no browser errors", errors.length === 0, errors.join("; "));
 

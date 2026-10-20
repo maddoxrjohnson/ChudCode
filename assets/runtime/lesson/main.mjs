@@ -69,6 +69,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 const isLab = answerForm?.dataset.lab === "true";
+const isMedia = answerForm?.dataset.media === "true";
 const isTranscript = answerForm?.dataset.transcript === "true";
 
 answerForm?.addEventListener("submit", async (event) => {
@@ -115,7 +116,15 @@ function renderLabFiles(listing) {
   if (!labFiles) return;
   labFiles.textContent = "";
   if (listing.files.length === 0)
-    labFiles.append(el("li", { class: "skipped" }, "None of the files this lab reads are there."));
+    labFiles.append(
+      el(
+        "li",
+        { class: "skipped" },
+        isMedia
+          ? "No site pages, README, or media files are there."
+          : "None of the files this lab reads are there.",
+      ),
+    );
   for (const file of listing.files)
     labFiles.append(el("li", {}, `${file.path} (${file.bytes.toLocaleString()} bytes)`));
   for (const skip of listing.skipped)
@@ -480,6 +489,50 @@ const planButton = document.getElementById("plan-button");
 const planResult = document.getElementById("plan-result");
 const usd = (v) => (v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(4)}`);
 
+// ── Media lab: the latest measurement ───────────────────────────────────────
+// Mirrors mediaResultsHtml in src/server/pages/lesson.ts.
+
+const CHECK_ORDER = { fail: 0, warn: 1, pass: 2 };
+const CHECK_LABEL = { fail: "Fails", warn: "Warning", pass: "Passes" };
+
+function renderMeasured(payload) {
+  const host = document.getElementById("media-results");
+  if (!host) return;
+  const shown = payload.checks
+    .filter((c) => c.status !== "n/a")
+    .sort((a, b) => (CHECK_ORDER[a.status] ?? 3) - (CHECK_ORDER[b.status] ?? 3));
+  const failed = shown.filter((c) => c.status === "fail").length;
+  const summary =
+    failed === 0
+      ? "Every fail-level check passed."
+      : `${failed} ${failed === 1 ? "check" : "checks"} must pass before the lesson can: fix ${failed === 1 ? "it" : "them"} and submit again.`;
+  const list = el("ul", { class: "media-checks" });
+  for (const check of shown) {
+    const item = el(
+      "li",
+      { class: `check check-${check.status}` },
+      el(
+        "span",
+        { class: `badge ${check.status === "pass" ? "ok" : "warn"}` },
+        CHECK_LABEL[check.status],
+      ),
+      ` ${check.title}`,
+    );
+    if (check.findings.length > 0)
+      item.append(
+        el(
+          "ul",
+          { class: "findings" },
+          ...check.findings.map((f) => el("li", {}, el("code", {}, f))),
+        ),
+      );
+    list.append(item);
+  }
+  host.textContent = "";
+  host.append(el("h2", {}, "Measured"), el("p", {}, summary), list);
+  host.hidden = false;
+}
+
 function renderPlan(grade) {
   if (!planResult) return;
   planResult.textContent = "";
@@ -673,7 +726,9 @@ function renderDebrief({ rubric, verdict, focus, notesHtml, nextDue, survivors, 
       el(
         "span",
         { class: "score" },
-        value === null ? "n/a" : `${"●".repeat(value)}${"○".repeat(4 - value)}`,
+        value === null || value === undefined
+          ? "n/a"
+          : `${"●".repeat(value)}${"○".repeat(4 - value)}`,
       ),
     );
   };
@@ -763,6 +818,7 @@ connectEvents(
     refactor: (payload) => renderRefactor(payload),
     review: (payload) => renderReview(payload),
     plan: (payload) => renderPlan(payload),
+    measured: (payload) => renderMeasured(payload),
     phase: (payload) => {
       timer.update(payload);
       applyPhase(payload.phase);

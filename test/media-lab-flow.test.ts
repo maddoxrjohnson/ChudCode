@@ -151,6 +151,13 @@ describe("media lab exercises", () => {
       stream.close();
     }
     expect(readLesson(id).lab).toMatchObject({ inspections: 1, gatePassed: false, failed: 7 });
+
+    // After a reload the page shows the measurement, never the private outline.
+    const page = await (await fetch(`${server.getBaseUrl()}/s/${id}`)).text();
+    expect(page).toContain('data-media="true"');
+    expect(page).toContain("7 checks must pass before the lesson can");
+    expect(page).toContain("<code>docs/index.html:7 autoplays without muted</code>");
+    expect(page).not.toContain(MEDIA_OUTLINE);
     expect(readLessonEvents(id).some((e) => e.type === "measured")).toBe(true);
     expect((await call("get_session", { session_id: id })).text).toContain("measured 1 time");
     expect(

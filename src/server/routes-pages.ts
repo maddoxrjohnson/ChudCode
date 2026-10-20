@@ -24,7 +24,7 @@ import { lessonPage } from "./pages/lesson.ts";
 import { nextLessonHtml } from "./pages/next-up.ts";
 import { nextLesson, pendingNextLesson } from "../next-lesson.ts";
 import { findLesson, loadCurriculumProgress } from "../curriculum.ts";
-import { drillReveal, drillSurvivors, lessonState } from "../lesson-flow.ts";
+import { drillReveal, drillSurvivors, latestMediaSnapshot, lessonState } from "../lesson-flow.ts";
 import { factFreshness, readFactChecks } from "../store/fact-checks.ts";
 import { lessonExists, listLessons, readAnswer, readLesson } from "../store/lessons.ts";
 
@@ -125,7 +125,12 @@ function lessonPageFor(id: string): string {
       ? { checklist: place?.lesson.checklist ?? [], labFiles: place?.lesson.labFiles ?? [] }
       : session.exerciseKind === "transcript"
         ? { checklist: place?.lesson.checklist ?? [] }
-        : {}),
+        : session.exerciseKind === "media-lab"
+          ? {
+              checklist: place?.lesson.checklist ?? [],
+              mediaChecks: latestMediaSnapshot(session)?.checks ?? null,
+            }
+          : {}),
     ...((session.exerciseKind === "mutation" || session.exerciseKind === "refactor") &&
     session.rubric
       ? { survivors: drillSurvivors(session) }

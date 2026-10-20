@@ -26,6 +26,7 @@ import { MAX_REVIEWS, type DrillReveal, type LessonState } from "../../lesson-fl
 import { plural } from "../../format.ts";
 import { FACT_REF } from "../../validate-exercise.ts";
 import { page, topbar } from "./layout.ts";
+import type { CheckResult } from "../../media-lab.ts";
 
 export interface LessonPageOptions {
   moduleName: string;
@@ -41,6 +42,8 @@ export interface LessonPageOptions {
   reveal?: DrillReveal | null;
   /** The Next lesson row under a debrief. */
   nextHtml?: string;
+  /** For a media lab: the latest measurement's checks. */
+  mediaChecks?: CheckResult[] | null;
 }
 
 const PHASE_LABELS: Record<LessonSession["phase"], string> = {
@@ -79,17 +82,19 @@ export function lessonPage(state: LessonState, options: LessonPageOptions): stri
     ${
       exercise.kind === "lab"
         ? labFormHtml(state, options, working)
-        : exercise.kind === "mutation"
-          ? drillHtml(state, working)
-          : exercise.kind === "refactor"
-            ? refactorHtml(state, working)
-            : exercise.kind === "transcript"
-              ? transcriptHtml(state, options, working)
-              : exercise.kind === "flaw-review"
-                ? flawReviewHtml(state, working)
-                : exercise.kind === "cache-plan"
-                  ? cachePlanHtml(state, working)
-                  : answerFormHtml(state, working)
+        : exercise.kind === "media-lab"
+          ? mediaLabFormHtml(state, options, working)
+          : exercise.kind === "mutation"
+            ? drillHtml(state, working)
+            : exercise.kind === "refactor"
+              ? refactorHtml(state, working)
+              : exercise.kind === "transcript"
+                ? transcriptHtml(state, options, working)
+                : exercise.kind === "flaw-review"
+                  ? flawReviewHtml(state, working)
+                  : exercise.kind === "cache-plan"
+                    ? cachePlanHtml(state, working)
+                    : answerFormHtml(state, working)
     }
     <section class="answers" id="answers">${answersHtml(options.answers)}</section>
   </section>
@@ -394,6 +399,68 @@ function labFormHtml(state: LessonState, options: LessonPageOptions, working: bo
     </form>`;
 }
 
+const CHECK_ORDER: Record<string, number> = { fail: 0, warn: 1, pass: 2 };
+const CHECK_LABEL: Record<string, string> = { fail: "Fails", warn: "Warning", pass: "Passes" };
+
+/**
+ * A media lab's latest measurement: every check that applied, failures first, with
+ * the file and line of each problem. The page script renders the same markup live.
+ */
+export function mediaResultsHtml(checks: readonly CheckResult[] | null | undefined): string {
+  if (!checks) return "";
+  const shown = checks
+    .filter((c) => c.status !== "n/a")
+    .sort((a, b) => (CHECK_ORDER[a.status] ?? 3) - (CHECK_ORDER[b.status] ?? 3));
+  const failed = shown.filter((c) => c.status === "fail").length;
+  const summary =
+    failed === 0
+      ? "Every fail-level check passed."
+      : `${plural(failed, "check")} must pass before the lesson can: fix ${failed === 1 ? "it" : "them"} and submit again.`;
+  const items = shown
+    .map(
+      (c) =>
+        `<li class="check check-${c.status}"><span class="badge ${c.status === "pass" ? "ok" : "warn"}">${CHECK_LABEL[c.status]}</span> ${escapeHtml(c.title)}${c.findings.length ? `<ul class="findings">${c.findings.map((f) => `<li><code>${escapeHtml(f)}</code></li>`).join("")}</ul>` : ""}</li>`,
+    )
+    .join("\n");
+  return `<h2>Measured</h2><p>${summary}</p><ul class="media-checks">${items}</ul>`;
+}
+
+/**
+ * A media lab's form: the repository with the site and media, what would be
+ * measured, and the consent box. It reuses the lab's ids so the page script and the
+ * routes are shared; nothing is opened until the learner ticks it and submits.
+ */
+function mediaLabFormHtml(
+  state: LessonState,
+  options: LessonPageOptions,
+  working: boolean,
+): string {
+  const checklist = (options.checklist ?? [])
+    .map((c) => `<li data-item="${escapeHtml(c.id)}">${escapeHtml(c.text)}</li>`)
+    .join("\n");
+  return `<section class="lab-checklist" id="lab-checklist">
+      <h2>What the review checks</h2>
+      <ul>${checklist}</ul>
+    </section>
+    <section class="media-results" id="media-results" ${options.mediaChecks ? "" : "hidden"}>${mediaResultsHtml(options.mediaChecks)}</section>
+    <form class="answer-form lab-form" id="answer-form" data-lab="true" data-media="true">
+      <label for="lab-path"><strong>Your project</strong> <span class="muted small">The repository with your site, README, and demo media.</span></label>
+      <div class="lab-path-row">
+        <input type="text" id="lab-path" autocomplete="off" spellcheck="false" placeholder="~/code/my-app" value="${escapeHtml(state.session.lab?.root ?? "")}" ${working ? "" : "disabled"}>
+        <button type="button" class="button" id="lab-preview" ${working ? "" : "disabled"}>Show the files</button>
+      </div>
+      <p class="muted small">A review reads the HTML pages at the root or in <code>docs/</code>, <code>site/</code>, <code>public/</code>, or <code>web/</code>, the README, and the headers of the images and videos in the project, read-only. It never follows a link out of the folder or reads <code>.env</code> files or keys. Up to three images under 1 MB (the social preview, a poster, a screenshot) are shown to the interviewer.</p>
+      <ul class="lab-files" id="lab-files" aria-live="polite"></ul>
+      <label for="answer-text">Notes for the reviewer <span class="muted small">Optional: the live URL, and what you changed.</span></label>
+      <textarea id="answer-text" rows="5" spellcheck="true" ${working ? "" : "disabled"}>${escapeHtml(state.draft)}</textarea>
+      <label class="consent"><input type="checkbox" id="lab-consent" disabled> Let ChudCode measure the files listed above and show three of the images to the interviewer.</label>
+      <div class="button-row">
+        <span class="save-state" id="save-state"></span>
+        <button type="submit" class="button primary" id="answer-button" disabled>Submit for review</button>
+      </div>
+    </form>`;
+}
+
 /** The teaching with each `[fact:<id>]` as a numbered link to its source below. */
 export function teachingHtml(markdown: string, facts: readonly FactFreshness[]): string {
   const order: FactFreshness[] = [];
@@ -444,7 +511,7 @@ export function lessonRubricHtml(
     const score = r[key];
     const focus = session.focus.includes(key) ? ` <span class="muted small">focus</span>` : "";
     const value =
-      score === null
+      score === null || score === undefined
         ? `<span class="muted">n/a</span>`
         : `${"●".repeat(score)}${"○".repeat(4 - score)}`;
     return `<li><span>${label}${focus}</span><span class="score">${value}</span></li>`;

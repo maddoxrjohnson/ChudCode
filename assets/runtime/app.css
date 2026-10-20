@@ -1192,6 +1192,35 @@ textarea:focus,
   list-style: none;
 }
 
+.media-results {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.media-checks {
+  display: grid;
+  gap: 0.4rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.media-checks .findings {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.media-checks .check-pass {
+  color: var(--muted);
+}
+
+/* A warning does not block the pass, so it is amber rather than red. */
+.media-checks .check-warn .badge {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
 /* ── Drills ──────────────────────────────────────────────────────────────── */
 
 .drill {

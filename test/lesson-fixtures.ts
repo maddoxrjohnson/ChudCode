@@ -104,7 +104,7 @@ export const MEDIA_TEACHING = [
   "",
   "## The path it is served under",
   "",
-  `A project site lives at <owner>.github.io/<repo> [fact:pages-project-url], so a link starting with / leaves it. ${PAGES_PARA.repeat(2)}`,
+  `A project site lives at \`<owner>.github.io/<repo>\` [fact:pages-project-url], so a link starting with / leaves it. ${PAGES_PARA.repeat(2)}`,
   "",
   "## The demo on the first screen",
   "",
