@@ -77,6 +77,7 @@ import {
   nextLessonPrompt,
   flawReviewedPrompt,
   labSubmittedPrompt,
+  mediaLabSubmittedPrompt,
   lessonAnswerPrompt,
   lessonDonePrompt,
   lessonMessagePrompt,
@@ -505,7 +506,9 @@ function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
                 ? transcriptSubmittedPrompt(session, event.number, answer, hidden, event.at)
                 : session.exerciseKind === "lab"
                   ? labSubmittedPrompt(session, event.number, answer, hidden, event.at)
-                  : lessonAnswerPrompt(session, event.number, answer, hidden, event.at);
+                  : session.exerciseKind === "media-lab"
+                    ? mediaLabSubmittedPrompt(session, event.number, answer, hidden, event.at)
+                    : lessonAnswerPrompt(session, event.number, answer, hidden, event.at);
       return inbox.push(prompt, `answer:${id}:${event.number}`, notDone);
     }
     case "timer_expired":

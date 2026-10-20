@@ -4,11 +4,19 @@
 
 import { findLesson, loadCurriculumProgress, type LessonPlace } from "../curriculum.ts";
 import { notifyDashboard } from "../flow.ts";
-import { inspectLab, inspectTranscript, recordLesson, startLesson } from "../lesson-flow.ts";
+import {
+  inspectLab,
+  inspectMediaLab,
+  inspectTranscript,
+  recordLesson,
+  startLesson,
+} from "../lesson-flow.ts";
+import { readVisual } from "../media-lab.ts";
 import {
   curriculumText,
   labSnapshotText,
   transcriptAuditText,
+  mediaSnapshotText,
   lessonBrief,
   lessonLine,
   LESSON_DIMENSION_NAMES,
@@ -615,20 +623,20 @@ export function lessonTools(host: ToolHost): ToolDef[] {
       title: "Record Lesson",
       description:
         "Score a lesson session on the agentic rubric, write the debrief to the page, and schedule the lesson for review. " +
-        "Every focus dimension needs a score; pass null for a dimension the lesson gave no evidence on. The lesson passes when an answer was submitted and every focus dimension is 2 or more.",
+        "Every focus dimension needs a score; pass null (or leave it out) for a dimension the lesson gave no evidence on. The lesson passes when an answer was submitted and every focus dimension is 2 or more.",
       inputSchema: schema.obj(
         {
           session_id: schema.str("The lesson session id."),
           scores: {
             type: "object",
-            description: "0 to 4 for each dimension, or null when the lesson gave no evidence.",
+            description:
+              "0 to 4 for each dimension, or null when the lesson gave no evidence. A dimension left out counts as null.",
             properties: Object.fromEntries(
               LESSON_DIMENSIONS.map((d) => [
                 d,
                 { type: ["integer", "null"], minimum: 0, maximum: 4 },
               ]),
             ),
-            required: [...LESSON_DIMENSIONS],
           },
           notes_md: schema.str(
             "The debrief, in Markdown: what went well and what a stronger answer does.",
@@ -644,7 +652,7 @@ export function lessonTools(host: ToolHost): ToolDef[] {
               status: schema.oneOf(CHECKLIST_STATUSES, "How far the project meets it."),
               note: schema.str("The evidence: a file and what it does or lacks."),
             }),
-            "Labs only, and required for them: one result for every item of the lesson's checklist, from what inspect_lab read.",
+            "Labs, media labs, and transcript reviews only, and required for them: one result for every item of the lesson's checklist, from what was inspected.",
           ),
         },
         ["strengths", "improvements", "checklist"],
@@ -659,9 +667,7 @@ export function lessonTools(host: ToolHost): ToolDef[] {
         const scores = {} as LessonScores;
         for (const dim of LESSON_DIMENSIONS) {
           const value = (raw as Record<string, unknown>)[dim];
-          if (value === undefined)
-            throw new ToolArgumentError(`scores.${dim} is required (a number, or null)`);
-          scores[dim] = value as number | null;
+          scores[dim] = value === undefined ? null : (value as number | null);
         }
         const checklist = readChecklist(args["checklist"]);
         const outcome = recordLesson(id, {
@@ -704,6 +710,39 @@ export function lessonTools(host: ToolHost): ToolDef[] {
           files: snapshot.files.map((f) => f.path),
           lints: snapshot.lints.length,
         });
+      },
+    },
+    {
+      name: "inspect_media",
+      title: "Inspect Media",
+      description:
+        "Measure the project the learner submitted for a media lab: their site pages, README, demo video, and promo images, read-only and by headers alone. " +
+        "Returns every check with the facts it rests on, and up to three of the images (the social preview, a poster, a screenshot) to judge by eye. " +
+        "The learner chooses the folder on the page; you cannot name one. Call it after they submit, and again if they resubmit.",
+      inputSchema: schema.obj({ session_id: schema.str("The media lab session id.") }),
+      async execute(args) {
+        const id = requireString(args, "session_id", 120);
+        if (!isValidSessionId(id) || !lessonExists(id))
+          return fail(`No lesson session named ${id}.`);
+        const session = readLesson(id);
+        const place = findLesson(session.lesson);
+        if (!place) return fail(`Lesson ${session.lesson} is no longer in the curriculum.`);
+        const snapshot = inspectMediaLab(id);
+        const result = ok(mediaSnapshotText(snapshot, place.lesson), {
+          gatePassed: snapshot.gatePassed,
+          failed: snapshot.checks.filter((c) => c.status === "fail").map((c) => c.id),
+          visuals: snapshot.visuals.map((v) => v.path),
+        });
+        for (const visual of snapshot.visuals) {
+          const bytes = readVisual(snapshot.root, visual);
+          if (bytes)
+            result.content.push({
+              type: "image",
+              data: bytes.toString("base64"),
+              mimeType: visual.mimeType,
+            });
+        }
+        return result;
       },
     },
     {

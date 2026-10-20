@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "budgets": {
+    "githubBlockBytes": 104857600,
+    "githubWarnBytes": 52428800,
+    "pageVideoBytes": 20971520,
+    "pageWeightBytes": 5242880,
+    "demoMinSeconds": 5,
+    "demoMaxSeconds": 180,
+    "minVideoHeight": 720,
+    "gifBytes": 5242880,
+    "ogRatioMin": 1.75,
+    "ogRatioMax": 2.1,
+    "ogMinWidth": 600,
+    "playableCodecs": ["avc1", "avc3", "av01", "vp09", "V_VP8", "V_VP9", "V_AV1"]
+  },
+  "checks": [
+    {
+      "id": "something-to-measure",
+      "severity": "fail",
+      "title": "There is a site page, a README image, or a media file to measure",
+      "facts": [],
+      "basis": "A media lab grades shipped media; with none, there is nothing to grade."
+    },
+    {
+      "id": "missing-file",
+      "severity": "fail",
+      "title": "Every local file a page or the README references exists",
+      "facts": [],
+      "basis": "A reference to a missing file shows a broken image or an empty player."
+    },
+    {
+      "id": "repo-file-blocked",
+      "severity": "fail",
+      "title": "No media file is over GitHub's 100 MiB limit",
+      "facts": ["github-file-size"]
+    },
+    {
+      "id": "repo-file-large",
+      "severity": "warn",
+      "title": "No media file is over the 50 MiB size Git warns about",
+      "facts": ["github-file-size"]
+    },
+    {
+      "id": "video-codec",
+      "severity": "fail",
+      "title": "Each video uses a codec browsers play: H.264, VP8, VP9, or AV1",
+      "facts": ["h264-browser-support"]
+    },
+    {
+      "id": "video-faststart",
+      "severity": "fail",
+      "title": "Each MP4 has its index (moov) at the start, as -movflags +faststart writes it",
+      "facts": ["ffmpeg-faststart"]
+    },
+    {
+      "id": "video-page-size",
+      "severity": "warn",
+      "title": "A video on a page is 20 MB or less",
+      "facts": ["pages-limits"],
+      "basis": "ChudCode's budget: a 30 to 90 second demo encodes well under 20 MB."
+    },
+    {
+      "id": "video-length",
+      "severity": "warn",
+      "title": "Each video runs between 5 seconds and 3 minutes",
+      "facts": [],
+      "basis": "ChudCode's guidance: a demo shorter than 5 s shows nothing, and past 3 minutes few watch to the end."
+    },
+    {
+      "id": "video-resolution",
+      "severity": "warn",
+      "title": "Each video is at least 720 pixels on its short side",
+      "facts": ["vertical-video-aspect"],
+      "basis": "ChudCode's guidance, matching the 720-pixel minimum ad platforms ask for."
+    },
+    {
+      "id": "autoplay-muted",
+      "severity": "fail",
+      "title": "A video that autoplays is muted",
+      "facts": ["autoplay-muted"]
+    },
+    {
+      "id": "autoplay-playsinline",
+      "severity": "warn",
+      "title": "A video that autoplays has playsinline",
+      "facts": ["autoplay-muted", "playsinline"]
+    },
+    {
+      "id": "video-poster",
+      "severity": "warn",
+      "title": "Each video on a page has a poster image",
+      "facts": ["video-poster"]
+    },
+    {
+      "id": "video-captions",
+      "severity": "warn",
+      "title": "A video with sound has a captions track",
+      "facts": ["webvtt-captions"]
+    },
+    {
+      "id": "img-alt",
+      "severity": "fail",
+      "title": "Every image has an alt attribute (empty for decoration)",
+      "facts": ["img-alt"]
+    },
+    {
+      "id": "img-dimensions",
+      "severity": "warn",
+      "title": "Every local image declares its width and height",
+      "facts": ["img-width-height"]
+    },
+    {
+      "id": "lazy-first-image",
+      "severity": "warn",
+      "title": "A page's first image is not lazy-loaded",
+      "facts": ["lazy-lcp"]
+    },
+    {
+      "id": "gif-as-video",
+      "severity": "warn",
+      "title": "No animated GIF is over 5 MB",
+      "facts": ["h264-browser-support"],
+      "basis": "ChudCode's guidance: a long animated GIF is several times larger than the same clip as H.264 video."
+    },
+    {
+      "id": "og-image",
+      "severity": "fail",
+      "title": "The main page sets og:image, so a shared link has a picture",
+      "facts": ["og-basic-properties"]
+    },
+    {
+      "id": "og-required",
+      "severity": "warn",
+      "title": "The main page sets og:title, og:type, and og:url",
+      "facts": ["og-basic-properties"]
+    },
+    {
+      "id": "og-image-shape",
+      "severity": "warn",
+      "title": "The og:image is an absolute URL to a wide image, about 2:1",
+      "facts": ["og-basic-properties", "github-social-preview"]
+    },
+    {
+      "id": "root-absolute-links",
+      "severity": "fail",
+      "title": "A project site has no links starting with /, which leave /<repo>/",
+      "facts": ["pages-project-url"]
+    },
+    {
+      "id": "page-weight",
+      "severity": "warn",
+      "title": "Each page loads 5 MB or less before anything is clicked",
+      "facts": [],
+      "basis": "ChudCode's budget: images, styles, scripts, and any video set to autoplay or preload=auto."
+    }
+  ]
+}

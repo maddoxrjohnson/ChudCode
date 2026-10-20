@@ -30,16 +30,21 @@ export const EXERCISE_KINDS = [
   "cache-plan",
   "refactor",
   "transcript",
+  "media-lab",
 ] as const;
 export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
 
-/** The five lesson dimensions; `null` means the lesson does not exercise it. */
+/**
+ * The lesson dimensions; `null` means the lesson does not exercise it. Presentation
+ * came later, so a rubric saved before it has no value there, which reads as null.
+ */
 export const LESSON_DIMENSIONS = [
   "decomposition",
   "verification",
   "contextCost",
   "safety",
   "delegation",
+  "presentation",
 ] as const;
 export type LessonDimension = (typeof LESSON_DIMENSIONS)[number];
 
@@ -69,7 +74,7 @@ export interface LessonVerdict {
   rubricOk: boolean;
   /** At least one answer was submitted before the debrief. */
   answered: boolean;
-  /** For a lab: the project was read with inspect_lab, and no checklist item is missing. */
+  /** For a lab: the project was read with inspect_lab (or inspect_media), and no checklist item is missing. */
   inspected?: boolean;
   checklistOk?: boolean;
   /** For a drill: the latest grading passed its gate. */
@@ -167,8 +172,13 @@ export interface LabSubmission {
   submittedAt: number;
   /** The answer number this submission was stored as. */
   answer: number;
-  /** How many times inspect_lab has read it. */
+  /** How many times inspect_lab (or inspect_media) has read it. */
   inspections: number;
+  /** For a media lab: whether the latest inspection cleared every `fail` check. */
+  gatePassed?: boolean;
+  /** For a media lab: the latest inspection's failed and warned checks. */
+  failed?: number;
+  warned?: number;
 }
 
 export interface LessonSession {
@@ -187,7 +197,7 @@ export interface LessonSession {
   endedAt?: number;
   phase: Phase;
   answers: number;
-  /** For a lab: the latest project submission. */
+  /** For a lab or a media lab: the latest project submission. */
   lab?: LabSubmission;
   /** For a drill: its workspace and latest grade. */
   drill?: DrillState;
@@ -213,6 +223,15 @@ export type LessonEvent =
   | { at: number; type: "answer"; number: number; chars: number }
   | { at: number; type: "lab"; number: number; root: string; files: number }
   | { at: number; type: "inspected"; number: number; files: number; lints: number }
+  | {
+      at: number;
+      type: "measured";
+      number: number;
+      pages: number;
+      media: number;
+      failed: number;
+      warned: number;
+    }
   | {
       at: number;
       type: "graded";

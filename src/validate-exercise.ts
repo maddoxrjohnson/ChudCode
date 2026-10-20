@@ -27,6 +27,7 @@ export const BRIEF_SECTIONS: Record<ExerciseKind, readonly string[]> = {
   "cache-plan": ["## Scenario", "## Your task"],
   refactor: ["## Scenario", "## Your task"],
   transcript: ["## Your task"],
+  "media-lab": ["## Your task"],
 };
 
 export const LIMITS = {
@@ -100,6 +101,8 @@ export function validateExercise(bundle: ExerciseBundle, lesson: Lesson): Exerci
   }
   if (bundle.meta.kind === "transcript" && !lesson.checklist?.length)
     errors.push(`Lesson ${lesson.id} has no checklist, so it cannot review a transcript.`);
+  if (bundle.meta.kind === "media-lab" && !lesson.checklist?.length)
+    errors.push(`Lesson ${lesson.id} has no checklist, so it cannot run a media lab.`);
   if (bundle.meta.kind === "lab" && !(lesson.checklist?.length && lesson.labFiles?.length))
     errors.push(`Lesson ${lesson.id} has no lab checklist or lab files, so it cannot run a lab.`);
   for (const heading of BRIEF_SECTIONS[bundle.meta.kind]) {

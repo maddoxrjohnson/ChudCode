@@ -600,6 +600,7 @@ const DIMENSIONS = [
   ["contextCost", "Context and cost"],
   ["safety", "Safety"],
   ["delegation", "Delegation"],
+  ["presentation", "Presentation"],
 ];
 
 function survivorsBlock(survivors) {

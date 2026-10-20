@@ -19,6 +19,12 @@ import {
   type LabSnapshot,
 } from "./lab.ts";
 import { renderMarkdown } from "./markdown.ts";
+import {
+  inspectMedia,
+  listMediaFiles,
+  type MediaListing,
+  type MediaSnapshot,
+} from "./media-lab.ts";
 import { relativeDay, type ReviewEvent } from "./review.ts";
 import { emitCandidateEvent } from "./server/hooks.ts";
 import { push, sessionChannel } from "./server/sse.ts";
@@ -207,11 +213,30 @@ export function lessonDone(id: string, now = Date.now()): LessonSession {
 
 // ── Labs ──────────────────────────────────────────────────────────────────────
 
+/** A lab or a media lab: both read a project the learner names on the page. */
 function labLesson(session: LessonSession): Lesson {
-  if (session.exerciseKind !== "lab") throw new FlowError(409, "This lesson is not a lab");
+  if (session.exerciseKind !== "lab" && session.exerciseKind !== "media-lab")
+    throw new FlowError(409, "This lesson is not a lab");
   const lesson = findLesson(session.lesson)?.lesson;
-  if (!lesson?.labFiles?.length) throw new FlowError(409, "This lesson has no lab files");
+  if (!lesson) throw new FlowError(409, `Lesson ${session.lesson} is no longer in the curriculum`);
+  if (session.exerciseKind === "lab" && !lesson.labFiles?.length)
+    throw new FlowError(409, "This lesson has no lab files");
   return lesson;
+}
+
+/** A media lab's listing in the lab's shape, so the page lists it the same way. */
+export function mediaListingAsLab(listing: MediaListing): LabListing {
+  return {
+    root: listing.root,
+    files: [...listing.pages, ...(listing.readme ? [listing.readme] : []), ...listing.media],
+    skipped: listing.skipped,
+  };
+}
+
+function listProject(session: LessonSession, lesson: Lesson, root: string): LabListing {
+  return session.exerciseKind === "media-lab"
+    ? mediaListingAsLab(listMediaFiles(root))
+    : listLabFiles(root, lesson.labFiles ?? []);
 }
 
 function resolveRoot(input: string): string {
@@ -225,8 +250,8 @@ function resolveRoot(input: string): string {
 
 /** What a lab would read in this project, for the page to show before consent. */
 export function previewLab(id: string, projectPath: string): LabListing {
-  const lesson = labLesson(readLesson(id));
-  return listLabFiles(resolveRoot(projectPath), lesson.labFiles ?? []);
+  const session = readLesson(id);
+  return listProject(session, labLesson(session), resolveRoot(projectPath));
 }
 
 /**
@@ -240,11 +265,13 @@ export function submitLab(id: string, projectPath: string, note: string, now = D
   if (session.phase === "done") throw new FlowError(409, "This lesson is finished");
   if (note.length > MAX_ANSWER_CHARS)
     throw new FlowError(400, `Notes are capped at ${MAX_ANSWER_CHARS} characters`);
-  const listing = listLabFiles(resolveRoot(projectPath), lesson.labFiles ?? []);
+  const listing = listProject(session, lesson, resolveRoot(projectPath));
   if (listing.files.length === 0)
     throw new FlowError(
       400,
-      `None of the files this lab reads are in ${listing.root}: ${(lesson.labFiles ?? []).join(", ")}.`,
+      session.exerciseKind === "media-lab"
+        ? `There are no site pages, README, or media files in ${listing.root}.`
+        : `None of the files this lab reads are in ${listing.root}: ${(lesson.labFiles ?? []).join(", ")}.`,
     );
   const files = listing.files.map((f) => f.path);
   const text = [
@@ -271,6 +298,8 @@ export function submitLab(id: string, projectPath: string, note: string, now = D
 export async function inspectLab(id: string, now = Date.now()): Promise<LabSnapshot> {
   const session = readLesson(id);
   const lesson = labLesson(session);
+  if (session.exerciseKind !== "lab")
+    throw new FlowError(409, "This is a media lab; call inspect_media");
   const lab = session.lab;
   if (!lab)
     throw new FlowError(409, "The learner has not submitted a project yet; it comes from the page");
@@ -287,6 +316,53 @@ export async function inspectLab(id: string, now = Date.now()): Promise<LabSnaps
     at: now,
   });
   return snapshot;
+}
+
+/**
+ * Measure the submitted project's site and media now, through the guards again, and
+ * keep the snapshot as evidence. The page gets the check results; the latest
+ * measurement decides the gate.
+ */
+export function inspectMediaLab(id: string, now = Date.now()): MediaSnapshot {
+  const session = readLesson(id);
+  labLesson(session);
+  if (session.exerciseKind !== "media-lab")
+    throw new FlowError(409, "This is not a media lab; call inspect_lab");
+  const lab = session.lab;
+  if (!lab)
+    throw new FlowError(409, "The learner has not submitted a project yet; it comes from the page");
+  const snapshot = inspectMedia(resolveRoot(lab.root), now);
+  writeJson(labSnapshotFile(id, lab.answer), snapshot);
+  const failed = snapshot.checks.filter((c) => c.status === "fail").length;
+  const warned = snapshot.checks.filter((c) => c.status === "warn").length;
+  updateLesson(id, (s) => {
+    if (!s.lab) return;
+    s.lab.inspections += 1;
+    s.lab.gatePassed = snapshot.gatePassed;
+    s.lab.failed = failed;
+    s.lab.warned = warned;
+  });
+  appendLessonEvent(id, {
+    type: "measured",
+    number: lab.answer,
+    pages: snapshot.pages.length,
+    media: snapshot.media.length,
+    failed,
+    warned,
+    at: now,
+  });
+  push(sessionChannel(id), "measured", {
+    number: lab.answer,
+    gatePassed: snapshot.gatePassed,
+    checks: snapshot.checks,
+  });
+  return snapshot;
+}
+
+/** The latest media measurement, for the page to show after a reload. */
+export function latestMediaSnapshot(session: LessonSession): MediaSnapshot | null {
+  if (session.exerciseKind !== "media-lab" || !session.lab?.inspections) return null;
+  return readJson<MediaSnapshot>(labSnapshotFile(session.id, session.lab.answer));
 }
 
 // ── Transcripts ───────────────────────────────────────────────────────────────
@@ -768,12 +844,28 @@ export function lessonVerdict(
             : session.cachePlan?.latest?.passed) ?? false;
     return { correct: rubricOk && answered && gatePassed, rubricOk, answered, gatePassed };
   }
-  if (session.exerciseKind !== "lab" && session.exerciseKind !== "transcript")
+  if (
+    session.exerciseKind !== "lab" &&
+    session.exerciseKind !== "media-lab" &&
+    session.exerciseKind !== "transcript"
+  )
     return { correct: rubricOk && answered, rubricOk, answered };
   // A lab or a transcript review passes on what was read, so it must have been
   // read, and nothing on the checklist may be missing outright.
   const inspected = ((session.lab ?? session.transcript)?.inspections ?? 0) > 0;
   const checklistOk = (checklist ?? []).every((c) => c.status !== "missing");
+  if (session.exerciseKind === "media-lab") {
+    // The latest measurement must clear every fail-severity check as well.
+    const gatePassed = inspected && session.lab?.gatePassed === true;
+    return {
+      correct: rubricOk && answered && inspected && checklistOk && gatePassed,
+      rubricOk,
+      answered,
+      inspected,
+      checklistOk,
+      gatePassed,
+    };
+  }
   return {
     correct: rubricOk && answered && inspected && checklistOk,
     rubricOk,
@@ -832,7 +924,11 @@ export function recordLesson(
   }
 
   let checklist: ChecklistResult[] | undefined;
-  if (before.exerciseKind === "lab" || before.exerciseKind === "transcript") {
+  if (
+    before.exerciseKind === "lab" ||
+    before.exerciseKind === "media-lab" ||
+    before.exerciseKind === "transcript"
+  ) {
     const lesson = findLesson(before.lesson)?.lesson;
     if (!lesson) throw new FlowError(409, `Lesson ${before.lesson} is no longer in the curriculum`);
     checklist = checkChecklist(lesson, input.checklist);

@@ -8,7 +8,18 @@
     "martinfowler.com",
     "www.martinfowler.com",
     "modelcontextprotocol.io",
-    "learn.chatgpt.com"
+    "learn.chatgpt.com",
+    "docs.github.com",
+    "developer.mozilla.org",
+    "web.dev",
+    "ogp.me",
+    "playwright.dev",
+    "ffmpeg.org",
+    "github.com",
+    "www.remotion.dev",
+    "www.ftc.gov",
+    "c2pa.org",
+    "support.google.com"
   ],
   "modules": [
     {
@@ -1117,6 +1128,371 @@
             ".claude/agents/**/*.md",
             ".claude/commands/*.md"
           ]
+        }
+      ]
+    },
+    {
+      "id": "showcase",
+      "name": "Showing your work",
+      "blurb": "Demo videos, promo images, honest ads, and a GitHub Pages site for an app you built, made with your agent and measured.",
+      "requires": ["planning", "skills"],
+      "lessons": [
+        {
+          "id": "demo-video-from-code",
+          "title": "A demo video, recorded from code",
+          "goals": [
+            "Script a short demo before recording it: one task a viewer can follow start to finish",
+            "Have your agent record it from code (Playwright, a VHS tape, or a Remotion composition) so it can be re-recorded when the UI changes",
+            "Encode it for the web and make it work without sound"
+          ],
+          "facts": [
+            {
+              "id": "playwright-record-video",
+              "claim": "In Playwright, the recordVideo option on browser.newContext() records video of every page in the context into recordVideo.dir; without it no video is recorded, and you must await browserContext.close() for the videos to be saved.",
+              "source": "https://playwright.dev/docs/api/class-browser#browser-new-context",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "playwright-video-size",
+              "claim": "If recordVideo.size is not set, Playwright's video size equals the viewport scaled down to fit into 800x800; if the viewport is not set explicitly, the video size defaults to 800x450, and each page is scaled down if needed to fit.",
+              "source": "https://playwright.dev/docs/api/class-browser#browser-new-context",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "vhs-tape",
+              "claim": "VHS (charmbracelet/vhs) writes terminal GIFs as code: a .tape file is a series of commands run on a virtual terminal, and its Output command can render a GIF, MP4, WebM, or a directory of PNG frames, plus .txt or .ascii text for golden files.",
+              "source": "https://github.com/charmbracelet/vhs",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "remotion-react",
+              "claim": "Remotion is a framework to make videos programmatically, creating videos and motion graphics with React.",
+              "source": "https://www.remotion.dev/",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "ffmpeg-faststart",
+              "claim": "The faststart flag of ffmpeg's MOV/MP4 muxer (-movflags) runs a second pass that moves the index (moov atom) to the beginning of the file; it is not on by default because it can take a while and does not work in some cases, such as fragmented output.",
+              "source": "https://ffmpeg.org/ffmpeg-formats.html#MOV_002fMPEG_002d4_002fISOMBFF-muxers",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "h264-browser-support",
+              "claim": "MDN describes AVC (H.264) as broadly compatible and supported in all versions of Chrome, Edge, Firefox, Opera, and Safari (Firefox relies on the operating system's codecs); VP9 is widely supported, and AV1 is supported in all browsers but in Safari only on devices with a hardware decoder.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Video_codecs",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "webvtt-captions",
+              "claim": "The <track> element, a child of <audio> or <video>, adds a timed text track in WebVTT format (.vtt); kind=\"subtitles\" is for when the sound is available but not understood, and kind=\"captions\" also covers sound effects and other audio, for when sound is unavailable or not clearly audible.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/track",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "github-file-size",
+              "claim": "Git warns when you add or update a file larger than 50 MiB, GitHub blocks files larger than 100 MiB, and files added through the browser can be no larger than 25 MiB.",
+              "source": "https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            }
+          ],
+          "exercises": ["design-review", "media-lab"],
+          "rubricFocus": ["decomposition", "presentation"],
+          "checklist": [
+            {
+              "id": "script",
+              "text": "The demo follows a script or storyboard: one task, start to finish, with nothing the viewer has to guess"
+            },
+            {
+              "id": "reproducible",
+              "text": "It is recorded from code (a Playwright script, a VHS tape, or a composition) checked into the repository, so it can be run again"
+            },
+            {
+              "id": "encoded",
+              "text": "The video is encoded for the web: a codec browsers play, faststart, and a sensible size and length"
+            },
+            {
+              "id": "silent",
+              "text": "A viewer without sound can follow it: captions, or on-screen text that carries the story"
+            }
+          ]
+        },
+        {
+          "id": "promo-images",
+          "title": "Screenshots and social previews",
+          "goals": [
+            "Capture real screenshots from code at high pixel density, never mocked-up UI",
+            "Make the image a shared link shows: Open Graph tags and GitHub's social preview, at the right size",
+            "Describe every image for people who cannot see it"
+          ],
+          "facts": [
+            {
+              "id": "playwright-screenshot",
+              "claim": "In Playwright's page.screenshot(), fullPage: true captures the full scrollable page instead of the visible viewport (default false), and clip takes x, y, width, and height to crop the image to that area.",
+              "source": "https://playwright.dev/docs/api/class-page#page-screenshot",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "playwright-device-scale",
+              "claim": "Playwright's deviceScaleFactor context option sets the device pixel ratio for a browser context and defaults to 1.",
+              "source": "https://playwright.dev/docs/api/class-browser#browser-new-context",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "og-basic-properties",
+              "claim": "Open Graph requires four properties on every page: og:title, og:type, og:image, and og:url; og:image:alt describes what is in the image (not a caption) and should be given whenever og:image is, and og:image:width and og:image:height give its size in pixels.",
+              "source": "https://ogp.me/",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "github-social-preview",
+              "claim": "A GitHub repository social preview image should be a PNG, JPG, or GIF under 1 MB; GitHub recommends at least 640 by 320 pixels, and 1280 by 640 pixels for the best display.",
+              "source": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "img-alt",
+              "claim": "An empty alt=\"\" on <img> marks the image as not a key part of the content, such as decoration, and non-visual browsers may omit it; leaving alt out entirely does not make an image decorative, and some screen readers may read out the file name instead.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img#alt",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "img-width-height",
+              "claim": "web.dev advises always including width and height attributes on images and video elements so the browser can allocate the correct space while they load, or reserving the space with CSS aspect-ratio.",
+              "source": "https://web.dev/articles/optimize-cls",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "lazy-lcp",
+              "claim": "web.dev says to use loading=lazy only for images outside the initial viewport, and not to lazy-load images likely to be in the viewport when the page loads, especially LCP images, which should load eagerly.",
+              "source": "https://web.dev/articles/browser-level-image-lazy-loading",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "claude-code-images",
+              "claim": "You can give Claude Code an image by dragging and dropping it into the window, pasting it with Ctrl+V (Alt+V on Windows and WSL), or giving its file path, and Claude can then analyze screenshots, diagrams, and mockups.",
+              "source": "https://code.claude.com/docs/en/common-workflows#work-with-images",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            }
+          ],
+          "exercises": ["design-review", "media-lab"],
+          "rubricFocus": ["verification", "presentation"],
+          "checklist": [
+            {
+              "id": "real",
+              "text": "The screenshots show the real app, captured by a script rather than mocked up or generated"
+            },
+            {
+              "id": "preview",
+              "text": "A shared link shows a social preview image that is sized right and says what the app does"
+            },
+            {
+              "id": "sharp",
+              "text": "Images are captured at a high device scale factor and compressed, so they are sharp and light"
+            },
+            {
+              "id": "described",
+              "text": "Every meaningful image has alt text that says what it shows; decorative ones have an empty alt"
+            }
+          ]
+        },
+        {
+          "id": "honest-ads",
+          "title": "Short ads that make true claims",
+          "goals": [
+            "Structure a short ad: a hook in the first seconds, one idea, one call to action",
+            "Make it work muted and in the placement's aspect ratio",
+            "Back every claim with evidence, and never fake a review, a testimonial, or a user"
+          ],
+          "facts": [
+            {
+              "id": "ftc-endorsement-truthful",
+              "claim": "Under the FTC's Endorsement Guides, an endorsement must reflect the endorser's honest opinion and accurate experience, and it can't be used to make a claim the product's marketer couldn't legally make.",
+              "source": "https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "ftc-fake-reviews-rule",
+              "claim": "On August 14, 2024, the FTC announced a final rule banning the sale or purchase of fake reviews and testimonials, letting it seek civil penalties against knowing violators; it covers reviews that falsely claim to be by someone who does not exist, such as AI-generated fake reviews.",
+              "source": "https://www.ftc.gov/news-events/news/press-releases/2024/08/federal-trade-commission-announces-final-rule-banning-fake-reviews-testimonials",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "ftc-substantiation",
+              "claim": "The FTC's policy statement on advertising substantiation says advertisers and ad agencies must have a reasonable basis for advertising claims before they are disseminated.",
+              "source": "https://www.ftc.gov/legal-library/browse/ftc-policy-statement-regarding-advertising-substantiation",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "autoplay-muted",
+              "claim": "MDN says you can generally assume media may autoplay if its audio is muted or its volume is 0, and that the playsinline attribute is required for autoplay in Safari, so a muted, playsinline video can autoplay.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Autoplay",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "playsinline",
+              "claim": "The playsinline attribute on <video> tells the browser to play the video inline, within the element's playback area; MDN notes that leaving it out does not mean the video will always play fullscreen.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/video#playsinline",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "vertical-video-aspect",
+              "claim": "Google Ads' video ad specs, which apply to all YouTube formats and campaign types, recommend 9:16 for vertical video at 1080 x 1920 px (minimum 720 x 1280 px), and also accept 2:3 and 4:5 vertical.",
+              "source": "https://support.google.com/google-ads/answer/13547298?hl=en",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            }
+          ],
+          "exercises": ["design-review"],
+          "rubricFocus": ["presentation", "safety"]
+        },
+        {
+          "id": "pages-site",
+          "title": "A GitHub Pages site for your app",
+          "goals": [
+            "Publish a project site from a branch folder or an Actions workflow, and know which you chose",
+            "Keep links working under the /<repo>/ path a project site is served from",
+            "Put the demo video on the first screen without making the page slow"
+          ],
+          "facts": [
+            {
+              "id": "pages-publishing-source",
+              "claim": "A GitHub Pages site publishes from a branch, using either the repository root (/) or a /docs folder on that branch, or from a custom GitHub Actions workflow, which GitHub recommends when you need a build process other than Jekyll or don't want a dedicated branch for the built files.",
+              "source": "https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "pages-project-url",
+              "claim": "By default a GitHub Pages project site is served at http(s)://<owner>.github.io/<repositoryname>, and each repository can have at most one Pages site.",
+              "source": "https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "pages-limits",
+              "claim": "GitHub Pages source repositories have a recommended limit of 1 GB, published sites may be no larger than 1 GB, deployments time out after 10 minutes, and sites have a soft bandwidth limit of 100 GB per month and a soft limit of 10 builds per hour.",
+              "source": "https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "pages-nojekyll",
+              "claim": "When publishing from a source branch with a static site generator other than Jekyll, you can disable the Jekyll build by putting an empty file called .nojekyll in the root of the publishing source.",
+              "source": "https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "pages-jekyll-underscores",
+              "claim": "By default, Jekyll doesn't build files or folders whose names start with _, ., or #.",
+              "source": "https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/about-github-pages-and-jekyll",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "pages-actions-deploy",
+              "claim": "A custom GitHub Pages workflow uses actions/configure-pages, actions/upload-pages-artifact, and actions/deploy-pages; the deploy job needs at least pages: write and id-token: write permissions, and the default environment is github-pages.",
+              "source": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "video-preload",
+              "claim": "The <video> preload attribute hints what to load before playback: none, metadata (only metadata such as length), or auto (the whole file may be downloaded); the default differs by browser, the spec advises metadata, and browsers don't have to follow the hint.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/video#preload",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "video-poster",
+              "claim": "The <video> poster attribute is the URL of an image shown while the video downloads; without it, nothing is shown until the first frame is available, which is then used as the poster frame.",
+              "source": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/video#poster",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            }
+          ],
+          "exercises": ["design-review", "media-lab"],
+          "rubricFocus": ["verification", "presentation"],
+          "checklist": [
+            {
+              "id": "deploys",
+              "text": "The site is published from a /docs folder, a branch, or an Actions workflow that is in the repository"
+            },
+            {
+              "id": "paths",
+              "text": "Every link and asset works under /<repo>/ (no root-absolute paths on a project site)"
+            },
+            {
+              "id": "video",
+              "text": "The demo video is on the page with a poster, and if it autoplays it is muted and plays inline"
+            },
+            {
+              "id": "first-screen",
+              "text": "The first screen says what the app does and loads quickly: sized images, a light page"
+            }
+          ]
+        },
+        {
+          "id": "generative-media-models",
+          "title": "Generated images and video, through MCP",
+          "goals": [
+            "Decide when generated media beats media recorded from the real app, and when it misleads",
+            "Wire an image or video model into your agent through an MCP server, with a human approving calls",
+            "Keep a consistent look across generated assets, and record how each was made"
+          ],
+          "facts": [
+            {
+              "id": "mcp-tools",
+              "claim": "The Model Context Protocol lets servers expose tools that language models can invoke, such as querying databases or calling APIs; tools are model-controlled, but for safety there SHOULD always be a human in the loop who can deny an invocation.",
+              "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "claude-code-mcp",
+              "claim": "You add MCP servers to Claude Code with claude mcp add, for example claude mcp add --transport http <name> <url>, with local stdio servers after --; scopes are local (the default: this project, private), project (a .mcp.json at the project root, shared through version control), and user (all your projects).",
+              "source": "https://code.claude.com/docs/en/mcp",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "c2pa-content-credentials",
+              "claim": "C2PA is an open technical standard for establishing the origin and edits of digital content, and its Content Credentials can label AI-generated, AI-modified, and non-synthetic content in tamper-evident, cryptographically signed manifests.",
+              "source": "https://c2pa.org/a-new-implementation-guide-for-content-credentials/",
+              "core": true,
+              "verifiedAt": "2026-10-20"
+            },
+            {
+              "id": "ftc-ai-claims",
+              "claim": "In April 2025 the FTC proposed an order against Workado, which advertised its AI Content Detector as 98 percent accurate while independent testing found 53 percent on general-purpose content; the order bars effectiveness claims unless backed by competent and reliable evidence.",
+              "source": "https://www.ftc.gov/news-events/news/press-releases/2025/04/ftc-order-requires-workado-back-artificial-intelligence-detection-claims",
+              "core": false,
+              "verifiedAt": "2026-10-20"
+            }
+          ],
+          "exercises": ["design-review"],
+          "rubricFocus": ["delegation", "presentation"]
         }
       ]
     }

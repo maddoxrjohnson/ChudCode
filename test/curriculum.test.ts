@@ -85,7 +85,21 @@ describe("the shipped curriculum", () => {
       "cost-context",
       "refactoring",
       "cross-provider",
+      "showcase",
     ]);
+  });
+
+  it("teaches launch media with a media lab wherever there are files to measure", () => {
+    const showcase = loadCurriculum().modules.find((m) => m.id === "showcase");
+    expect(showcase?.requires).toEqual(["planning", "skills"]);
+    const withLab = showcase?.lessons
+      .filter((l) => l.exercises.includes("media-lab"))
+      .map((l) => l.id);
+    expect(withLab).toEqual(["demo-video-from-code", "promo-images", "pages-site"]);
+    for (const lesson of showcase?.lessons ?? []) {
+      expect(isTeachable(lesson), lesson.id).toBe(true);
+      expect(lesson.rubricFocus).toContain("presentation");
+    }
   });
 });
 
@@ -118,6 +132,14 @@ describe("validateCurriculum", () => {
     expect(errors).toMatch(/lists a lab, so it needs a checklist/);
     expect(errors).toMatch(/lists a lab, so it needs labFiles/);
     expect(errors).toMatch(/rubricFocus must list dimensions/);
+  });
+
+  it("needs a checklist for a media lab, but no lab files", () => {
+    const bad = structuredClone(SMALL) as Curriculum;
+    bad.modules[0]!.lessons[0]!.exercises = ["design-review", "media-lab"];
+    const errors = validateCurriculum(bad).join("\n");
+    expect(errors).toMatch(/lists a media lab, so it needs a checklist/);
+    expect(errors).not.toMatch(/needs labFiles/);
   });
 
   it("keeps lab files to the lab allow-list", () => {

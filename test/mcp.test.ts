@@ -226,6 +226,7 @@ describe("protocol", () => {
       "begin_lesson",
       "get_session",
       "inspect_lab",
+      "inspect_media",
       "inspect_transcript",
       "list_curriculum",
       "list_due",

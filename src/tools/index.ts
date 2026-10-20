@@ -8,8 +8,12 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** Text, or an image as base64 (MCP's image content), which only inspect_media returns. */
+export type ToolContent =
+  { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+
 export interface ToolResult {
-  content: Array<{ type: "text"; text: string }>;
+  content: ToolContent[];
   details: Record<string, unknown>;
 }
 

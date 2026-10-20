@@ -92,7 +92,7 @@ export function defaultGuards(): LabGuards {
 }
 
 /** Is `inner` equal to `outer` or below it? */
-function within(inner: string, outer: string): boolean {
+export function within(inner: string, outer: string): boolean {
   return inner === outer || inner.startsWith(outer.endsWith(path.sep) ? outer : outer + path.sep);
 }
 
