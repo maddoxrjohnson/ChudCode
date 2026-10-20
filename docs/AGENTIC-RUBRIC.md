@@ -1,12 +1,13 @@
 # Agentic rubric
 
-Five dimensions, each scored 0 to 4, or null when the lesson gave no evidence for it.
+Six dimensions, each scored 0 to 4, or null when the lesson gave no evidence for it.
 A lesson's focus dimensions are always scored, and each must reach 2 for the lesson to
 pass. Score what the learner showed you, in the answer and the follow-ups, not what
 they might know.
 
 The rubric is half of the verdict for some kinds. A lab or a transcript review also
-needs to have been read, with nothing on its checklist missing. A drill graded by
+needs to have been read, with nothing on its checklist missing. A media lab needs that
+too, and its latest measurement must pass every fail-level check. A drill graded by
 code (mutation tests, a flaw review, a cache plan, a refactor) also needs its latest
 attempt to have cleared its gate: the rubric cannot pass work the checks failed, and
 a passed gate cannot pass judgement the rubric found wanting.
@@ -60,3 +61,16 @@ a passed gate cannot pass judgement the rubric found wanting.
 | 2     | Clear jobs per worker with a stated result; the same model and effort for everything.                                     |
 | 3     | Model, effort, and tools chosen per worker with reasons; independent workers run in parallel.                             |
 | 4     | Everything in 3, plus hand-off contracts precise enough to check, and a plan for a worker that fails or returns nonsense. |
+
+## Presentation
+
+Added with the Showing your work module. A rubric saved before it has no value here,
+which reads as n/a.
+
+| Score | Looks like                                                                                                                   |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Nothing a stranger could follow: no demo, or one that shows a mock-up the app does not have.                                 |
+| 1     | Media exists but buries the point: a long, silent, unscripted recording, or images with no context.                          |
+| 2     | A clear demo and images that show the real app; rough edges in pacing, sizing, or accessibility.                             |
+| 3     | Scripted, short, and reproducible from code; works muted and on a phone; sized and described images; every claim true.       |
+| 4     | Everything in 3, plus a hook in the first seconds, one call to action, and media an agent can re-record when the UI changes. |

@@ -80,7 +80,7 @@ export const COMMANDS = {
   },
   learn: {
     description:
-      "Take a lesson on coding with agents: planning, context, tests, subagents, cost, and more. Usage: /learn [topic or lesson]",
+      "Take a lesson on coding with agents: planning, context, tests, subagents, cost, demo videos and launch pages, and more. Usage: /learn [topic or lesson]",
     prompt: (args: string) =>
       [
         "Teach a ChudCode lesson on agentic coding.",

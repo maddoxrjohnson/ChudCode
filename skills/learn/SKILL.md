@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Teach a lesson on coding with agents, such as planning with plan mode, CLAUDE.md and progress files, context and cost, strong tests, subagents with the right model and effort, skills, loops, refactoring, or working across providers. The learner works a realistic scenario with their own agent and is graded on their judgement. Use when the user wants to get better at agentic coding or asks what there is to learn about it.
+description: Teach a lesson on coding with agents, such as planning with plan mode, CLAUDE.md and progress files, context and cost, strong tests, subagents with the right model and effort, skills, loops, refactoring, working across providers, or showing an app off with demo videos, promo images, ads, and a GitHub Pages site. The learner works a realistic scenario with their own agent and is graded on their judgement. Use when the user wants to get better at agentic coding or asks what there is to learn about it.
 ---
 
 # Learn
@@ -25,13 +25,15 @@ description: Teach a lesson on coding with agents, such as planning with plan mo
    state. The learner may spend a long time in another terminal with their own
    agent; keep waiting. Do not end your turn during the lesson.
    - A lab arrives as a project folder the learner consented to on the page: read it
-     with `inspect_lab`. A transcript review arrives as one of their Claude Code
-     sessions: read it with `inspect_transcript`. Neither tool takes a path.
+     with `inspect_lab`. A media lab arrives the same way: measure it with
+     `inspect_media`, which also shows you up to three of its images to judge by eye.
+     A transcript review arrives as one of their Claude Code sessions: read it with
+     `inspect_transcript`. None of these tools takes a path.
    - A drill (mutation tests, a flaw review, a cache plan, a refactor) is graded by
      code when the learner presses its button; you get the full result, the page
      gets counts. Do not name what they missed before the debrief.
-6. Score it with `record_lesson` (labs and transcript reviews need a result for
-   every checklist item), then give the user the verdict, two strengths, two things
+6. Score it with `record_lesson` (labs, media labs, and transcript reviews need a
+   result for every checklist item), then give the user the verdict, two strengths, two things
    to work on, and when the lesson comes back for review. Then do what it says about
    the Next lesson button: write the next lesson's exercise ahead and keep waiting
    while the window is open.

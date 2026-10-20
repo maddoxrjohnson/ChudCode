@@ -56,15 +56,17 @@ The agentic-coding track is one file, `data/agentic/curriculum.json`, checked by
 - **Outlines.** A lesson with `"facts": []` is an outline: it shows on the dashboard
   as coming, cannot be taught, and does not count toward unlocking. Write and source
   its facts to make it teachable.
-- **Transcript reviews.** A teachable lesson that lists `transcript` needs a
-  `checklist`.
+- **Transcript reviews and media labs.** A teachable lesson that lists `transcript`
+  or `media-lab` needs a `checklist`. A media lab's mechanical checks live in
+  `data/agentic/media-checks.json`, and every fact a check cites must exist here.
 - **Labs.** A teachable lesson that lists `lab` needs a `checklist` and the
   `labFiles` a lab reads. Every lab file must be a pattern on `LAB_ALLOW` in
   `src/lab.ts`, so a curriculum edit cannot widen what a lab may read.
 
 ## Keeping facts current
 
-Claude Code changes faster than this file. Before teaching, the interviewer re-reads
+Claude Code changes faster than this file, and so do the web pages the Showing your
+work module cites (GitHub, MDN, web.dev, the FTC). Before teaching, the interviewer re-reads
 the source of any fact last confirmed more than 14 days ago and records what it
 found with `record_fact_check` in `~/.chudcode/curriculum/fact-checks.jsonl`. A fact
 found changed is taught as the page says now, flagged on the lesson page, and

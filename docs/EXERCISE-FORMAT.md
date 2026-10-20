@@ -9,7 +9,8 @@ before serving it with `start_lesson`.
 ~/.chudcode/exercises/<slug>/
   meta.json      { slug, kind, lesson, title, createdAt, validatedAt?, timesServed, lastServedAt? }
   teaching.md    the lesson, citing curriculum facts as [fact:<id>]
-  brief.md       "## Scenario" and "## Your task" ("## Your task" alone for a lab)
+  brief.md       "## Scenario" and "## Your task" ("## Your task" alone for a lab,
+                 a media lab, or a transcript review)
   private.json   { modelOutline, followUps[], pitfalls[], mutation?, flawReview?, cachePlan?, refactor? }
 ```
 
@@ -23,7 +24,8 @@ checks that the outline and follow-ups appear on no page or API response.
 
 - the exercise's lesson exists and lists its kind;
 - the brief is 200 to 8,000 characters with its kind's sections;
-- a lab is for a lesson with a lab checklist and lab files;
+- a lab is for a lesson with a lab checklist and lab files, and a media lab or a
+  transcript review for a lesson with a checklist;
 - the teaching is 600 to 16,000 characters, cites every core fact of the lesson, and
   cites no fact the lesson does not have, so nothing unsourced is taught as fact;
 - the outline is at least 200 characters, with at least two follow-ups and two
@@ -42,6 +44,7 @@ Writing an exercise again clears its validation.
 | `refactor`      | has their agent commit characterisation tests, then refactor and commit         | code: tests first, 60% of bugs caught, behaviour and interface kept, simpler shape |
 | `transcript`    | picks one of their own Claude Code sessions and consents                        | the interviewer, on the rubric and the lesson's checklist                          |
 | `lab`           | builds it in their own repository and submits the folder                        | the interviewer, on the rubric and the lesson's checklist                          |
+| `media-lab`     | ships a site, demo video, and images in their repository and submits the folder | code: no fail-level media check fails; then the interviewer, as for a lab          |
 
 Every kind the curriculum lists can be served.
 
@@ -133,3 +136,29 @@ that do not parse, counts usage once per message id, and returns counts and the
 learner's first prompts (clipped and redacted), never the replies or tool output.
 The format is Claude Code's own, not a published contract, so every field is
 optional to the reader.
+
+## Media labs
+
+A media lab measures what the learner shipped to show their app off. Its brief has
+only "## Your task", since the scenario is their own project, and its lesson needs a
+checklist. The project comes from the page with the learner's consent, through the
+lab's guards (`resolveProjectRoot`, the deny-list, no links out of the folder).
+`src/media-lab.ts` then opens:
+
+- HTML pages at the root or in `docs/`, `site/`, `public/`, or `web/` (12 at most,
+  256 KB each), and the root README;
+- the images and videos those reference or that sit anywhere else in the project (80
+  at most), by their headers only: `src/media/probe.ts` reads PNG, JPEG, GIF, WebP,
+  SVG, AVIF, MP4, and WebM in at most 1 MB of positioned reads per file, never
+  decoding a frame, and a truncated or hostile file comes back with an error;
+- up to three images under 1 MB (the og:image, a video poster, then a screenshot),
+  which `inspect_media` returns to the interviewer as MCP image content.
+
+The checks are in `data/agentic/media-checks.json`. Each has an id the engine knows,
+a severity (`fail` or `warn`), and the curriculum facts it rests on, or a `basis`
+saying when a threshold is ChudCode's own budget rather than a platform's rule; a
+test keeps the file, the engine, and the curriculum in step. A check that does not
+apply (captions on a silent video, root-absolute links on a site with a `CNAME`) is
+`n/a`. The latest measurement decides the gate: the lesson cannot pass while a
+`fail` check fails, whatever the rubric says. The page shows every check and its
+findings after each measurement; nothing about it is hidden.

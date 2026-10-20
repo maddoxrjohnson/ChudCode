@@ -146,6 +146,13 @@ make sure the patterns you keep missing are the ones you see again.
   reviews how you worked from its numbers: models and switches, cache reads and
   writes, long gaps, compactions, and your prompts. Nothing is listed or read until
   you ask on the page, and the replies and tool output are never read.
+- Media labs: the Showing your work module covers demo videos recorded from code,
+  screenshots and social previews, honest short ads, a GitHub Pages site, and
+  generated media through MCP. Point a media lab at the repository you ship from and
+  it measures your pages and media by their headers: codec and faststart, autoplay
+  that is muted and inline, posters, captions, alt text, Open Graph tags, and links
+  that break on a project site. The interviewer also sees your social preview and
+  poster, and judges them by eye.
 - After any lesson's debrief, the Next lesson button opens the next one; the
   interviewer writes it while you read the debrief.
 - Company trends: the research skill reads recent interview-experience posts with
@@ -176,6 +183,11 @@ A flaw review shows an agent's diff; click the lines you would block and name th
 problem.
 
 ![A flaw review: an agent's diff to a Flask invoices blueprint with four lines marked, including a committed key and a SQL string built from the search term, and the mark form open on a call to an API that does not exist](docs/screenshots/flaw-review.png)
+
+A media lab measures the site and media in your repository. After each measurement
+the page lists the checks that fail first, each with the file and line to fix.
+
+![A media lab page: the teaching on GitHub Pages with cited sources, and the measured checks for a first attempt, with failures for a missing image, an HEVC video without faststart, an autoplaying video that is not muted, an image with no alt text, no og:image, and a root-absolute link, then amber warnings](docs/screenshots/media-lab.png)
 
 The dashboard shows every pattern's place in the review schedule, what is due, the
 streak, progress through both roadmaps and the agentic-coding modules, and past
