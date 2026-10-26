@@ -268,7 +268,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
             ...(unlisted ? [unlisted] : []),
             `The candidate sees the statement, ${bundle.tests.filter((c) => c.visible).length} examples, a ${timerMinutes}-minute clock, and ${bundle.hints.length} hints they can take. ${bundle.tests.length - bundle.tests.filter((c) => c.visible).length} hidden cases run on Submit.`,
             `Target complexity: ${bundle.meta.complexityTarget.time} time, ${bundle.meta.complexityTarget.space} space.`,
-            `Your reply to the user in the terminal must include this link: ${url} — the page is where they work, and without it they cannot reach the session. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
+            `Before any other tool call, write this link to the user in a message (they cannot see tool results): ${url} — the page is where they work, and without it they cannot reach the session. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
             "",
             "The statement as the candidate sees it, so you can answer clarifying questions from it:",
             "",

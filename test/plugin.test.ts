@@ -9,7 +9,7 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hookOutput, sessionLink } from "../hooks/session-link.ts";
+import { hookOutput, respond, sessionLink, unsentLink } from "../hooks/session-link.ts";
 import { CandidateInbox, MAX_WAIT_SECONDS, McpSession } from "../src/mcp.ts";
 import { packageRoot } from "../src/store/paths.ts";
 
@@ -75,6 +75,65 @@ describe("Claude Code plugin", () => {
     expect(hookOutput(found!).systemMessage).toBe(`ChudCode session ready: ${url}`);
     expect(sessionLink(JSON.stringify({ tool_response: "No problem named x." }))).toBeNull();
     expect(sessionLink("not json")).toBeNull();
+  });
+
+  it("holds the model back until it has written the link itself", () => {
+    const hooks = readJson("hooks/hooks.json")["hooks"];
+    const command = expect.stringContaining("${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts");
+    expect(hooks.PreToolUse).toEqual([
+      expect.objectContaining({
+        matcher: `mcp__plugin_${manifest["name"]}_chudcode__wait_for_candidate`,
+        hooks: [expect.objectContaining({ command })],
+      }),
+    ]);
+    expect(hooks.Stop).toEqual([{ hooks: [expect.objectContaining({ command })] }]);
+
+    const url = "http://127.0.0.1:4100/s/20261026-1723-phone-recruiter-1dce";
+    const line = (type: string, content: unknown[]) =>
+      JSON.stringify({ type, message: { role: type, content } });
+    const started = line("user", [
+      {
+        type: "tool_result",
+        content: [
+          { type: "text", text: `Session 20261026-1723-phone-recruiter-1dce is ready: ${url}` },
+        ],
+      },
+    ]);
+    const quiet = [
+      line("user", [{ type: "text", text: "phone screen please" }]),
+      started,
+      line("assistant", [{ type: "tool_use", name: "say_to_candidate", input: { markdown: url } }]),
+      "not json",
+    ].join("\n");
+    const told = `${quiet}\n${line("assistant", [{ type: "text", text: `Here's the link: ${url}` }])}`;
+    expect(unsentLink(quiet)?.url).toBe(url);
+    expect(unsentLink(told)).toBeNull();
+    // A later session needs its own link.
+    expect(unsentLink(`${told}\n${started.replaceAll("1dce", "beef")}`)?.sessionId).toBe(
+      "20261026-1723-phone-recruiter-beef",
+    );
+    expect(unsentLink(line("user", [{ type: "text", text: "hi" }]))).toBeNull();
+
+    const event = (name: string, extra = {}) =>
+      JSON.stringify({ hook_event_name: name, transcript_path: "/t.jsonl", ...extra });
+    const read = (transcript: string) => () => transcript;
+    expect(respond(event("PreToolUse"), read(quiet))).toEqual({
+      hookSpecificOutput: expect.objectContaining({
+        permissionDecision: "deny",
+        permissionDecisionReason: expect.stringContaining(url),
+      }),
+    });
+    expect(respond(event("Stop"), read(quiet))).toEqual({
+      decision: "block",
+      reason: expect.stringContaining(url),
+    });
+    expect(respond(event("Stop"), read(told))).toBeNull();
+    expect(respond(event("Stop", { stop_hook_active: true }), read(quiet))).toBeNull();
+    expect(
+      respond(event("PreToolUse"), () => {
+        throw new Error("no transcript");
+      }),
+    ).toBeNull();
   });
 
   it("is listed by the marketplace at the repository root", () => {

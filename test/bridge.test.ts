@@ -208,7 +208,9 @@ describe("helpers", () => {
       params: { name: "start_session", arguments: { slug: "window-sum" } },
     })) as { result: { content: Array<{ text: string }> } };
     const text = started.result.content.map((c) => c.text).join("\n");
-    expect(text).toMatch(/must include this link: http:\/\/127\.0\.0\.1:\d+\/s\//);
+    expect(text).toMatch(
+      /write this link to the user in a message \(they cannot see tool results\): http:\/\/127\.0\.0\.1:\d+\/s\//,
+    );
     await until(() => statuses.some((s) => s.connected && s.session), "the session link");
     const last = statuses.at(-1);
     expect(last?.connected && last.session?.title).toBe("Largest Window Sum");

@@ -612,7 +612,7 @@ export function lessonTools(host: ToolHost): ToolDef[] {
             workspace
               ? `The learner sees the teaching for ${place.lesson.title}, the brief "${bundle.meta.title}", and a ${minutes}-minute clock. Their workspace is ${workspace}: ${module}.py and an empty tests/. They point their own agent at it, then press Grade on the page.`
               : `The learner sees the teaching for ${place.lesson.title}, the brief "${bundle.meta.title}", an answer box, and a ${minutes}-minute clock.`,
-            `Your reply to the user in the terminal must include this link: ${url} — the page is where they work. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
+            `Before any other tool call, write this link to the user in a message (they cannot see tool results): ${url} — the page is where they work. Then say one sentence on the page with say_to_candidate. ${thenWait()}`,
           ].join("\n"),
           { sessionId: session.id, url },
         );

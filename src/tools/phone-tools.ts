@@ -151,7 +151,7 @@ export function phoneTools(host: ToolHost): ToolDef[] {
           [
             `Session ${session.id} is ready: ${url}`,
             `The learner sees a ${minutes}-minute ${title.toLowerCase()} with a Start the call button. Your lines are read aloud there; they answer by voice or by typing.`,
-            `Your reply to the user in the terminal must include this link: ${url}. Then say one sentence on the page with say_to_candidate: who you are playing and that they press Start the call when ready. ${thenWait()}`,
+            `Before any other tool call, write this link to the user in a message (they cannot see tool results): ${url}. Then say one sentence on the page with say_to_candidate: who you are playing and that they press Start the call when ready. ${thenWait()}`,
           ].join("\n"),
           { sessionId: session.id, url },
         );

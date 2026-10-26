@@ -1,5 +1,5 @@
 {
-  "description": "Show the link of every ChudCode session in the terminal, whatever the model says.",
+  "description": "Give the user the link of every ChudCode session: print it in the terminal, and hold the model back until it has written it too.",
   "hooks": {
     "PostToolUse": [
       {
@@ -24,6 +24,29 @@
       },
       {
         "matcher": "mcp__plugin_chudcode_chudcode__start_phone_screen",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_chudcode_chudcode__wait_for_candidate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-link.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
         "hooks": [
           {
             "type": "command",
