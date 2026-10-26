@@ -7,6 +7,12 @@
  * JavaScript; its module only reloads it when a session changes.
  */
 
+import {
+  PHONE_FORMAT_NAMES,
+  PHONE_FORMATS,
+  type PhoneSession,
+  type Story,
+} from "../../store/phone.ts";
 import { plural } from "../../format.ts";
 import { escapeHtml } from "../../markdown.ts";
 import type { NextUp } from "../../next-up.ts";
@@ -39,6 +45,17 @@ export interface DashboardData {
   next?: { ups: NextUp[]; view: NextButtonView };
   /** The agentic-coding lessons; left out, the section is not shown. */
   agentic?: AgenticData;
+  /** Phone screen practice; left out, the section is not shown. */
+  phone?: PhoneData;
+}
+
+export interface PhoneData {
+  /** Recent phone screens, newest first. */
+  sessions: PhoneSession[];
+  /** Phone review items: formats and fundamentals topics. */
+  items: ReviewItem[];
+  stories: Story[];
+  topics: Array<{ id: string; name: string }>;
 }
 
 export function dashboardPage(data: DashboardData): string {
@@ -63,6 +80,7 @@ export function dashboardPage(data: DashboardData): string {
     <p class="muted small">Press Next problem, or ask your agent for the next roadmap problem. You get an original problem in the shape of the listed one, and solving it checks the listed one off. A topic opens once half of every topic before it is solved.</p>
   </section>
   ${data.agentic ? agenticHtml(data.agentic, progress.now) : ""}
+  ${data.phone ? phoneHtml(data.phone, progress.now) : ""}
   <section id="sessions">
     <h2>Recent sessions</h2>
     ${sessionsHtml(data.sessions)}
@@ -269,6 +287,62 @@ ${modules}
     </div>
     ${recent}
     <p class="muted small">Ask your agent for a lesson, or run /chudcode:learn. Each lesson teaches a few sourced facts about coding with agents, then gives you a scenario to work with your own agent; the interviewer grades your judgement. A module opens once half of every module before it is passed.</p>
+  </section>`;
+}
+
+function phoneHtml(data: PhoneData, now: number): string {
+  const formats = PHONE_FORMATS.map((format) => {
+    const done = data.sessions.filter((s) => s.format === format && s.verdict);
+    const passed = done.filter((s) => s.verdict?.correct).length;
+    const item = data.items.find((i) => i.id === format);
+    const due = item
+      ? item.dueAt <= now
+        ? `<span class="badge warn">${escapeHtml(dueText(item.dueAt, now))}</span>`
+        : `<span class="muted small">next ${escapeHtml(dueText(item.dueAt, now))}</span>`
+      : `<span class="muted small">not tried</span>`;
+    return `<li data-format="${format}"><strong>${escapeHtml(PHONE_FORMAT_NAMES[format])}</strong> <span class="badge">${passed}/${done.length} passed</span> ${due}</li>`;
+  }).join("\n");
+  const topicItems = data.topics
+    .map((t) => ({ t, item: data.items.find((i) => i.id === `topic-${t.id}`) }))
+    .filter((x) => x.item);
+  const topics = topicItems.length
+    ? `<p class="small" id="phone-topics"><span class="muted">Fundamentals:</span> ${topicItems
+        .map(
+          ({ t, item }) =>
+            `<span class="badge ${item?.lastCorrect ? "ok" : "warn"}" title="box ${item?.box}">${escapeHtml(t.name)}</span>`,
+        )
+        .join(" ")}</p>`
+    : "";
+  const stories = data.stories.length
+    ? `<p class="small" id="phone-stories"><span class="muted">Story bank (${data.stories.length}):</span> ${data.stories.map((s) => escapeHtml(s.title)).join(" · ")}</p>`
+    : `<p class="muted small" id="phone-stories">No stories saved yet. A behavioral screen saves the ones you tell well.</p>`;
+  const recent = data.sessions.length
+    ? `<table class="table" id="phone-sessions">
+<thead><tr><th>When</th><th>Call</th><th>Company</th><th>Result</th></tr></thead>
+<tbody>${data.sessions
+        .slice(0, 8)
+        .map(
+          (s) => `<tr>
+  <td><a href="/s/${escapeHtml(s.id)}">${escapeHtml(formatDate(s.createdAt))}</a></td>
+  <td>${escapeHtml(PHONE_FORMAT_NAMES[s.format])}</td>
+  <td>${escapeHtml(s.company ?? "")}</td>
+  <td>${s.verdict ? (s.verdict.correct ? `<span class="badge ok">passed</span>` : `<span class="badge warn">not passed</span>`) : s.abandonedReason ? `<span class="muted">abandoned</span>` : `<span class="muted">in progress</span>`}</td>
+</tr>`,
+        )
+        .join("\n")}</tbody>
+</table>`
+    : "";
+  return `<section id="phone">
+    <h2>Phone screens</h2>
+    <div class="roadmap-card">
+    <ul class="due-list" id="phone-formats">
+${formats}
+    </ul>
+    ${topics}
+    ${stories}
+    </div>
+    ${recent}
+    <p class="muted small">Ask your agent for a mock recruiter, behavioral, or CS fundamentals phone screen, or run /chudcode:phone. Name a company and it plays that company's screen from what research found.</p>
   </section>`;
 }
 

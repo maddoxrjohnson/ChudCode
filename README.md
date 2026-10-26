@@ -41,8 +41,10 @@ again. `/chudcode:roadmap` takes you through NeetCode 150 in order, or Grind 75 
 name it: each step is an original problem in the shape of the next one on the list,
 and after each debrief a Next problem button takes you straight to the one after.
 `/chudcode:learn` teaches the next lesson on coding with agents, or the topic you
-name. `/chudcode:research <company>` finds what that company has been asking lately,
-so an interview for it has the right shape. `/chudcode:dashboard` opens the page with
+name. `/chudcode:phone recruiter|behavioral|fundamentals [company]` runs a mock phone
+screen you answer out loud. `/chudcode:research <company>` finds what that company has
+been asking lately, in coding rounds and on the phone, so a mock for it has the right
+shape. `/chudcode:dashboard` opens the page with
 your review schedule, streak, and past sessions.
 
 To try a checkout without installing it: `claude --plugin-dir /path/to/ChudCode`.
@@ -75,7 +77,7 @@ Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your cl
 ```
 
 `CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
-are `/interview`, `/review`, `/roadmap`, `/learn`, `/research <company>`, and `/dashboard`. While the
+are `/interview`, `/review`, `/roadmap`, `/learn`, `/phone`, `/research <company>`, and `/dashboard`. While the
 interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
 below the editor, and the link of the session it opened last.
 
@@ -155,6 +157,14 @@ make sure the patterns you keep missing are the ones you see again.
   poster, and judges them by eye.
 - After any lesson's debrief, the Next lesson button opens the next one; the
   interviewer writes it while you read the debrief.
+- Phone screens: a recruiter screen, a behavioral screen, or rapid-fire CS
+  fundamentals, as a call. The interviewer's questions are read aloud and you answer
+  out loud (Chrome or Edge transcribe it) or by typing. Each answer is kept with how
+  you delivered it: how long you spoke, words per minute, filler words heard, and long
+  pauses. The debrief scores each answer and the format's dimensions (STAR structure
+  and impact for behavioral, accuracy and depth for fundamentals), behavioral screens
+  build a bank of your best stories, fundamentals topics you miss come back sooner,
+  and research on a company's phone process shapes its mock. See `docs/PHONE.md`.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -189,9 +199,14 @@ the page lists the checks that fail first, each with the file and line to fix.
 
 ![A media lab page: the teaching on GitHub Pages with cited sources, and the measured checks for a first attempt, with failures for a missing image, an HEVC video without faststart, an autoplaying video that is not muted, an image with no alt text, no og:image, and a root-absolute link, then amber warnings](docs/screenshots/media-lab.png)
 
+A phone screen is a call: the current question in large type, the call so far with how
+each answer was delivered, and what research found about the company's phone screens.
+
+![A recruiter phone screen for Stripe: the question "Tell me about yourself", the Speak button and answer box, the call with two typed answers and a follow-up, and Stripe's phone screens from research on the right](docs/screenshots/phone.png)
+
 The dashboard shows every pattern's place in the review schedule, what is due, the
-streak, progress through both roadmaps and the agentic-coding modules, and past
-sessions.
+streak, progress through both roadmaps, the agentic-coding modules, and phone screens,
+and past sessions.
 
 ![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, a Next problem button under each roadmap, the agentic-coding modules with the next lesson, and recent sessions](docs/screenshots/dashboard.png)
 

@@ -116,6 +116,17 @@ export function lessonDir(id: string): string {
   return path.join(lessonsDir(), id);
 }
 
+/** Phone screen sessions, the story bank, and company phone briefs. */
+export function phoneDir(): string {
+  return path.join(baseDir, "phone");
+}
+
+/** Phone screens share the session id format, like lessons. */
+export function phoneSessionDir(id: string): string {
+  if (!isValidSessionId(id)) throw new Error(`Invalid phone session id: ${JSON.stringify(id)}`);
+  return path.join(phoneDir(), "sessions", id);
+}
+
 export function exercisesDir(): string {
   return path.join(baseDir, "exercises");
 }

@@ -1,5 +1,5 @@
 /**
- * session-link.ts: after `start_session` or `start_lesson`, print the link in the terminal.
+ * session-link.ts: after `start_session`, `start_lesson`, or `start_phone_screen`, print the link in the terminal.
  *
  * The model is asked to give the link, but this hook makes it certain: Claude Code
  * shows a hook's `systemMessage` to the user directly. The link is read from the

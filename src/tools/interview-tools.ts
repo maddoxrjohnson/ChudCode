@@ -17,6 +17,8 @@ import { isValidSessionId } from "../store/paths.ts";
 import { readProblem } from "../store/problems.ts";
 import { readSession, sessionExists } from "../store/sessions.ts";
 import { lessonExists } from "../store/lessons.ts";
+import { postPhoneMessage } from "../phone-flow.ts";
+import { phoneExists } from "../store/phone.ts";
 import { postLessonMessage } from "../lesson-flow.ts";
 import {
   ok,
@@ -56,6 +58,11 @@ export function interviewTools(): ToolDef[] {
         if (lessonExists(id)) {
           const message = postLessonMessage(id, "interviewer", markdown);
           return ok(`Sent. ${thenWait()}`, { at: message.at });
+        }
+        // On a phone screen the line is also read aloud.
+        if (phoneExists(id)) {
+          const message = postPhoneMessage(id, "interviewer", markdown);
+          return ok(`Said. ${thenWait()}`, { at: message.at });
         }
         const message = postMessage(requireSession(args), "interviewer", markdown);
         return ok(`Sent. ${thenWait()}`, { at: message.at });

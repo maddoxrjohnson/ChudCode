@@ -30,6 +30,15 @@
  *   POST /api/curriculum/next               { from?: lesson id }   the Next lesson button
  */
 
+import {
+  MAX_REPLY_CHARS,
+  phoneDone,
+  phoneState,
+  phoneTimerExpired,
+  startPhone,
+  submitReply,
+} from "../phone-flow.ts";
+import { phoneExists } from "../store/phone.ts";
 import type * as http from "node:http";
 
 import * as flow from "../flow.ts";
@@ -65,7 +74,13 @@ import { suiteRunner } from "../runs.ts";
 import { hasAgentToken } from "./agent-auth.ts";
 import { agentConnected, agentInbox, agentListening } from "./hooks.ts";
 import { HttpError, expectString, readJsonBody, sendJson } from "./http.ts";
-import { agenticData, lessonNextHtml, nextButtonView, sessionNextHtml } from "./routes-pages.ts";
+import {
+  agenticData,
+  lessonNextHtml,
+  nextButtonView,
+  phoneData,
+  sessionNextHtml,
+} from "./routes-pages.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
 
 export const MAX_CODE_BYTES = 200 * 1024;
@@ -98,6 +113,7 @@ export async function handleApi(
       roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
       next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
       agentic: agenticData(),
+      phone: phoneData(),
     });
   }
 
@@ -131,6 +147,12 @@ export async function handleApi(
     return sendJson(res, publicView(readProblem(id), 0));
   }
 
+  if (resource === "sessions" && id !== undefined && phoneExists(id)) {
+    if (action === undefined && req.method === "GET")
+      return sendJson(res, phoneState(id, agentListening()));
+    if (action !== undefined) return handlePhoneAction(req, res, id, action);
+  }
+
   if (resource === "sessions" && id !== undefined && lessonExists(id)) {
     if (action === undefined && req.method === "GET")
       return sendJson(res, lessonState(id, agentListening()));
@@ -151,7 +173,10 @@ function handleEvents(req: http.IncomingMessage, res: http.ServerResponse, url: 
   const session = url.searchParams.get("session");
   const scope = url.searchParams.get("scope");
   if (session !== null) {
-    if (!isValidSessionId(session) || !(sessionExists(session) || lessonExists(session)))
+    if (
+      !isValidSessionId(session) ||
+      !(sessionExists(session) || lessonExists(session) || phoneExists(session))
+    )
       throw new HttpError(404, "No such session");
     return subscribe(sessionChannel(session), req, res);
   }
@@ -232,6 +257,37 @@ async function handleSessionAction(
       return sendJson(res, { session: flow.candidateDone(id) });
     default:
       throw new HttpError(404, "No such session action");
+  }
+}
+
+async function handlePhoneAction(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  id: string,
+  action: string,
+): Promise<void> {
+  if (req.method !== "POST") throw new HttpError(405, "Method not allowed");
+  switch (action) {
+    case "start":
+      return sendJson(res, { session: startPhone(id) });
+    case "reply": {
+      const body = asRecord(await readJsonBody(req, MAX_REPLY_CHARS * 4 + 1024));
+      const text = expectString(body["text"], "text", MAX_REPLY_CHARS);
+      return sendJson(
+        res,
+        submitReply(id, text, {
+          spoken: body["spoken"],
+          durationMs: body["durationMs"],
+          longPauses: body["longPauses"],
+        }),
+      );
+    }
+    case "timeout":
+      return sendJson(res, { session: phoneTimerExpired(id) });
+    case "done":
+      return sendJson(res, { session: phoneDone(id) });
+    default:
+      throw new HttpError(404, "No such phone screen action");
   }
 }
 

@@ -1,6 +1,6 @@
 ---
 name: research
-description: Find out what a company has been asking in coding interviews lately, from public interview-experience posts, and save it as patterns and constraints so the next mock interview for that company has the right shape. Use when the user names a company and asks what it asks, wants to prepare for a specific company, or asks to research or update interview trends.
+description: Find out what a company has been asking in coding interviews and phone screens lately, from public interview-experience posts, and save it so the next mock interview or phone screen for that company has the right shape. Use when the user names a company and asks what it asks, wants to prepare for a specific company or its phone screen, or asks to research or update interview trends.
 ---
 
 # Research
@@ -36,3 +36,17 @@ description: Find out what a company has been asking in coding interviews lately
 
 Aim for five to ten entries per run from several posts rather than one long one. A
 dated, first-person account of a coding round is worth more than a list of titles.
+
+## Phone screens
+
+When the user is preparing for a company's phone screen (or asks what it is like),
+research that too. Call `list_phone_briefs` with the company to see what is on file.
+Then look for recent posts describing the phone rounds: "<company> recruiter call",
+"<company> phone screen", "<company> behavioral interview", "<company> technical
+phone screen". For each round a post describes, record its format (`recruiter`,
+`behavioral`, `fundamentals`, or `technical`), its length if given, the date, the
+post's URL, and a note of at most 400 characters in your own words: who called, what
+they asked about, anything unusual (a take-home after, a shared doc, questions on a
+specific technology). For a fundamentals round, list the topics with the ids that
+`record_phone_briefs` accepts. Save them all with one `record_phone_briefs` call,
+summarise the company's phone process in the terminal, and offer a mock phone screen.

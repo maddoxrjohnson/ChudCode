@@ -2,6 +2,10 @@
  * routes-pages.ts: HTML pages and static assets.
  */
 
+import { phoneState } from "../phone-flow.ts";
+import { listPhoneSessions, phoneExists, readStories } from "../store/phone.ts";
+import { fundamentalsTopics } from "../phone.ts";
+import { phonePage } from "./pages/phone.ts";
 import type * as http from "node:http";
 
 import { sessionState } from "../flow.ts";
@@ -15,7 +19,7 @@ import { listProblems, problemExists, publicView, readProblem } from "../store/p
 import { listSessions, readSession, sessionExists } from "../store/sessions.ts";
 import { agentConnected, agentListening } from "./hooks.ts";
 import { HttpError, sendFile, sendHtml } from "./http.ts";
-import { dashboardPage, type AgenticData } from "./pages/dashboard.ts";
+import { dashboardPage, type AgenticData, type PhoneData } from "./pages/dashboard.ts";
 import { reviewItems } from "../store/review-events.ts";
 import { nextUpHtml, type NextButtonView } from "./pages/next-up.ts";
 import { problemPage } from "./pages/problem.ts";
@@ -47,6 +51,7 @@ export function handlePage(
         roadmaps: ROADMAP_IDS.map(loadRoadmapProgress),
         next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
         agentic: agenticData(),
+        phone: phoneData(),
       }),
     );
   }
@@ -61,6 +66,10 @@ export function handlePage(
     const file = safeJoin(assetsDir(), rest.join("/"));
     if (!file || rest.length === 0) throw new HttpError(404, "No such asset");
     return sendFile(res, file);
+  }
+
+  if (head === "s" && rest.length === 1 && phoneExists(rest[0] ?? "")) {
+    return sendHtml(res, phonePage(phoneState(rest[0] as string, agentListening())));
   }
 
   if (head === "s" && rest.length === 1 && lessonExists(rest[0] ?? "")) {
@@ -89,6 +98,15 @@ export function handlePage(
   }
 
   throw new HttpError(404, "No such page");
+}
+
+export function phoneData(): PhoneData {
+  return {
+    sessions: listPhoneSessions(20),
+    items: reviewItems().filter((i) => i.kind === "phone"),
+    stories: readStories(),
+    topics: fundamentalsTopics().map((t) => ({ id: t.id, name: t.name })),
+  };
 }
 
 export function agenticData(now = Date.now()): AgenticData {

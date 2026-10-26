@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "topics": [
+    {
+      "id": "complexity",
+      "name": "Complexity and Big-O",
+      "covers": [
+        "time and space of common operations",
+        "amortised cost",
+        "best, average, and worst case",
+        "comparing two approaches"
+      ]
+    },
+    {
+      "id": "data-structures",
+      "name": "Data structures",
+      "covers": [
+        "arrays versus linked lists",
+        "hash tables and collisions",
+        "stacks and queues",
+        "heaps",
+        "when to pick which"
+      ]
+    },
+    {
+      "id": "trees-graphs",
+      "name": "Trees and graphs",
+      "covers": [
+        "binary search trees and balance",
+        "BFS versus DFS",
+        "shortest paths",
+        "representations",
+        "tries"
+      ]
+    },
+    {
+      "id": "algorithms",
+      "name": "Sorting and searching",
+      "covers": [
+        "merge, quick, and heap sort trade-offs",
+        "stability",
+        "binary search",
+        "recursion versus iteration",
+        "dynamic programming in one sentence"
+      ]
+    },
+    {
+      "id": "oop",
+      "name": "Object-oriented design",
+      "covers": [
+        "encapsulation, inheritance, polymorphism",
+        "composition over inheritance",
+        "interfaces and abstract classes",
+        "SOLID in practice"
+      ]
+    },
+    {
+      "id": "concurrency",
+      "name": "Concurrency",
+      "covers": [
+        "processes versus threads",
+        "race conditions and locks",
+        "deadlock and its conditions",
+        "async and event loops"
+      ]
+    },
+    {
+      "id": "operating-systems",
+      "name": "Operating systems",
+      "covers": [
+        "virtual memory and paging",
+        "the stack and the heap",
+        "scheduling",
+        "system calls",
+        "what happens when a program runs"
+      ]
+    },
+    {
+      "id": "networking",
+      "name": "Networking and the web",
+      "covers": [
+        "TCP versus UDP",
+        "what happens when you type a URL",
+        "DNS",
+        "HTTP methods and status codes",
+        "HTTPS and TLS at a high level"
+      ]
+    },
+    {
+      "id": "databases",
+      "name": "Databases",
+      "covers": [
+        "SQL joins",
+        "indexes and why they help",
+        "transactions and ACID",
+        "normalisation",
+        "SQL versus NoSQL"
+      ]
+    },
+    {
+      "id": "systems-basics",
+      "name": "System design basics",
+      "covers": [
+        "caching",
+        "load balancing",
+        "horizontal versus vertical scaling",
+        "consistency versus availability",
+        "REST API design"
+      ]
+    },
+    {
+      "id": "languages",
+      "name": "Language and tooling",
+      "covers": [
+        "pass by value versus reference",
+        "garbage collection",
+        "compiled versus interpreted",
+        "testing and version control habits"
+      ]
+    }
+  ]
+}

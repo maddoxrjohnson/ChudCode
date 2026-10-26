@@ -95,6 +95,22 @@ export const COMMANDS = {
           "When their answer has arrived and you have asked your follow-ups, score it with `record_lesson` and summarise in the terminal: the verdict, two strengths, two things to work on, and when the lesson comes back. Then follow what it says about the Next lesson button.",
       ].join("\n\n"),
   },
+  phone: {
+    description:
+      "Practise a phone screen out loud: recruiter, behavioral, or CS fundamentals. Usage: /phone <recruiter|behavioral|fundamentals> [company] [role]",
+    prompt: (args: string) =>
+      [
+        args
+          ? `The user wants a mock phone screen: ${args}`
+          : "The user wants a mock phone screen but named no format: ask which (recruiter, behavioral, or fundamentals) and stop.",
+        "If they named a company, call `list_phone_briefs` for it; with nothing on file, research its phone screens if you can and save them with `record_phone_briefs`. " +
+          "Call `begin_phone_screen` with the format, company, and role, and follow the method it returns in full. Then call `start_phone_screen`.",
+        "Give the user the URL in the terminal and say one sentence on the page with `say_to_candidate`. " +
+          "The learner's actions then arrive here as messages; handle each one and end your turn. Ask each graded question with `ask_question` (with a topic for fundamentals) and follow up with `say_to_candidate`; your lines are read aloud, so keep them short. " +
+          "In a behavioral screen, save the stories they tell well with `save_story`. " +
+          "When the call ends, score it with `record_phone_screen` and summarise in the terminal: the verdict, the one change for next time, and two strengths.",
+      ].join("\n\n"),
+  },
   research: {
     description:
       "Find what a company has been asking in coding interviews. Usage: /research <company> [role]",

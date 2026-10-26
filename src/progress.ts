@@ -133,8 +133,10 @@ export function buildProgress(input: ProgressInput): Progress {
 /** The standing right now, from the review log and the configured intervals. */
 export function loadProgress(now = Date.now()): Progress {
   const config = readConfig();
-  // Interview standing only: lesson events have their own section on the dashboard.
-  const events = readReviewEvents().filter((event) => !event.key.startsWith("lesson:"));
+  // Interview standing only: lessons and phone screens have their own sections.
+  const events = readReviewEvents().filter(
+    (event) => !event.key.startsWith("lesson:") && !event.key.startsWith("phone:"),
+  );
   return buildProgress({
     items: scheduleItems(events, scheduleOptions(config)),
     taxonomy: patterns(),

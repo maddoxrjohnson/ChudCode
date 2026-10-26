@@ -2,6 +2,9 @@
  * session-tools.ts: tools that set a session up, inspect it, or end it early.
  */
 
+import { abandonPhone } from "../phone-flow.ts";
+import { phoneLine, phoneSummary } from "../phone-prompts.ts";
+import { phoneExists, readPhoneSession } from "../store/phone.ts";
 import {
   abandonSession,
   notifyDashboard,
@@ -290,6 +293,10 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       async execute(args) {
         const id = requireString(args, "session_id", 120);
         if (lessonExists(id)) return ok(lessonSummary(id), { phase: readLesson(id).phase });
+        if (phoneExists(id)) {
+          const phone = readPhoneSession(id);
+          return ok(phoneSummary(phone), { phase: phone.phase });
+        }
         if (!isValidSessionId(id) || !sessionExists(id)) return fail(`No session named ${id}.`);
         const state = sessionState(id);
         return ok(sessionSummaryText(state, optionalBool(args, "include_code") ?? false), {
@@ -319,6 +326,18 @@ export function sessionTools(host: ToolHost): ToolDef[] {
               `Abandoned. ${lessonLine(outcome.session)}`,
               outcome.reviewEvent
                 ? `Recorded as a miss for ${outcome.session.lessonTitle}.`
+                : "Not counted against the learner.",
+              ...(outcome.nextDue ? [outcome.nextDue] : []),
+            ].join("\n"),
+          );
+        }
+        if (phoneExists(id)) {
+          const outcome = abandonPhone(id, requireString(args, "reason", 500));
+          return ok(
+            [
+              `Abandoned. ${phoneLine(outcome.session)}`,
+              outcome.reviewEvents.length
+                ? "Recorded as a miss for this format."
                 : "Not counted against the learner.",
               ...(outcome.nextDue ? [outcome.nextDue] : []),
             ].join("\n"),

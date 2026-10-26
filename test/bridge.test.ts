@@ -252,6 +252,7 @@ describe("commands", () => {
       "review",
       "roadmap",
       "learn",
+      "phone",
       "research",
       "dashboard",
     ]);

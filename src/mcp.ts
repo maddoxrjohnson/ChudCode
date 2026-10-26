@@ -14,6 +14,21 @@
  * follow pi-teach's src/mcp.ts (Josh Noll, MIT); see docs/ATTRIBUTION.md.
  */
 
+import {
+  phoneDonePrompt,
+  phoneMessagePrompt,
+  phoneReplyPrompt,
+  phoneStartedPrompt,
+  phoneTimerExpiredPrompt,
+  recoveredPhonePrompt,
+} from "./phone-prompts.ts";
+import {
+  listPhoneSessions,
+  phoneExists,
+  readPhoneSession,
+  type PhoneSession,
+} from "./store/phone.ts";
+import { phoneTools } from "./tools/phone-tools.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -328,6 +343,10 @@ export function activeLessons(): LessonSession[] {
   return listLessons(10).filter((s) => s.phase !== "done");
 }
 
+export function activePhoneScreens(): PhoneSession[] {
+  return listPhoneSessions(10).filter((s) => s.phase !== "done");
+}
+
 /**
  * Tell every open page whether the interviewer is listening (the session badge) and
  * whether it is connected at all (the Next problem button). Finished sessions are
@@ -335,7 +354,7 @@ export function activeLessons(): LessonSession[] {
  */
 function broadcastPresence(listening: boolean): void {
   const payload = { listening, connected: agentConnected() };
-  for (const session of [...listSessions(10), ...listLessons(10)])
+  for (const session of [...listSessions(10), ...listLessons(10), ...listPhoneSessions(10)])
     push(sessionChannel(session.id), "presence", payload);
   push(DASHBOARD_CHANNEL, "presence", payload);
 }
@@ -388,6 +407,7 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
     return;
   }
   if (lessonExists(event.sessionId)) return routeLessonEvent(inbox, event);
+  if (phoneExists(event.sessionId)) return routePhoneEvent(inbox, event);
   let session: Session;
   try {
     session = readSession(event.sessionId);
@@ -520,6 +540,34 @@ function routeLessonEvent(inbox: PromptSink, event: CandidateEvent): void {
   }
 }
 
+function routePhoneEvent(inbox: PromptSink, event: CandidateEvent): void {
+  const id = event.sessionId;
+  const session = readPhoneSession(id);
+  const notDone = () => phoneExists(id) && readPhoneSession(id).phase !== "done";
+  switch (event.kind) {
+    case "started":
+      return inbox.push(phoneStartedPrompt(session, event.at), `started:${id}`, notDone);
+    case "message":
+      return inbox.push(
+        phoneMessagePrompt(session, event.text, event.at),
+        `message:${id}:${event.at}`,
+        notDone,
+      );
+    case "answer":
+      return inbox.push(
+        phoneReplyPrompt(session, event.number, event.at),
+        `reply:${id}:${event.at}`,
+        notDone,
+      );
+    case "timer_expired":
+      return inbox.push(phoneTimerExpiredPrompt(session, event.at), `timeout:${id}`, notDone);
+    case "candidate_done":
+      return inbox.push(phoneDonePrompt(session, event.at), `done:${id}`, notDone);
+    default:
+      return;
+  }
+}
+
 /** A press of Next lesson, dropped once a lesson starts. */
 function routeNextLesson(inbox: PromptSink, request: NextLessonRequest): void {
   inbox.push(
@@ -552,6 +600,14 @@ export function recoverSessions(
   created: ReadonlySet<string>,
   now = Date.now(),
 ): void {
+  for (const phone of activePhoneScreens()) {
+    if (created.has(phone.id)) continue;
+    inbox.push(
+      recoveredPhonePrompt(phone, now),
+      `recover:${phone.id}`,
+      () => readPhoneSession(phone.id).phase !== "done",
+    );
+  }
   for (const lesson of activeLessons()) {
     if (created.has(lesson.id)) continue;
     inbox.push(
@@ -638,6 +694,7 @@ export class McpSession {
         ...roadmapTools(),
         ...trendTools(),
         ...lessonTools(host),
+        ...phoneTools(host),
       ].map((tool) => [tool.name, tool]),
     );
   }

@@ -28,6 +28,13 @@ import { updateMeta } from "../src/store/problems.ts";
 import { readReviewEvents } from "../src/store/review-events.ts";
 import { createSession, readDraft, readSession } from "../src/store/sessions.ts";
 import { loadCurriculumProgress } from "../src/curriculum.ts";
+import { askQuestion, postPhoneMessage, recordPhone } from "../src/phone-flow.ts";
+import {
+  createPhoneSession,
+  phoneExists,
+  readPhoneSession,
+  recordBriefs,
+} from "../src/store/phone.ts";
 import {
   inspectLab,
   inspectMediaLab,
@@ -74,6 +81,7 @@ let solved = false;
 function interviewer(event: CandidateEvent): void {
   const id = event.sessionId;
   if (lessonExists(id)) return lessonInterviewer(event);
+  if (phoneExists(id)) return phoneInterviewer(event);
   switch (event.kind) {
     case "started":
       postMessage(id, "interviewer", "Hi, I'm your interviewer today. Ask me anything as you go.");
@@ -199,6 +207,32 @@ function labInterviewer(event: CandidateEvent): void {
           { id: "no-duplication", status: "met", note: "Nothing the code shows" },
           { id: "progress-next", status: "partial", note: "progress.md has no next step" },
         ],
+      });
+      return;
+    default:
+      return;
+  }
+}
+
+/** A phone screen: one question, one follow-up, then score when the learner hangs up. */
+function phoneInterviewer(event: CandidateEvent): void {
+  const id = event.sessionId;
+  switch (event.kind) {
+    case "started":
+      postPhoneMessage(id, "interviewer", "Hi, thanks for making the time. Let's start.");
+      askQuestion(id, "Tell me about yourself.");
+      return;
+    case "answer":
+      if (readPhoneSession(id).questions[0]?.replies.length === 1)
+        postPhoneMessage(id, "interviewer", "And why **this** company?");
+      return;
+    case "candidate_done":
+      recordPhone(id, {
+        scores: { clarity: 3, concision: 2, specificity: 3, motivation: 2 },
+        answers: [{ n: 1, score: 3, note: "Clear arc; the company reason was generic." }],
+        notesMd: "Name one thing only this company does.",
+        strengths: ["A clear arc"],
+        improvements: ["A company-specific reason"],
       });
       return;
     default:
@@ -928,6 +962,47 @@ try {
     (await page.locator("#rubric", { hasText: "The best plan known" }).count()) === 1,
   );
 
+  // A phone screen: questions on the page, typed answers with delivery, a debrief.
+  const call = createPhoneSession({ format: "recruiter", company: "Stripe", timerMs: 20 * 60_000 });
+  recordBriefs([
+    {
+      company: "Stripe",
+      format: "recruiter",
+      minutes: 30,
+      seenAt: "2026-08-01",
+      sourceUrl: "https://example.com/stripe-recruiter",
+      note: "Background, why Stripe, a project walkthrough, and timeline.",
+    },
+  ]);
+  await page.goto(`${base}/s/${call.id}`);
+  check(
+    "the phone page shows the company's screens",
+    (await page.locator(".phone-brief li").count()) === 1,
+  );
+  await page.locator("#voice-toggle").uncheck();
+  await page.locator("#start-button").click();
+  await page.locator("#question-text", { hasText: "Tell me about yourself." }).waitFor();
+  check("the first question appears on the call", true);
+  await page
+    .locator("#answer-text")
+    .fill("I'm a senior at Virginia Tech. I built a mock-interview tool, um, used by my club.");
+  await page.locator("#send-button").click();
+  await page.locator(".line-reply .delivery", { hasText: "typed" }).waitFor();
+  await page.locator(".line-interviewer", { hasText: "why this company" }).waitFor();
+  check("a follow-up arrives after the answer", true);
+  await page.locator("#answer-text").fill("Stripe's API docs taught me how to design my own.");
+  await page.locator("#send-button").click();
+  await page.locator(".line-reply >> nth=1").waitFor();
+  await page.mouse.move(0, 0);
+  await screenshot(page, "phone");
+  await page.locator("#done-button").click();
+  await page.locator("#rubric h2", { hasText: "Debrief" }).waitFor({ timeout: 10_000 });
+  check(
+    "the phone debrief scores each answer",
+    (await page.locator("#rubric .answer-scores li").count()) === 1,
+  );
+  check("the call passed", readPhoneSession(call.id).verdict?.correct === true);
+
   // Server state.
   check("the verdict is recorded", readSession(session.id).verdict?.correct === true);
   check(
@@ -936,7 +1011,7 @@ try {
       .map((e) => e.key)
       .sort()
       .join() ===
-      "lesson:context-files,lesson:pages-site,lesson:plan-before-code,lesson:prompt-caching,lesson:review-agent-diffs,lesson:verify-with-checks,pattern:sliding-window,problem:window-sum",
+      "lesson:context-files,lesson:pages-site,lesson:plan-before-code,lesson:prompt-caching,lesson:review-agent-diffs,lesson:verify-with-checks,pattern:sliding-window,phone:recruiter,problem:window-sum",
   );
   check("no browser errors", errors.length === 0, errors.join("; "));
 
