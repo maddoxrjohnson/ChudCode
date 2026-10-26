@@ -9,7 +9,17 @@ import { el, readConfig } from "../shared/dom.mjs";
 import { connectEvents } from "../shared/events.mjs";
 import { initTheme } from "../shared/theme.mjs";
 import { createTimer } from "../session/timer.mjs";
-import { createRecorder, speak, speechSupport, stopSpeaking } from "./speech.mjs";
+import {
+  createRecorder,
+  isNaturalVoice,
+  onVoices,
+  rankedVoices,
+  speak,
+  speakable,
+  speechSupport,
+  stopSpeaking,
+  voiceLabel,
+} from "./speech.mjs";
 
 const config = readConfig();
 const { sessionId } = config;
@@ -24,6 +34,7 @@ const sendButton = $("send-button");
 const micButton = $("mic-button");
 const micState = $("mic-state");
 const voiceToggle = $("voice-toggle");
+const voiceSelect = $("voice-select");
 const saveState = $("save-state");
 const lines = $("call-lines");
 
@@ -50,18 +61,65 @@ voiceToggle?.addEventListener("change", () => {
   }
 });
 
-/** Markdown marks are not read aloud. */
-function readAloud(text) {
-  if (!voiceToggle?.checked || !text) return;
-  speak(text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_`#>]/g, ""));
+// ── Which voice reads the interviewer ────────────────────────────────────────
+
+const VOICE_NAME_KEY = "chudcode-phone-voice-name";
+let voices = [];
+
+function chosenVoice() {
+  return voices.find((v) => v.name === voiceSelect?.value) ?? voices[0];
 }
 
 const support = speechSupport();
 const supportNote = $("speech-support");
-if (supportNote)
-  supportNote.textContent = support.recognition
+
+function describeSupport() {
+  if (!supportNote) return;
+  const hearing = support.recognition
     ? "Your browser can transcribe speech. It will ask for the microphone the first time you press Speak."
     : "This browser cannot transcribe speech (Chrome and Edge can). You can still type every answer.";
+  const voice = chosenVoice();
+  const reading = !voice
+    ? ""
+    : isNaturalVoice(voice)
+      ? ` The interviewer speaks as ${voiceLabel(voice)}.`
+      : ` The interviewer speaks as ${voiceLabel(voice)}. For a voice that sounds like a person, open this page in Microsoft Edge, whose Natural voices are neural.`;
+  supportNote.textContent = hearing + reading;
+}
+
+onVoices(() => {
+  voices = rankedVoices();
+  if (voiceSelect) {
+    let saved = null;
+    try {
+      saved = localStorage.getItem(VOICE_NAME_KEY);
+    } catch {
+      // storage unavailable: use the best voice
+    }
+    const current = voiceSelect.value || saved;
+    voiceSelect.replaceChildren(
+      ...voices.map((v) => el("option", { value: v.name }, voiceLabel(v))),
+    );
+    if (current && voices.some((v) => v.name === current)) voiceSelect.value = current;
+    voiceSelect.hidden = voices.length < 2;
+  }
+  describeSupport();
+});
+
+voiceSelect?.addEventListener("change", () => {
+  try {
+    localStorage.setItem(VOICE_NAME_KEY, voiceSelect.value);
+  } catch {
+    // not remembered
+  }
+  describeSupport();
+  if (voiceToggle?.checked) speak("Hi, thanks for making the time today.", chosenVoice());
+});
+
+function readAloud(text) {
+  if (!voiceToggle?.checked || !text) return;
+  speak(speakable(text), chosenVoice());
+}
 
 // ── The answer: microphone or keyboard ───────────────────────────────────────
 

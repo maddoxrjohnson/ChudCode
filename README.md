@@ -158,8 +158,9 @@ make sure the patterns you keep missing are the ones you see again.
 - After any lesson's debrief, the Next lesson button opens the next one; the
   interviewer writes it while you read the debrief.
 - Phone screens: a recruiter screen, a behavioral screen, or rapid-fire CS
-  fundamentals, as a call. The interviewer's questions are read aloud and you answer
-  out loud (Chrome or Edge transcribe it) or by typing. Each answer is kept with how
+  fundamentals, as a call. The interviewer's questions are read aloud in the most
+  natural voice your browser has (Edge's neural "Natural" voices sound closest to a
+  person; pick another beside the voice toggle), and you answer out loud (Chrome or Edge transcribe it) or by typing. Each answer is kept with how
   you delivered it: how long you spoke, words per minute, filler words heard, and long
   pauses. The debrief scores each answer and the format's dimensions (STAR structure
   and impact for behavioral, accuracy and depth for fundamentals), behavioral screens

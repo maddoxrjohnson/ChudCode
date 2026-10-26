@@ -979,6 +979,40 @@ try {
     "the phone page shows the company's screens",
     (await page.locator(".phone-brief li").count()) === 1,
   );
+  const speech = await page.evaluate(async () => {
+    const url = "/static/runtime/phone/speech.mjs";
+    const m = await import(url);
+    const fake = (name: string, lang: string, localService: boolean) => ({
+      name,
+      lang,
+      localService,
+    });
+    Object.defineProperty(window.speechSynthesis, "getVoices", {
+      value: () => [
+        fake("Microsoft David - English (United States)", "en-US", true),
+        fake("Microsoft Ana Online (Natural) - English (United States)", "en-US", false),
+        fake("Google US English", "en-US", false),
+        fake("Microsoft Aria Online (Natural) - English (United States)", "en-US", false),
+        fake("Google français", "fr-FR", false),
+      ],
+    });
+    return {
+      text: m.speakable(
+        "**Compare** `max_heap` vs. a sorted list, e.g. for top-k:\n- insert\n- pop",
+      ),
+      chunks: m.speechChunks(`${"One two three. ".repeat(20)}Done?`, 60).length,
+      ranked: m.rankedVoices("en-US").map((v: { name: string }) => m.voiceLabel(v)),
+    };
+  });
+  check(
+    "the interviewer's text is read as a person would say it",
+    speech.text === "Compare max heap versus a sorted list, for example, for top-k: insert. pop",
+  );
+  check("long text is read in sentence-sized pieces", speech.chunks === 6);
+  check(
+    "the most human voice is chosen first",
+    speech.ranked.join(", ") === "Aria (Natural), US English, Ana (Natural), David",
+  );
   await page.locator("#voice-toggle").uncheck();
   await page.locator("#start-button").click();
   await page.locator("#question-text", { hasText: "Tell me about yourself." }).waitFor();

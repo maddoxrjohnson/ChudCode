@@ -52,7 +52,10 @@ export function phonePage(state: PhoneState): string {
       </div>
       <textarea id="answer-text" rows="5" spellcheck="true" placeholder="Your answer appears here as you speak; you can also type."></textarea>
       <div class="button-row">
-        <label class="voice-toggle"><input type="checkbox" id="voice-toggle" checked> Read the interviewer aloud</label>
+        <span class="voice-controls">
+          <label class="voice-toggle"><input type="checkbox" id="voice-toggle" checked> Read the interviewer aloud</label>
+          <select id="voice-select" aria-label="The interviewer's voice" hidden></select>
+        </span>
         <span class="save-state" id="save-state"></span>
         <button type="submit" class="button primary" id="send-button">Send</button>
       </div>

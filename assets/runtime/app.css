@@ -1475,12 +1475,30 @@ textarea:focus,
   border-color: var(--danger);
 }
 
+.voice-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+
 .voice-toggle {
   display: flex;
   gap: 0.4rem;
   align-items: center;
-  margin-right: auto;
   font-size: 0.9rem;
+}
+
+#voice-select {
+  max-width: 14rem;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
 }
 
 .call-lines {
