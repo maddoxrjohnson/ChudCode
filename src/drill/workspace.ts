@@ -110,6 +110,14 @@ export async function createRefactorWorkspace(
   return dir;
 }
 
+/** Make `dir` a git repository holding one commit, so the learner can diff. Best effort. */
+export async function commitWorkspace(dir: string, message: string): Promise<boolean> {
+  if (!(await gitInit(dir))) return false;
+  const identity = ["-c", "user.name=ChudCode", "-c", "user.email=drills@chudcode.invalid"];
+  await git(["-C", dir, "add", "-A"]);
+  return git(["-C", dir, ...identity, "commit", "-q", "-m", message]);
+}
+
 /** The module file the learner changed, read back as text; never through a link. */
 export function readWorkspaceModule(dir: string, module: string): string {
   const file = path.join(dir, `${module}.py`);

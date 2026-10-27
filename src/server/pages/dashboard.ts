@@ -23,6 +23,7 @@ import type { ProblemMeta } from "../../store/problems.ts";
 import type { Session } from "../../store/sessions.ts";
 import type { CurriculumProgress, LessonState } from "../../curriculum.ts";
 import type { LessonSession } from "../../store/lessons.ts";
+import type { ProjectPattern, ProjectSession } from "../../store/projects.ts";
 import { difficultyBadge, page, topbar } from "./layout.ts";
 import { nextUpHtml, type NextButtonView } from "./next-up.ts";
 
@@ -47,6 +48,16 @@ export interface DashboardData {
   agentic?: AgenticData;
   /** Phone screen practice; left out, the section is not shown. */
   phone?: PhoneData;
+  /** Repository debugging practice; left out, the section is not shown. */
+  projects?: ProjectsData;
+}
+
+export interface ProjectsData {
+  /** Recent project sessions, newest first. */
+  sessions: ProjectSession[];
+  /** Project review items, one per bug category practised. */
+  items: ReviewItem[];
+  categories: ProjectPattern[];
 }
 
 export interface PhoneData {
@@ -81,6 +92,7 @@ export function dashboardPage(data: DashboardData): string {
   </section>
   ${data.agentic ? agenticHtml(data.agentic, progress.now) : ""}
   ${data.phone ? phoneHtml(data.phone, progress.now) : ""}
+  ${data.projects ? projectsHtml(data.projects, progress.now) : ""}
   <section id="sessions">
     <h2>Recent sessions</h2>
     ${sessionsHtml(data.sessions)}
@@ -343,6 +355,46 @@ ${formats}
     </div>
     ${recent}
     <p class="muted small">Ask your agent for a mock recruiter, behavioral, or CS fundamentals phone screen, or run /chudcode:phone. Name a company and it plays that company's screen from what research found.</p>
+  </section>`;
+}
+
+function projectsHtml(data: ProjectsData, now: number): string {
+  const categories = data.categories
+    .map((c) => ({ c, item: data.items.find((i) => i.id === c.id) }))
+    .map(({ c, item }) => {
+      const due = item
+        ? item.dueAt <= now
+          ? `<span class="badge warn">${escapeHtml(dueText(item.dueAt, now))}</span>`
+          : `<span class="muted small">next ${escapeHtml(dueText(item.dueAt, now))}</span>`
+        : `<span class="muted small">not practised</span>`;
+      return `<li data-category="${escapeHtml(c.id)}"><strong>${escapeHtml(c.name)}</strong> ${item ? `<span class="badge ${item.lastCorrect ? "ok" : "warn"}">box ${item.box}</span>` : ""} ${due}</li>`;
+    })
+    .join("\n");
+  const recent = data.sessions.length
+    ? `<table class="table" id="project-sessions">
+<thead><tr><th>When</th><th>Project</th><th>Mode</th><th>Bugs fixed</th><th>Result</th></tr></thead>
+<tbody>${data.sessions
+        .map(
+          (s) => `<tr>
+  <td><a href="/s/${escapeHtml(s.id)}">${escapeHtml(formatDate(s.createdAt))}</a></td>
+  <td>${escapeHtml(s.projectTitle)} ${difficultyBadge(s.difficulty)}</td>
+  <td>${s.oa ? "OA" : "Interview"}</td>
+  <td>${s.verdict ? `${s.verdict.bugsFixed.length}/${s.verdict.bugsTotal}` : ""}</td>
+  <td>${s.verdict ? (s.verdict.correct ? `<span class="badge ok">passed</span>` : `<span class="badge warn">not passed</span>`) : s.abandonedReason ? `<span class="muted">abandoned</span>` : `<span class="muted">in progress</span>`}</td>
+</tr>`,
+        )
+        .join("\n")}</tbody>
+</table>`
+    : "";
+  return `<section id="projects">
+    <h2>Projects</h2>
+    <div class="roadmap-card">
+    <ul class="due-list" id="project-categories">
+${categories}
+    </ul>
+    </div>
+    ${recent}
+    <p class="muted small">Debug a Django project against hidden tests, the backend half of online assessments like IBM's. Ask your agent for a project session, or run /chudcode:project. Say it is an online assessment and the interviewer stays silent until you finish.</p>
   </section>`;
 }
 

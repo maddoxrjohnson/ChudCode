@@ -29,6 +29,24 @@ import {
   type PhoneSession,
 } from "./store/phone.ts";
 import { phoneTools } from "./tools/phone-tools.ts";
+import {
+  projectDonePrompt,
+  projectHintPrompt,
+  projectMessagePrompt,
+  projectStartedPrompt,
+  projectSubmissionPrompt,
+  projectTimerExpiredPrompt,
+  recoveredProjectPrompt,
+} from "./project-prompts.ts";
+import {
+  listProjectSessions,
+  projectSessionExists,
+  readProject,
+  readProjectSession,
+  readSubmission as readProjectSubmission,
+  type ProjectSession,
+} from "./store/projects.ts";
+import { projectTools } from "./tools/project-tools.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -347,6 +365,10 @@ export function activePhoneScreens(): PhoneSession[] {
   return listPhoneSessions(10).filter((s) => s.phase !== "done");
 }
 
+export function activeProjects(): ProjectSession[] {
+  return listProjectSessions(10).filter((s) => s.phase !== "done");
+}
+
 /**
  * Tell every open page whether the interviewer is listening (the session badge) and
  * whether it is connected at all (the Next problem button). Finished sessions are
@@ -354,7 +376,12 @@ export function activePhoneScreens(): PhoneSession[] {
  */
 function broadcastPresence(listening: boolean): void {
   const payload = { listening, connected: agentConnected() };
-  for (const session of [...listSessions(10), ...listLessons(10), ...listPhoneSessions(10)])
+  for (const session of [
+    ...listSessions(10),
+    ...listLessons(10),
+    ...listPhoneSessions(10),
+    ...listProjectSessions(10),
+  ])
     push(sessionChannel(session.id), "presence", payload);
   push(DASHBOARD_CHANNEL, "presence", payload);
 }
@@ -408,6 +435,7 @@ function routeEvent(inbox: PromptSink, event: CandidateEvent): void {
   }
   if (lessonExists(event.sessionId)) return routeLessonEvent(inbox, event);
   if (phoneExists(event.sessionId)) return routePhoneEvent(inbox, event);
+  if (projectSessionExists(event.sessionId)) return routeProjectEvent(inbox, event);
   let session: Session;
   try {
     session = readSession(event.sessionId);
@@ -568,6 +596,45 @@ function routePhoneEvent(inbox: PromptSink, event: CandidateEvent): void {
   }
 }
 
+function routeProjectEvent(inbox: PromptSink, event: CandidateEvent): void {
+  const id = event.sessionId;
+  const session = readProjectSession(id);
+  const notDone = () => projectSessionExists(id) && readProjectSession(id).phase !== "done";
+  switch (event.kind) {
+    case "started":
+      return inbox.push(projectStartedPrompt(session, event.at), `started:${id}`, notDone);
+    case "message":
+      return inbox.push(
+        projectMessagePrompt(session, event.text, event.at),
+        `message:${id}:${event.at}`,
+        notDone,
+      );
+    case "hint_used": {
+      const hint = readProject(session.project).hints.find((h) => h.level === event.level);
+      return inbox.push(
+        projectHintPrompt(session, event.level, hint?.text ?? "", event.at),
+        `hint:${id}:${event.level}`,
+        notDone,
+      );
+    }
+    case "answer": {
+      const submission = readProjectSubmission(id, event.number);
+      if (!submission) return;
+      return inbox.push(
+        projectSubmissionPrompt(session, readProject(session.project), submission, event.at),
+        `submit:${id}:${event.number}`,
+        notDone,
+      );
+    }
+    case "timer_expired":
+      return inbox.push(projectTimerExpiredPrompt(session, event.at), `timeout:${id}`, notDone);
+    case "candidate_done":
+      return inbox.push(projectDonePrompt(session, event.at), `done:${id}`, notDone);
+    default:
+      return;
+  }
+}
+
 /** A press of Next lesson, dropped once a lesson starts. */
 function routeNextLesson(inbox: PromptSink, request: NextLessonRequest): void {
   inbox.push(
@@ -600,6 +667,14 @@ export function recoverSessions(
   created: ReadonlySet<string>,
   now = Date.now(),
 ): void {
+  for (const project of activeProjects()) {
+    if (created.has(project.id)) continue;
+    inbox.push(
+      recoveredProjectPrompt(project, now),
+      `recover:${project.id}`,
+      () => readProjectSession(project.id).phase !== "done",
+    );
+  }
   for (const phone of activePhoneScreens()) {
     if (created.has(phone.id)) continue;
     inbox.push(
@@ -695,6 +770,7 @@ export class McpSession {
         ...trendTools(),
         ...lessonTools(host),
         ...phoneTools(host),
+        ...projectTools(host),
       ].map((tool) => [tool.name, tool]),
     );
   }

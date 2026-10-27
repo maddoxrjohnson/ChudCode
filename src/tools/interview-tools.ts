@@ -20,6 +20,8 @@ import { lessonExists } from "../store/lessons.ts";
 import { postPhoneMessage } from "../phone-flow.ts";
 import { phoneExists } from "../store/phone.ts";
 import { postLessonMessage } from "../lesson-flow.ts";
+import { postProjectMessage, revealProjectHint, runProjectTests } from "../project-flow.ts";
+import { projectSessionExists } from "../store/projects.ts";
 import {
   ok,
   optionalBool,
@@ -64,6 +66,10 @@ export function interviewTools(): ToolDef[] {
           const message = postPhoneMessage(id, "interviewer", markdown);
           return ok(`Said. ${thenWait()}`, { at: message.at });
         }
+        if (projectSessionExists(id)) {
+          const message = postProjectMessage(id, "interviewer", markdown);
+          return ok(`Sent. ${thenWait()}`, { at: message.at });
+        }
         const message = postMessage(requireSession(args), "interviewer", markdown);
         return ok(`Sent. ${thenWait()}`, { at: message.at });
       },
@@ -81,9 +87,11 @@ export function interviewTools(): ToolDef[] {
         ["level"],
       ),
       async execute(args) {
-        const id = requireSession(args);
         const level = optionalInt(args, "level", 1, 10);
-        const reveal = revealHint(id, level);
+        const projectId = requireString(args, "session_id", 120);
+        const reveal = projectSessionExists(projectId)
+          ? revealProjectHint(projectId, level, "interviewer")
+          : revealHint(requireSession(args), level);
         return ok(
           `Revealed hint ${reveal.hint.level}: "${reveal.hint.text}"\n${reveal.remaining} hint${reveal.remaining === 1 ? "" : "s"} left. ${thenWait()}`,
           { level: reveal.hint.level, remaining: reveal.remaining },
@@ -94,7 +102,7 @@ export function interviewTools(): ToolDef[] {
       name: "run_tests",
       title: "Run Tests",
       description:
-        "Run the candidate's current draft yourself: against the visible examples, every case including hidden ones, or custom inputs you supply. " +
+        "Run the candidate's current draft yourself: against the visible examples, every case including hidden ones, or custom inputs you supply. For a project session, runs the visible tests on the workspace as it is now. " +
         "Returns the full result. Set show_candidate to put the result in their tests panel too.",
       inputSchema: schema.obj(
         {
@@ -114,6 +122,19 @@ export function interviewTools(): ToolDef[] {
         ["cases", "custom", "show_candidate"],
       ),
       async execute(args) {
+        const projectId = requireString(args, "session_id", 120);
+        if (projectSessionExists(projectId)) {
+          const { suite } = await runProjectTests(projectId, undefined, "interviewer");
+          const failing = suite.tests.filter((t) => t.status !== "pass" && t.status !== "skip");
+          return ok(
+            [
+              `Visible tests on the workspace as it is now: ${suite.tests.length - failing.length}/${suite.tests.length} passed (${suite.status}).`,
+              ...failing.map((t) => `- ${t.id} [${t.status}]\n${t.message.slice(-600)}`),
+              ...(suite.status !== "ok" ? [suite.stderrTail.slice(-1500)] : []),
+            ].join("\n"),
+            { passed: suite.tests.length - failing.length, total: suite.tests.length },
+          );
+        }
         const id = requireSession(args);
         let scope: RunScope = "visible";
         const custom = args["custom"];

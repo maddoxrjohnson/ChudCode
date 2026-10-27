@@ -192,39 +192,80 @@ export class ProcessRunner implements Runner {
         JSON.stringify({ limits: request.limits }),
       );
 
-      const tests: SuiteTest[] = [];
-      let scan: SuiteScan[] = [];
-      let fatal: string | null = null;
-      let done = false;
-      const outcome = await this.spawnAndCollect(
+      return await this.collectSuite(
         { cmd: request.pythonBin, args: [...PYTHON_FLAGS, "suite_harness.py"] },
         workdir,
         request.limits,
-        parseSuiteLine,
-        (line) => {
-          if (line.event === "test") tests.push(line.test);
-          else if (line.event === "scan") scan = line.tests;
-          else if (line.event === "fatal") fatal = line.message;
-          else done = true;
-        },
       );
-      const status: SuiteResult["status"] = fatal
-        ? "error"
-        : outcome.timedOut
-          ? "timeout"
-          : done
-            ? "ok"
-            : "crashed";
-      return {
-        status,
-        tests,
-        scan,
-        wallMs: outcome.wallMs,
-        stderrTail: fatal ?? outcome.stderr.slice(-4000),
-      };
     } finally {
       fs.rmSync(workdir, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * Run a whole project's test suite, for project sessions: `files` is the project
+   * laid out by relative path (any depth), the Django harness runs the given test
+   * labels, and each test's outcome comes back. `pythonBin` is the project
+   * environment's interpreter, which has the framework installed.
+   */
+  async runProject(request: ProjectRunRequest): Promise<SuiteResult> {
+    return this.queue.enqueue(() => this.executeProject(request));
+  }
+
+  private async executeProject(request: ProjectRunRequest): Promise<SuiteResult> {
+    fs.mkdirSync(tmpDir(), { recursive: true });
+    const workdir = fs.mkdtempSync(path.join(tmpDir(), "project-"));
+    try {
+      for (const [name, contents] of Object.entries(request.files)) {
+        const target = safeJoin(workdir, name);
+        if (!target || target === workdir) throw new Error(`Bad project path: ${name}`);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, contents, "utf8");
+      }
+      fs.writeFileSync(path.join(workdir, "chud_django_harness.py"), djangoHarness(), "utf8");
+      fs.writeFileSync(
+        path.join(workdir, "project.json"),
+        JSON.stringify({ labels: request.labels, limits: request.limits }),
+      );
+      return await this.collectSuite(
+        { cmd: request.pythonBin, args: [...PYTHON_FLAGS, "chud_django_harness.py"] },
+        workdir,
+        request.limits,
+      );
+    } finally {
+      fs.rmSync(workdir, { recursive: true, force: true });
+    }
+  }
+
+  private async collectSuite(
+    command: Command,
+    workdir: string,
+    limits: Limits,
+  ): Promise<SuiteResult> {
+    const tests: SuiteTest[] = [];
+    let scan: SuiteScan[] = [];
+    let fatal: string | null = null;
+    let done = false;
+    const outcome = await this.spawnAndCollect(command, workdir, limits, parseSuiteLine, (line) => {
+      if (line.event === "test") tests.push(line.test);
+      else if (line.event === "scan") scan = line.tests;
+      else if (line.event === "fatal") fatal = line.message;
+      else done = true;
+    });
+    const status: SuiteResult["status"] = fatal
+      ? "error"
+      : outcome.timedOut
+        ? "timeout"
+        : done
+          ? "ok"
+          : "crashed";
+    return {
+      status,
+      tests,
+      scan,
+      wallMs: outcome.wallMs,
+      stderrTail: fatal ?? outcome.stderr.slice(-4000),
+    };
   }
 
   private populate(workdir: string, request: RunRequest): void {
@@ -383,6 +424,15 @@ function skipReason(status: RunResult["status"]): string {
   }
 }
 
+export interface ProjectRunRequest {
+  /** Relative path to contents: every file of the project, tests included. */
+  files: Record<string, string>;
+  /** Test labels for the framework's runner, e.g. `["tests", "hidden_tests"]`. */
+  labels: string[];
+  limits: Limits;
+  pythonBin: string;
+}
+
 export interface SuiteRequest {
   /** Relative path to contents: the module under test and `tests/*.py`. */
   files: Record<string, string>;
@@ -465,6 +515,15 @@ let suiteHarnessSource: string | null = null;
 function suiteHarness(): string {
   suiteHarnessSource ??= fs.readFileSync(path.join(pythonAdapterDir(), "suite_harness.py"), "utf8");
   return suiteHarnessSource;
+}
+
+let djangoHarnessSource: string | null = null;
+function djangoHarness(): string {
+  djangoHarnessSource ??= fs.readFileSync(
+    path.join(pythonAdapterDir(), "django_harness.py"),
+    "utf8",
+  );
+  return djangoHarnessSource;
 }
 
 export const processRunner = new ProcessRunner();

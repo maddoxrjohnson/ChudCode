@@ -308,6 +308,7 @@ pre code {
 }
 
 .button.primary:hover:not(:disabled) {
+  background: var(--accent);
   filter: brightness(1.08);
 }
 
@@ -1560,4 +1561,111 @@ textarea:focus,
   gap: 0.5rem;
   padding-left: 0;
   list-style: none;
+}
+
+/* ── Project sessions ─────────────────────────────────────────────────────── */
+
+.project-ide {
+  flex: 1 1 55%;
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  min-height: 320px;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-ide .editor-host {
+  min-height: 0;
+}
+
+.file-tree {
+  overflow: auto;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.file-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.file-tree .tree-folder {
+  padding: 0.35rem 0.5rem 0.1rem;
+  color: var(--muted);
+}
+
+.file-tree button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  cursor: pointer;
+}
+
+.file-tree button:hover {
+  background: var(--surface);
+}
+
+.file-tree .active button {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.file-tree .readonly button {
+  color: var(--muted);
+}
+
+.file-tree .tree-mark {
+  color: var(--accent);
+}
+
+.readonly-list {
+  font-size: 0.85rem;
+  padding-left: 1.1rem;
+}
+
+.bug-list .fixed strong {
+  color: var(--ok);
+}
+
+.bug-list .open strong {
+  color: var(--danger);
+}
+
+@media (max-width: 700px) {
+  .project-ide {
+    grid-template-columns: 1fr;
+  }
+
+  .file-tree {
+    max-height: 10rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.project-session .toolbar {
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.project-session .toolbar .button,
+.project-session .toolbar .link-button {
+  white-space: nowrap;
+}
+
+.project-session .toolbar [hidden] {
+  display: none;
+}
+
+.project-session #file-name {
+  overflow-wrap: anywhere;
 }

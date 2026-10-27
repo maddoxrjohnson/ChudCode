@@ -1,0 +1,69 @@
+{
+  "slug": "box-office",
+  "title": "Box Office API",
+  "framework": "django",
+  "app": "boxoffice",
+  "drf": false,
+  "patterns": ["orm-queries", "pagination", "caching", "input-validation"],
+  "difficulty": "medium",
+  "minutes": 45,
+  "source": { "kind": "hand" },
+  "bugs": [
+    {
+      "id": "filters",
+      "pattern": "orm-queries",
+      "summary": "The city filter's result is never assigned back to the queryset, and max_price filters with __gte instead of __lte.",
+      "files": ["boxoffice/views.py"],
+      "tests": [
+        "FilterTests.test_city_filter_ignores_case",
+        "FilterTests.test_city_count_matches_results",
+        "FilterTests.test_max_price",
+        "FilterTests.test_price_range",
+        "FilterTests.test_filters_combine"
+      ]
+    },
+    {
+      "id": "pagination",
+      "pattern": "pagination",
+      "summary": "paginate() calls int() on page and page_size with no fallback: a missing or non-numeric value raises, and zero or a negative number slices backwards.",
+      "files": ["boxoffice/pagination.py"],
+      "tests": [
+        "PaginationTests.test_missing_page_defaults_to_first",
+        "PaginationTests.test_non_numeric_page_falls_back",
+        "PaginationTests.test_zero_and_negative_fall_back",
+        "PaginationTests.test_page_size_is_capped"
+      ]
+    },
+    {
+      "id": "quantity",
+      "pattern": "input-validation",
+      "summary": "parse_quantity() is a bare int(): text or a missing quantity is a 500, and 0, negative, or more than 10 tickets are accepted.",
+      "files": ["boxoffice/services.py"],
+      "tests": [
+        "QuantityValidationTests.test_text_quantity",
+        "QuantityValidationTests.test_missing_quantity",
+        "QuantityValidationTests.test_zero_and_negative",
+        "QuantityValidationTests.test_more_than_ten"
+      ]
+    },
+    {
+      "id": "overbooking",
+      "pattern": "orm-queries",
+      "summary": "create_booking() compares the quantity with capacity instead of seats_left, so an event can be oversold.",
+      "files": ["boxoffice/services.py"],
+      "tests": [
+        "OverbookingTests.test_cannot_buy_more_than_seats_left",
+        "OverbookingTests.test_sold_out"
+      ]
+    },
+    {
+      "id": "stale-cache",
+      "pattern": "caching",
+      "summary": "A booking changes seats_sold but never evicts the cached event detail, so GET /api/events/<id>/ shows the old seats_left until the TTL expires.",
+      "files": ["boxoffice/services.py"],
+      "tests": ["CacheTests.test_detail_reflects_a_booking"]
+    }
+  ],
+  "createdAt": 1793145600000,
+  "timesServed": 0
+}

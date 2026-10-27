@@ -49,6 +49,7 @@ const completionExtensions = () => [autocompletion(), closeBrackets()];
 export function createEditor({ parent, doc = "", autocomplete = false, dark = false, onChange }) {
   const completion = new Compartment();
   const theme = new Compartment();
+  const editable = new Compartment();
 
   const state = EditorState.create({
     doc,
@@ -69,6 +70,7 @@ export function createEditor({ parent, doc = "", autocomplete = false, dark = fa
       python(),
       completion.of(autocomplete ? completionExtensions() : []),
       theme.of(dark ? oneDark : []),
+      editable.of(EditorView.editable.of(true)),
       keymap.of([
         ...closeBracketsKeymap,
         ...defaultKeymap,
@@ -95,6 +97,9 @@ export function createEditor({ parent, doc = "", autocomplete = false, dark = fa
     },
     setDark(on) {
       view.dispatch({ effects: theme.reconfigure(on ? oneDark : []) });
+    },
+    setReadOnly(on) {
+      view.dispatch({ effects: editable.reconfigure(EditorView.editable.of(!on)) });
     },
     focus: () => view.focus(),
   };

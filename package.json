@@ -1,6 +1,6 @@
 {
   "name": "chudcode",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "private": true,
   "description": "A mock technical interviewer you can code against: original interview-style problems in a local web UI with an editor, hidden tests, a timer, hints, and spaced review of the patterns you miss.",
   "type": "module",

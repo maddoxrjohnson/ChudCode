@@ -39,6 +39,21 @@ This protects the machine from runaway code. It is not a security sandbox: the
 solution runs as you, with your filesystem and your network. That is the right
 trade for a tool where the only author of the code is the person running it.
 
+## Project runs
+
+A project session runs a whole Django project's test suite, so it needs Django and
+cannot use the standard-library-only interpreter. `ProcessRunner.runProject` lays
+the project out in a fresh workdir (any depth of paths, each checked by `safeJoin`),
+writes `chud_django_harness.py` and `project.json` with the test labels, and spawns
+the project environment's Python with the same flags, limits, clean environment,
+process group, and serial queue as any other run. The harness calls `django.setup()`,
+builds the suite with Django's own runner, sets up the test database (SQLite in
+memory), and reports each test as it finishes, in the suite harness's protocol. It
+names files by repository path and folds framework frames out of tracebacks.
+
+Project runs always use the process runner. The Docker image has no Django, so
+`CHUDCODE_RUNNER=docker` does not apply to them.
+
 ## DockerRunner (opt in)
 
 `src/runner/docker-runner.ts`. The same runner with one change: each command runs in

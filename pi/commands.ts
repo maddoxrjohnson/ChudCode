@@ -111,6 +111,21 @@ export const COMMANDS = {
           "When the call ends, score it with `record_phone_screen` and summarise in the terminal: the verdict, the one change for next time, and two strengths.",
       ].join("\n\n"),
   },
+  project: {
+    description:
+      "Debug a Django project against hidden tests, like the backend task of an online assessment. Usage: /project [oa] [company] [easy|medium|hard]",
+    prompt: (args: string) =>
+      [
+        args
+          ? `The user wants a project debugging session: ${args}`
+          : "The user wants a project debugging session.",
+        "Someone preparing for an online assessment wants OA mode (`oa: true`): silent while the clock runs, no hints. If they named a company, call `list_trends` for it. " +
+          "Call `begin_project` with the company, difficulty, and `oa`, and follow the method it returns in full. Serve a validated project they have not done, or write one with `write_project` and `validate_project` until it passes. Then call `start_project`.",
+        "Give the user the URL and the workspace path in the terminal. In interview mode, say one sentence on the page with `say_to_candidate`. " +
+          "The candidate's actions then arrive here as messages; handle each one and end your turn. Each submission arrives with the hidden results, the bugs fixed, and the diff; never reveal where a bug is. " +
+          "When the clock stops or they finish, debrief, score it with `record_project`, and summarise in the terminal: the verdict, the bugs fixed and missed, two strengths, and two things to work on.",
+      ].join("\n\n"),
+  },
   research: {
     description:
       "Find what a company has been asking in coding interviews. Usage: /research <company> [role]",

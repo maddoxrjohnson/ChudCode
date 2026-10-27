@@ -6,6 +6,9 @@ import { phoneState } from "../phone-flow.ts";
 import { listPhoneSessions, phoneExists, readStories } from "../store/phone.ts";
 import { fundamentalsTopics } from "../phone.ts";
 import { phonePage } from "./pages/phone.ts";
+import { projectState } from "../project-flow.ts";
+import { listProjectSessions, projectPatterns, projectSessionExists } from "../store/projects.ts";
+import { projectPage } from "./pages/project.ts";
 import type * as http from "node:http";
 
 import { sessionState } from "../flow.ts";
@@ -19,7 +22,12 @@ import { listProblems, problemExists, publicView, readProblem } from "../store/p
 import { listSessions, readSession, sessionExists } from "../store/sessions.ts";
 import { agentConnected, agentListening } from "./hooks.ts";
 import { HttpError, sendFile, sendHtml } from "./http.ts";
-import { dashboardPage, type AgenticData, type PhoneData } from "./pages/dashboard.ts";
+import {
+  dashboardPage,
+  type AgenticData,
+  type PhoneData,
+  type ProjectsData,
+} from "./pages/dashboard.ts";
 import { reviewItems } from "../store/review-events.ts";
 import { nextUpHtml, type NextButtonView } from "./pages/next-up.ts";
 import { problemPage } from "./pages/problem.ts";
@@ -52,6 +60,7 @@ export function handlePage(
         next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
         agentic: agenticData(),
         phone: phoneData(),
+        projects: projectsData(),
       }),
     );
   }
@@ -70,6 +79,15 @@ export function handlePage(
 
   if (head === "s" && rest.length === 1 && phoneExists(rest[0] ?? "")) {
     return sendHtml(res, phonePage(phoneState(rest[0] as string, agentListening())));
+  }
+
+  if (head === "s" && rest.length === 1 && projectSessionExists(rest[0] ?? "")) {
+    return sendHtml(
+      res,
+      projectPage(projectState(rest[0] as string, agentListening()), {
+        autocomplete: readConfig().editor.autocomplete,
+      }),
+    );
   }
 
   if (head === "s" && rest.length === 1 && lessonExists(rest[0] ?? "")) {
@@ -106,6 +124,14 @@ export function phoneData(): PhoneData {
     items: reviewItems().filter((i) => i.kind === "phone"),
     stories: readStories(),
     topics: fundamentalsTopics().map((t) => ({ id: t.id, name: t.name })),
+  };
+}
+
+export function projectsData(): ProjectsData {
+  return {
+    sessions: listProjectSessions(20),
+    items: reviewItems().filter((i) => i.kind === "project"),
+    categories: projectPatterns(),
   };
 }
 

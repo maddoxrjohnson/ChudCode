@@ -1,0 +1,16 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "text": "Each issue maps to one place: the create view, the detail view, the loan serializer, and how the model counts copies out."
+    },
+    {
+      "level": 2,
+      "text": "Django REST framework only calls a field validator named exactly validate_<field name>. And Response() answers 200 unless you pass a status."
+    },
+    {
+      "level": 3,
+      "text": "A loan with returned_at set no longer holds a copy. And django.shortcuts has a helper that turns a missing row into a 404."
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "library-loans",
+  "title": "Library Loans API",
+  "framework": "django",
+  "app": "library",
+  "drf": true,
+  "patterns": ["http-semantics", "serializers", "business-logic"],
+  "difficulty": "easy",
+  "minutes": 30,
+  "source": { "kind": "hand" },
+  "bugs": [
+    {
+      "id": "create-status",
+      "pattern": "http-semantics",
+      "summary": "BookList.post returns Response(serializer.data) with no status, so a create answers 200 instead of 201.",
+      "files": ["library/views.py"],
+      "tests": ["StatusCodeTests.test_create_answers_201"]
+    },
+    {
+      "id": "missing-404",
+      "pattern": "http-semantics",
+      "summary": "BookDetail.get uses Book.objects.get, so an unknown id raises DoesNotExist (a 500) instead of answering 404; get_object_or_404 fixes it.",
+      "files": ["library/views.py"],
+      "tests": [
+        "StatusCodeTests.test_unknown_book_is_404",
+        "StatusCodeTests.test_unknown_book_after_delete_is_404"
+      ]
+    },
+    {
+      "id": "due-date",
+      "pattern": "serializers",
+      "summary": "LoanSerializer's validator is named validate_due_dat, so DRF never calls it: past, same-day, and 31-day loans are accepted.",
+      "files": ["library/serializers.py"],
+      "tests": [
+        "DueDateTests.test_past_due_date_is_rejected",
+        "DueDateTests.test_today_is_rejected",
+        "DueDateTests.test_more_than_thirty_days_is_rejected"
+      ]
+    },
+    {
+      "id": "returned-loans",
+      "pattern": "business-logic",
+      "summary": "Book.copies_out counts every loan ever made, returned ones included, so a returned copy can never be borrowed again.",
+      "files": ["library/models.py"],
+      "tests": [
+        "AvailabilityTests.test_returned_copy_can_be_borrowed_again",
+        "AvailabilityTests.test_available_count_ignores_returned_loans"
+      ]
+    }
+  ],
+  "createdAt": 1793145600000,
+  "timesServed": 0
+}

@@ -1,0 +1,16 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "text": "Trace each reported issue from the URL to the code: urls.py names the view, and the view calls into pagination.py, services.py, and cache.py."
+    },
+    {
+      "level": 2,
+      "text": "QuerySet methods return a new queryset; they never change the one they are called on. And look at what paginate() does with a value that is missing or not a number."
+    },
+    {
+      "level": 3,
+      "text": "services.py holds three of the five: how quantity is parsed, what the seat check compares against, and what a booking forgets to do that PATCH remembers."
+    }
+  ]
+}

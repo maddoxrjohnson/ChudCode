@@ -55,6 +55,7 @@ describe("Claude Code plugin", () => {
       link(tool),
       link(`mcp__plugin_${manifest["name"]}_chudcode__start_lesson`),
       link(`mcp__plugin_${manifest["name"]}_chudcode__start_phone_screen`),
+      link(`mcp__plugin_${manifest["name"]}_chudcode__start_project`),
     ]);
     const names = new McpSession(new CandidateInbox()).toolNames();
     expect(names).toContain("start_session");

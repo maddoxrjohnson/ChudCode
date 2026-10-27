@@ -24,7 +24,11 @@ and research into what a company has been asking shapes the problems you get for
 ## Install
 
 ChudCode needs Node 22.18 or later and Python 3.12 or later on your PATH. It runs
-TypeScript directly, with no build step.
+TypeScript directly, with no build step. Project sessions also need Django: the
+first one builds a virtual environment under `~/.chudcode/envs/` with
+[uv](https://docs.astral.sh/uv/) if you have it, or `python3 -m venv` and pip
+otherwise, which needs the network once. To use an interpreter that already has
+Django and Django REST framework, set `CHUDCODE_DJANGO_PYTHON` to it.
 
 ### Claude Code
 
@@ -42,7 +46,10 @@ name it: each step is an original problem in the shape of the next one on the li
 and after each debrief a Next problem button takes you straight to the one after.
 `/chudcode:learn` teaches the next lesson on coding with agents, or the topic you
 name. `/chudcode:phone recruiter|behavioral|fundamentals [company]` runs a mock phone
-screen you answer out loud. `/chudcode:research <company>` finds what that company has
+screen you answer out loud. `/chudcode:project [oa] [company]` hands you a Django
+repository with planted bugs and hidden tests, the backend task of online assessments
+like IBM's; say it is an OA and the interviewer stays silent until you finish.
+`/chudcode:research <company>` finds what that company has
 been asking lately, in coding rounds and on the phone, so a mock for it has the right
 shape. `/chudcode:dashboard` opens the page with
 your review schedule, streak, and past sessions.
@@ -77,7 +84,7 @@ Then add the server to `~/.pi/agent/mcp.json`, with the absolute path to your cl
 ```
 
 `CHUDCODE_HOST=pi` is what switches the server from waiting to pushing. The commands
-are `/interview`, `/review`, `/roadmap`, `/learn`, `/phone`, `/research <company>`, and `/dashboard`. While the
+are `/interview`, `/review`, `/roadmap`, `/learn`, `/phone`, `/project`, `/research <company>`, and `/dashboard`. While the
 interviewer is connected, Pi shows `chudcode interviewer connected on port <port>`
 below the editor, and the link of the session it opened last.
 
@@ -166,6 +173,19 @@ make sure the patterns you keep missing are the ones you see again.
   and impact for behavioral, accuracy and depth for fundamentals), behavioral screens
   build a bank of your best stories, fundamentals topics you miss come back sooner,
   and research on a company's phone process shapes its mock. See `docs/PHONE.md`.
+- Project sessions: a multi-file Django or Django REST framework project with bugs
+  planted in it, a ticket of user reports, visible tests, and hidden tests, worked in
+  the page's file tree and editor or in your own editor on the same folder. Run runs
+  the visible tests and Submit adds the hidden ones, against real Django. The tests are
+  read-only, and a submission that changes one is refused, because on HackerRank it
+  scores zero. Hidden failures show as numbers, never names. The interviewer gets
+  which planted bugs each submission fixed and your diff, and scores correctness,
+  debugging, code quality, and time. Online-assessment mode keeps it silent with no
+  hints until you finish, like the 80-minute IBM OA that pairs an algorithm problem
+  with a Django debugging task. Bug categories you miss (ORM queries, pagination,
+  caching, validation, status codes, serializers, and more) come back on the review
+  schedule. Every project, hand-written or written by the interviewer, is proven
+  against real Django before it is served. See `docs/PROJECT.md`.
 - Company trends: the research skill reads recent interview-experience posts with
   the host's web tools and records each problem as a pattern, a role, a date, a
   source, and a short paraphrase of its shape, never a statement. Name the company
@@ -205,9 +225,15 @@ each answer was delivered, and what research found about the company's phone scr
 
 ![A recruiter phone screen for Stripe: the question "Tell me about yourself", the Speak button and answer box, the call with two typed answers and a follow-up, and Stripe's phone screens from research on the right](docs/screenshots/phone.png)
 
+A project session is a repository to debug: the ticket on the left, the file tree and
+editor in the middle with the test results under them, and the interviewer on the
+right.
+
+![A project session for the Box Office API: the ticket with the API's rules, the boxoffice app's files with views.py changed, and a Run showing 5 of 6 visible tests passing, the failing one's traceback pointing at boxoffice/views.py](docs/screenshots/project.png)
+
 The dashboard shows every pattern's place in the review schedule, what is due, the
-streak, progress through both roadmaps, the agentic-coding modules, and phone screens,
-and past sessions.
+streak, progress through both roadmaps, the agentic-coding modules, phone screens,
+project bug categories, and past sessions.
 
 ![The dashboard: streak and due counts, the pattern grid with Sliding Window in the three-day box, the NeetCode 150 topics with what each needs to open, a Next problem button under each roadmap, the agentic-coding modules with the next lesson, and recent sessions](docs/screenshots/dashboard.png)
 

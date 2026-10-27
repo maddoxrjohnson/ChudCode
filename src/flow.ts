@@ -20,6 +20,7 @@ import { publicView, readProblem, type Hint, type PublicProblem } from "./store/
 import { appendReviewEvents, reviewItems, rewriteReviewEvents } from "./store/review-events.ts";
 import { eventsFromLessons, listLessons } from "./store/lessons.ts";
 import { eventsFromPhone, listPhoneSessions } from "./store/phone.ts";
+import { eventsFromProjects, listProjectSessions } from "./store/projects.ts";
 import {
   appendEvent,
   listSessions,
@@ -471,12 +472,13 @@ export function eventsFromSessions(sessions: readonly Session[]): ReviewEvent[] 
   return events.sort((a, b) => a.at - b.at);
 }
 
-/** Every review event the interviews, lessons, and phone screens on disk imply, oldest first. */
+/** Every review event the interviews, lessons, phone screens, and projects on disk imply, oldest first. */
 export function eventsFromDisk(): ReviewEvent[] {
   return [
     ...eventsFromSessions(listSessions(Number.MAX_SAFE_INTEGER)),
     ...eventsFromLessons(listLessons(Number.MAX_SAFE_INTEGER)),
     ...eventsFromPhone(listPhoneSessions(Number.MAX_SAFE_INTEGER)),
+    ...eventsFromProjects(listProjectSessions(Number.MAX_SAFE_INTEGER)),
   ].sort((a, b) => a.at - b.at);
 }
 

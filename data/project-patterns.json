@@ -1,0 +1,55 @@
+{
+  "$comment": "Bug categories for project sessions (repository debugging tasks). Each bug a project plants names one; a recorded session appends a `project:<id>` review event per category it exercised. Keep ids stable: changing one orphans its review history.",
+  "patterns": [
+    {
+      "id": "orm-queries",
+      "name": "ORM queries",
+      "blurb": "QuerySet filters that are never chained back, the wrong lookup (__gte for __lte, exact for iexact), ordering, counts, and N+1 queries."
+    },
+    {
+      "id": "pagination",
+      "name": "Pagination",
+      "blurb": "Parsing page and page_size from the query string: defaults, non-numeric and out-of-range values, caps, and the page past the end."
+    },
+    {
+      "id": "caching",
+      "name": "Caching",
+      "blurb": "Cache keys, TTLs, and eviction: every write that changes a cached object must invalidate it."
+    },
+    {
+      "id": "input-validation",
+      "name": "Input validation",
+      "blurb": "Missing, blank, malformed, or out-of-range request fields answered with 400 and an error body instead of a 500 or a bad row."
+    },
+    {
+      "id": "http-semantics",
+      "name": "HTTP semantics",
+      "blurb": "Status codes (201 on create, 404 for missing, 405 for wrong methods, 409 for conflicts) and the shape of responses."
+    },
+    {
+      "id": "url-routing",
+      "name": "URL routing",
+      "blurb": "URL patterns, path converters, include(), trailing slashes, and the view a route actually reaches."
+    },
+    {
+      "id": "models",
+      "name": "Models",
+      "blurb": "Field defaults and constraints, relations and on_delete, computed properties, and save() overrides."
+    },
+    {
+      "id": "serializers",
+      "name": "Serializers",
+      "blurb": "Django REST framework serializers: fields, read_only and required, validate_<field> and validate(), and what to_representation returns."
+    },
+    {
+      "id": "auth-permissions",
+      "name": "Auth and permissions",
+      "blurb": "Who may read or change what: ownership checks, permission classes, and 401 against 403."
+    },
+    {
+      "id": "business-logic",
+      "name": "Business logic",
+      "blurb": "Off-by-one comparisons, the wrong field in a rule, totals and rounding, and state transitions."
+    }
+  ]
+}

@@ -12,6 +12,10 @@
  *     lessons/<id>/      session.json events.jsonl draft.md answers/NN.md
  *     exercises/<slug>/  meta.json brief.md teaching.md private.json
  *     curriculum/fact-checks.jsonl
+ *     projects/bundles/<slug>/  a repository debugging task: meta.json statement.md
+ *                               hints.json files/ fix/ tests/visible/ tests/hidden/
+ *     projects/sessions/<id>/   session.json events.jsonl submissions/NN.json
+ *     envs/django-5.2/          the virtual environment project sessions run in
  *   ~/chudcode-drills/<id>/  a drill's workspace (README.md, the module, tests/), kept
  *                            outside the state root; see workspacesDir
  *     review/events.jsonl
@@ -127,6 +131,22 @@ export function phoneSessionDir(id: string): string {
   return path.join(phoneDir(), "sessions", id);
 }
 
+/** Project bundles (repository debugging tasks) and project sessions. */
+export function projectsDir(): string {
+  return path.join(baseDir, "projects");
+}
+
+export function projectBundleDir(slug: string): string {
+  assertSlug(slug);
+  return path.join(projectsDir(), "bundles", slug);
+}
+
+/** Project sessions share the session id format, like lessons and phone screens. */
+export function projectSessionDir(id: string): string {
+  if (!isValidSessionId(id)) throw new Error(`Invalid project session id: ${JSON.stringify(id)}`);
+  return path.join(projectsDir(), "sessions", id);
+}
+
 export function exercisesDir(): string {
   return path.join(baseDir, "exercises");
 }
@@ -201,6 +221,10 @@ export function docsDir(): string {
 
 export function examplesDir(): string {
   return path.join(packageDir, "problems", "examples");
+}
+
+export function projectExamplesDir(): string {
+  return path.join(packageDir, "problems", "projects");
 }
 
 export function pythonAdapterDir(): string {

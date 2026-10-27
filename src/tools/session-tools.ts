@@ -5,6 +5,9 @@
 import { abandonPhone } from "../phone-flow.ts";
 import { phoneLine, phoneSummary } from "../phone-prompts.ts";
 import { phoneExists, readPhoneSession } from "../store/phone.ts";
+import { abandonProject } from "../project-flow.ts";
+import { projectLine, projectSummary } from "../project-prompts.ts";
+import { projectSessionExists, readProjectSession } from "../store/projects.ts";
 import {
   abandonSession,
   notifyDashboard,
@@ -282,7 +285,7 @@ export function sessionTools(host: ToolHost): ToolDef[] {
       name: "get_session",
       title: "Get Session",
       description:
-        "The state of a session for the interviewer: phase, clock, approach note, hints, submissions, the conversation on the page, and optionally the draft code.",
+        "The state of a session for the interviewer: phase, clock, approach note, hints, submissions, the conversation on the page, and optionally the draft code (for a project session, the diff at the latest submission).",
       inputSchema: schema.obj(
         {
           session_id: schema.str("The session id."),
@@ -296,6 +299,12 @@ export function sessionTools(host: ToolHost): ToolDef[] {
         if (phoneExists(id)) {
           const phone = readPhoneSession(id);
           return ok(phoneSummary(phone), { phase: phone.phase });
+        }
+        if (projectSessionExists(id)) {
+          const project = readProjectSession(id);
+          return ok(projectSummary(project, optionalBool(args, "include_code") ?? false), {
+            phase: project.phase,
+          });
         }
         if (!isValidSessionId(id) || !sessionExists(id)) return fail(`No session named ${id}.`);
         const state = sessionState(id);
@@ -340,6 +349,18 @@ export function sessionTools(host: ToolHost): ToolDef[] {
                 ? "Recorded as a miss for this format."
                 : "Not counted against the learner.",
               ...(outcome.nextDue ? [outcome.nextDue] : []),
+            ].join("\n"),
+          );
+        }
+        if (projectSessionExists(id)) {
+          const outcome = abandonProject(id, requireString(args, "reason", 500));
+          return ok(
+            [
+              `Abandoned. ${projectLine(outcome.session)}`,
+              outcome.reviewEvents.length
+                ? `Recorded as a miss for ${outcome.session.patterns.join(", ")}.`
+                : "Not counted against the candidate.",
+              ...outcome.nextDue,
             ].join("\n"),
           );
         }

@@ -1,7 +1,7 @@
 /**
  * session-link.ts: make sure the user gets the link of every session that starts.
  *
- * After `start_session`, `start_lesson`, or `start_phone_screen` (PostToolUse) it
+ * After `start_session`, `start_lesson`, `start_phone_screen`, or `start_project` (PostToolUse) it
  * prints the link as a `systemMessage`, read from the tool's own result ("Session
  * <id> is ready: <url>"), so nothing is guessed. That message is easy to miss, so the
  * link must also be in the model's own words: before `wait_for_candidate`

@@ -24,6 +24,9 @@
  * POST review { marks }, and a cache plan POST plan { plan }. A transcript review adds
  * POST transcripts (list the learner's recent sessions) and transcript { id, note,
  * consent }.
+ * A project session (a repository to debug) uses GET for its state, GET file?path= and
+ * PUT file { path, text } for the editor, and POST start, run, submit, reset { path },
+ * message { text }, hint, timeout, done.
  *   GET  /api/problems/<slug>               public view
  *   GET  /api/dashboard
  *   POST /api/roadmaps/<id>/next            { from?: session id }  the Next problem button
@@ -39,6 +42,21 @@ import {
   submitReply,
 } from "../phone-flow.ts";
 import { phoneExists } from "../store/phone.ts";
+import {
+  openProjectFile,
+  postProjectMessage,
+  projectDone,
+  projectState,
+  projectTimerExpired,
+  resetProjectFile,
+  revealProjectHint,
+  runProjectTests,
+  saveProjectFile,
+  startProject,
+  submitProject,
+} from "../project-flow.ts";
+import { projectSessionExists } from "../store/projects.ts";
+import { WORKSPACE_LIMITS } from "../drill/project-workspace.ts";
 import type * as http from "node:http";
 
 import * as flow from "../flow.ts";
@@ -79,6 +97,7 @@ import {
   lessonNextHtml,
   nextButtonView,
   phoneData,
+  projectsData,
   sessionNextHtml,
 } from "./routes-pages.ts";
 import { AGENT_CHANNEL, DASHBOARD_CHANNEL, sessionChannel, subscribe } from "./sse.ts";
@@ -114,6 +133,7 @@ export async function handleApi(
       next: { ups: ROADMAP_IDS.flatMap((id) => nextUp(id) ?? []), view: nextButtonView() },
       agentic: agenticData(),
       phone: phoneData(),
+      projects: projectsData(),
     });
   }
 
@@ -153,6 +173,12 @@ export async function handleApi(
     if (action !== undefined) return handlePhoneAction(req, res, id, action);
   }
 
+  if (resource === "sessions" && id !== undefined && projectSessionExists(id)) {
+    if (action === undefined && req.method === "GET")
+      return sendJson(res, projectState(id, agentListening()));
+    if (action !== undefined) return handleProjectAction(req, res, id, action, url);
+  }
+
   if (resource === "sessions" && id !== undefined && lessonExists(id)) {
     if (action === undefined && req.method === "GET")
       return sendJson(res, lessonState(id, agentListening()));
@@ -175,7 +201,12 @@ function handleEvents(req: http.IncomingMessage, res: http.ServerResponse, url: 
   if (session !== null) {
     if (
       !isValidSessionId(session) ||
-      !(sessionExists(session) || lessonExists(session) || phoneExists(session))
+      !(
+        sessionExists(session) ||
+        lessonExists(session) ||
+        phoneExists(session) ||
+        projectSessionExists(session)
+      )
     )
       throw new HttpError(404, "No such session");
     return subscribe(sessionChannel(session), req, res);
@@ -288,6 +319,56 @@ async function handlePhoneAction(
       return sendJson(res, { session: phoneDone(id) });
     default:
       throw new HttpError(404, "No such phone screen action");
+  }
+}
+
+async function handleProjectAction(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  id: string,
+  action: string,
+  url: URL,
+): Promise<void> {
+  const method = req.method ?? "GET";
+  if (action === "file" && method === "GET")
+    return sendJson(res, openProjectFile(id, url.searchParams.get("path") ?? ""));
+  if (action === "file" && method === "PUT") {
+    const body = asRecord(await readJsonBody(req, WORKSPACE_LIMITS.fileBytes * 4 + 1024));
+    const path = expectString(body["path"], "path", 200);
+    const text = body["text"];
+    if (typeof text !== "string") throw new HttpError(400, "text must be a string");
+    return sendJson(res, { tree: saveProjectFile(id, path, text) });
+  }
+  if (method !== "POST") throw new HttpError(405, "Method not allowed");
+  switch (action) {
+    case "start":
+      return sendJson(res, { session: startProject(id) });
+    case "run":
+      return sendJson(res, (await runProjectTests(id)).candidate);
+    case "submit":
+      return sendJson(res, await submitProject(id));
+    case "reset": {
+      const body = asRecord(await readJsonBody(req, 1024));
+      return sendJson(res, { text: resetProjectFile(id, expectString(body["path"], "path", 200)) });
+    }
+    case "message": {
+      const body = asRecord(await readJsonBody(req, MAX_TEXT_CHARS * 4));
+      return sendJson(res, {
+        message: postProjectMessage(
+          id,
+          "candidate",
+          expectString(body["text"], "text", MAX_TEXT_CHARS),
+        ),
+      });
+    }
+    case "hint":
+      return sendJson(res, revealProjectHint(id));
+    case "timeout":
+      return sendJson(res, { session: projectTimerExpired(id) });
+    case "done":
+      return sendJson(res, { session: projectDone(id) });
+    default:
+      throw new HttpError(404, "No such project action");
   }
 }
 
