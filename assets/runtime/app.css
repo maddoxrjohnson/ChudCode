@@ -1565,16 +1565,114 @@ textarea:focus,
 
 /* ── Project sessions ─────────────────────────────────────────────────────── */
 
-.project-ide {
-  flex: 1 1 55%;
-  display: grid;
-  grid-template-columns: minmax(160px, 220px) 1fr;
-  min-height: 320px;
-  border-bottom: 1px solid var(--border);
+/* Laid out like HackerRank's project IDE: the question, then the file tree, then the
+   editor over the results, filling the window with nothing scrolling but the panels. */
+
+.project-session {
+  height: 100vh;
+  overflow: hidden;
 }
 
-.project-ide .editor-host {
+.project-layout {
+  --statement-width: clamp(260px, 26vw, 420px);
+  --tests-height: 30%;
+  flex: 1;
+  display: flex;
   min-height: 0;
+}
+
+.project-layout .pane-statement {
+  flex: 0 0 var(--statement-width);
+  overflow: auto;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.project-layout .pane-statement h1 {
+  font-size: 1.15rem;
+}
+
+.project-layout .pane-statement h2 {
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+.project-layout.statement-hidden .pane-statement,
+.project-layout.statement-hidden #statement-splitter {
+  display: none;
+}
+
+.project-layout .briefing {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--surface);
+}
+
+.splitter {
+  flex: 0 0 5px;
+  background: var(--border);
+  touch-action: none;
+}
+
+.splitter-col {
+  cursor: col-resize;
+}
+
+.splitter-row {
+  cursor: row-resize;
+}
+
+.splitter:hover,
+.splitter.dragging {
+  background: var(--accent);
+}
+
+.project-workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.project-ide {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.editor-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.project-session .editor-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.project-session .tests-panel {
+  flex: 0 0 var(--tests-height);
+  min-height: 0;
+  border-top: 0;
+}
+
+.project-layout .pane-side {
+  flex: 0 0 300px;
+  overflow: auto;
+  padding: 0.75rem 1rem;
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+
+.project-layout [hidden] {
+  display: none;
 }
 
 .file-tree {
@@ -1640,9 +1738,31 @@ textarea:focus,
   color: var(--danger);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
+  .project-session {
+    height: auto;
+    overflow: visible;
+  }
+
+  .project-layout {
+    flex-direction: column;
+  }
+
+  .project-layout .pane-statement {
+    flex: none;
+    max-height: 40vh;
+  }
+
+  .project-layout .splitter-col {
+    display: none;
+  }
+
   .project-ide {
     grid-template-columns: 1fr;
+  }
+
+  .editor-column {
+    height: 75vh;
   }
 
   .file-tree {
@@ -1650,11 +1770,19 @@ textarea:focus,
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
+
+  .project-layout .pane-side {
+    flex: none;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .project-session .toolbar {
   flex-wrap: wrap;
   row-gap: 0.35rem;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
 }
 
 .project-session .toolbar .button,
@@ -1662,10 +1790,17 @@ textarea:focus,
   white-space: nowrap;
 }
 
-.project-session .toolbar [hidden] {
+.project-session .toolbar [hidden],
+.project-session .topbar [hidden] {
   display: none;
 }
 
 .project-session #file-name {
   overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.project-session .topbar {
+  padding: 0.35rem 0.75rem;
 }

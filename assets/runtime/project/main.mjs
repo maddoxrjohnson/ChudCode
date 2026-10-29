@@ -1,6 +1,6 @@
 /**
  * The project session page: a file tree and editor over the candidate's workspace,
- * Run tests and Submit, the clock, and the interviewer's chat and hints.
+ * Run and Submit, the clock, resizable panels, and the interviewer's chat and hints.
  *
  * Every file is saved to the workspace as it is edited, so the candidate can switch
  * between this editor and their own. When the window regains focus, the open file is
@@ -56,12 +56,21 @@ function applyPhase(next) {
   const badge = document.getElementById("phase");
   badge.textContent = PHASE_LABELS[phase] ?? phase;
   badge.className = `phase-badge phase-${phase}`;
+  const over = phase === "review" || phase === "done";
   document.getElementById("briefing").hidden = phase !== "briefing";
+  document.getElementById("start-button").hidden = phase !== "briefing";
   document.getElementById("run-button").disabled = !canEdit();
   document.getElementById("submit-button").disabled = !canEdit();
-  document.getElementById("done-button").disabled = phase === "review" || phase === "done";
-  // An online assessment opens the chat only once the clock stops.
-  document.getElementById("chat").hidden = config.oa && !(phase === "review" || phase === "done");
+  const done = document.getElementById("done-button");
+  done.hidden = phase === "briefing";
+  done.disabled = over;
+  // An online assessment opens the chat, and the side panel with it, only once the
+  // clock stops.
+  const quiet = config.oa && !over;
+  document.getElementById("chat").hidden = quiet;
+  document.getElementById("presence").hidden = quiet;
+  document.getElementById("side-pane").hidden =
+    quiet && !document.getElementById("rubric").hasChildNodes();
   if (phase === "done") hints.lock();
   syncReadOnly();
 }
@@ -348,6 +357,7 @@ document.addEventListener("keydown", (event) => {
 
 function renderRubric({ rubric, verdict, notesHtml, nextDue, dimensions, bugs }) {
   const host = document.getElementById("rubric");
+  document.getElementById("side-pane").hidden = false;
   const score = (label, value) =>
     el(
       "li",
@@ -398,6 +408,95 @@ function renderRubric({ rubric, verdict, notesHtml, nextDue, dimensions, bugs })
   );
   host.scrollIntoView({ block: "nearest" });
 }
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+// The question's width, the results panel's height, and whether the question is
+// shown are remembered per browser, like an IDE's layout.
+const layout = document.getElementById("project-layout");
+const LAYOUT_KEY = "chudcode.projectLayout";
+
+function loadLayout() {
+  try {
+    return JSON.parse(window.localStorage.getItem(LAYOUT_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+
+const layoutState = loadLayout();
+
+function saveLayout() {
+  try {
+    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutState));
+  } catch {
+    /* the layout simply resets next time */
+  }
+}
+
+function applyLayout() {
+  if (layoutState.statementWidth)
+    layout.style.setProperty("--statement-width", `${layoutState.statementWidth}px`);
+  else layout.style.removeProperty("--statement-width");
+  if (layoutState.testsHeight)
+    layout.style.setProperty("--tests-height", `${layoutState.testsHeight}px`);
+  else layout.style.removeProperty("--tests-height");
+  const shown = !layoutState.statementHidden;
+  layout.classList.toggle("statement-hidden", !shown);
+  const toggle = document.getElementById("toggle-statement");
+  toggle.setAttribute("aria-pressed", String(shown));
+  toggle.title = shown ? "Hide the question" : "Show the question";
+}
+
+/** Drag `handle` to resize; `measure` turns a pointer position into the new size. */
+function makeSplitter(handle, key, measure, min, max) {
+  handle.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("dragging");
+    const move = (e) => {
+      layoutState[key] = Math.round(Math.min(max(), Math.max(min, measure(e))));
+      applyLayout();
+    };
+    const up = () => {
+      handle.classList.remove("dragging");
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      saveLayout();
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  });
+  handle.addEventListener("dblclick", () => {
+    delete layoutState[key];
+    applyLayout();
+    saveLayout();
+  });
+}
+
+makeSplitter(
+  document.getElementById("statement-splitter"),
+  "statementWidth",
+  (e) => e.clientX - layout.getBoundingClientRect().left,
+  220,
+  () => layout.getBoundingClientRect().width * 0.6,
+);
+const editorColumn = document.getElementById("editor-column");
+makeSplitter(
+  document.getElementById("tests-splitter"),
+  "testsHeight",
+  (e) => editorColumn.getBoundingClientRect().bottom - e.clientY,
+  60,
+  () => editorColumn.getBoundingClientRect().height - 120,
+);
+document.getElementById("toggle-statement").addEventListener("click", () => {
+  layoutState.statementHidden = !layoutState.statementHidden;
+  applyLayout();
+  saveLayout();
+});
+applyLayout();
 
 // ── Panels and live updates ──────────────────────────────────────────────────
 
