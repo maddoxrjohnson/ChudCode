@@ -1,7 +1,7 @@
 {
   "name": "chudcode",
   "displayName": "ChudCode",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A mock technical interviewer you can code against: interview-style problems in a local web page with an editor, hidden tests, a timer, hints, follow-up questions, and a scored debrief.",
   "author": {
     "name": "Maddox Johnson"
